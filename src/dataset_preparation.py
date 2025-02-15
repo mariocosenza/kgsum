@@ -1,5 +1,20 @@
+import re
+from os import listdir
+import pandas as pd
 import rdflib
+from rdflib.term import _toPythonMapping
 from rdflib import Graph
+
+
+def force_string_converter(value):
+    return str(value)
+for dt in list(_toPythonMapping.keys()):
+    _toPythonMapping[dt] = force_string_converter
+
+
+categories = {
+    'cross_domain', 'geography', 'government', 'life_sciences', 'linguistics', 'media', 'publications', 'social_networking', 'user_generated'
+}
 
 def select_local_vocabularies(path):
     g = Graph()
@@ -65,14 +80,14 @@ def select_local_tld(path):
         FILTER(isIRI(?o))
     }
     """)
-    tlds = []
+    tlds = set()
     for row in qres:
         url = str(row.o)
         if url.startswith('http') or url.startswith('https'):
             try:
                 tld = url.split('/')[2].split('.')[-1]
                 if 1 < len(tld) <= 10:
-                    tlds.append(tld)
+                    tlds.add(tld)
             except:
                 pass
     return tlds
@@ -152,3 +167,26 @@ def select_local_class_name(path):
             local_name = class_uri
         local_names.append(local_name)
     return local_names
+
+def create_local_dataset():
+    lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+    df = pd.DataFrame(columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category'])
+    for category in categories:
+        for file in listdir(f'../data/raw/rdf_dump/{category}'):
+            path = f'../data/raw/rdf_dump/{category}/{file}'
+            number = re.search(r'(\d+)\.rdf', path)
+            try:
+                df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
+                       select_local_vocabularies(path),
+                       select_local_class(path),
+                       select_local_property(path),
+                       select_local_class_name(path),
+                       select_local_property_names(path),
+                       select_local_label(path),
+                       select_local_tld(path),
+                       lod_frame['category'][int(number.group(1))]]
+            except Exception as e:
+                print(e)
+    df.to_csv('../data/raw/local_feature_set.csv', index=False)
+
+create_local_dataset()
