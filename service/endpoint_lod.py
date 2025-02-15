@@ -37,4 +37,3 @@ def extract_sparql_or_full_download_list():
 
     return_list.to_csv("../data/raw/sparql_full_download.csv")
 
-download_dataset()
