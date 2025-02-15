@@ -12,7 +12,7 @@ logger = logging.getLogger("endpoint_lod")
 def download_dataset(): #expected number of triples 167001612763
     df = pd.read_csv('../data/raw/sparql_full_download.csv')
     for index, row in df.iterrows():
-        if not isinstance(row['download_url'], float) and index > 150:
+        if not isinstance(row['download_url'], float):
             logger.info("Downloading " + row['download_url'] + f' Number: {index}')
             response = requests.get(row['download_url'], timeout=600)
             if response.status_code == 200 and response.headers['Content-Type'] and response.headers['Content-Type'] != 'text/html':
