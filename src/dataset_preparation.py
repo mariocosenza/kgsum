@@ -25,7 +25,7 @@ def select_local_vocabularies(path):
             else:
                 vocabulary_uri = predicate_uri
 
-            if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"): # Re-apply W3 exclusion in Python
+            if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
                 vocabularies.append(vocabulary_uri)
     return vocabularies
 
@@ -105,7 +105,7 @@ def select_local_property_names(path):
     )
 
     local_property_names = []
-    processed_local_names = set() # To track unique local names already added
+    processed_local_names = set()
 
     for row in qres:
         property_uri = str(row.property)
@@ -118,11 +118,11 @@ def select_local_property_names(path):
         elif "/" in property_uri:
             local_name = property_uri.split("/")[-1]
         else:
-            local_name = property_uri # Fallback to full URI if no separator
+            local_name = property_uri
 
-        if local_name and local_name not in processed_local_names: # Check if local name is not empty and not already processed
+        if local_name and local_name not in processed_local_names:
             local_property_names.append(local_name)
-            processed_local_names.add(local_name) # Add to processed set
+            processed_local_names.add(local_name)
 
     return local_property_names
 
@@ -139,7 +139,7 @@ def select_local_class_name(path):
     )
     local_names = []
     for row in qres:
-        class_uri = str(row.classUri)  # Access renamed variable row.classUri
+        class_uri = str(row.classUri)
         if not class_uri:
             continue
 
@@ -152,6 +152,3 @@ def select_local_class_name(path):
             local_name = class_uri
         local_names.append(local_name)
     return local_names
-
-
-print(select_local_label('../data/raw/rdf_dump/user_generated/4.rdf'))
