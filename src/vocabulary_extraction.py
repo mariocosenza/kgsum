@@ -86,21 +86,34 @@ def search_from_list():
          find_vocabulary_tag(endpoint)
 
 
-
 def find_tags_from_json():
-      df = pd.read_json("../data/raw/local_feature_set.json")
-      subject_list = set()
-      for index, row in df.iterrows():
-            for voc in set(row['voc']):
-               print(voc)
-               response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}")
-               if response_lov.status_code != 404:
-                  try:
-                     subject_list.add(json.loads(response_lov.text))
-                  except:
-                     pass
-               print(requests.get(f"https://coli-conc.gbv.de/api/concepts?uri={voc}").text)
+   df = pd.read_json("../data/raw/local_feature_set.json")
+   response_df = pd.DataFrame(columns=['id', 'tags', 'category'])
+   subject_list = []
 
+   for index, row in df.iterrows():
+      for voc in set(row['voc']):
+         response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}",
+                                     timeout=120)
+         if response_lov.status_code != 404:
+            try:
+               response_dict = json.loads(response_lov.text)
+               tags = response_dict['tags']
+               frame_tags = []
+               for tag in tags:
+                  if 'Vocabularies' not in tag and 'Metadata' not in tag:
+                     subject_list.append(tag)
+                     frame_tags.append(tag)
 
-find_tags_from_json()
-#find_vocabulary_local('../data/raw/rdf_dump/geography/20.rdf')
+               response_df.loc[len(response_df)] = {
+                  'id': row['id'],
+                  'tags': frame_tags,
+                  'category': row['category']
+               }
+
+               response_df.to_json('../data/raw/vocabulary_tag.json', index=False)
+            except Exception as e:
+               print(e)
+         print(requests.get(f"https://coli-conc.gbv.de/api/concepts?uri={voc}").text)
+
+   return subject_list
