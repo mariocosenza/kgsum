@@ -2,6 +2,7 @@ import json
 import rdflib.util
 import requests
 from SPARQLWrapper import SPARQLWrapper
+from mpmath.libmp.backend import python3
 from rdflib import Graph
 import pandas as pd
 
@@ -86,5 +87,20 @@ def search_from_list():
 
 
 
+def find_tags_from_json():
+      df = pd.read_json("../data/raw/local_feature_set.json")
+      subject_list = set()
+      for index, row in df.iterrows():
+            for voc in set(row['voc']):
+               print(voc)
+               response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}")
+               if response_lov.status_code != 404:
+                  try:
+                     subject_list.add(json.loads(response_lov.text))
+                  except:
+                     pass
+               print(requests.get(f"https://coli-conc.gbv.de/api/concepts?uri={voc}").text)
 
+
+find_tags_from_json()
 #find_vocabulary_local('../data/raw/rdf_dump/geography/20.rdf')
