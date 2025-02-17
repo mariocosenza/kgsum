@@ -183,7 +183,7 @@ def select_local_void_subject(path):
                         )
     local_names = []
     for row in qres:
-        local_name = str(row.classUri)
+        local_names.append(row.classUri)
 
     return local_names
 
