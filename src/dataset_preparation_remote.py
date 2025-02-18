@@ -364,28 +364,72 @@ def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300, max_
 
     return local_names
 
-def select_local_void_subject_remote(endpoint, timeout=300): # timeout increased to 300
+def has_void_description(endpoint, timeout=300) -> bool:
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     sparql.setReturnFormat('xml')
     sparql.setQuery("""
-        PREFIX dcterms: <http://purl.org/dc/terms/> .
-        SELECT DISTINCT ?classUri WHERE {
-            ?s dcterms:subject ?classUri .
-        }
-        """)
+           PREFIX void: <http://rdfs.org/ns/void#> 
+           
+           SELECT ?classUri WHERE {
+               ?s void:dataset ?classUri .
+           }
+           """)
     try:
         results = sparql.query().response.read()
         root = ET.fromstring(results)
-        local_names = []
+        ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+        bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+        if bindings:
+            return True
+        return False
+    except:
+        return False
+
+def select_void_description(endpoint, timeout=300) -> []:
+    sparql = SPARQLWrapper(endpoint)
+    sparql.setTimeout(timeout)
+    sparql.setReturnFormat('xml')
+    sparql.setQuery("""
+          PREFIX dcterms: <http://purl.org/dc/terms/> 
+          
+          SELECT ?classUri WHERE {
+              ?s dcterms:description ?classUri .
+          }
+          """)
+    try:
+        results = sparql.query().response.read()
+        root = ET.fromstring(results)
+        local_names = set()
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
         bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
         for binding in bindings:
-            local_names.append(binding.text)
+            local_names.add(binding.text)
         return local_names
     except:
         return []
 
+def select_void_subject_remote(endpoint, timeout=300): # timeout increased to 300
+    sparql = SPARQLWrapper(endpoint)
+    sparql.setTimeout(timeout)
+    sparql.setReturnFormat('xml')
+    sparql.setQuery("""PREFIX dcterms: <http://purl.org/dc/terms/>
+
+    SELECT  ?classUri
+    WHERE {
+        ?subject dcterms:subject ?classUri .
+    }""")
+    try:
+        results = sparql.query().response.read()
+        root = ET.fromstring(results)
+        local_names = set()
+        ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+        bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+        for binding in bindings:
+            local_names.add(binding.text)
+        return local_names
+    except:
+        return []
 
 
 def process_row(row, index, result_queue):
@@ -466,4 +510,68 @@ def create_remote_dataset_sparqlwrapper():
     df.to_json('../data/raw/remote_feature_set_sparqlwrapper.json', orient='records')
     logger.info('Finished dataset processing')
 
-create_remote_dataset_sparqlwrapper()
+def process_row_void(row, index, result_queue):
+    logger.info(f"Endpoint: {row['id']} Number: {index}")
+    endpoint = row['sparql_url']
+    try:
+        query_tasks = {
+            'sbj': (select_void_subject_remote, {'endpoint': endpoint, 'timeout': 300}),
+            'dsc': (select_void_description, {'endpoint': endpoint, 'timeout': 300}),
+        }
+
+        results_dict = {}
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_to_key = {
+                executor.submit(func, **params): key
+                for key, (func, params) in query_tasks.items()
+            }
+
+            for future in as_completed(future_to_key):
+                key = future_to_key[future]
+                try:
+                    results_dict[key] = future.result()
+                except Exception as e:
+                    logger.warning(f"Error in task {key} for endpoint {row['id']}: {str(e)}")
+                    results_dict[key] = ''  # or handle error appropriately
+
+        # Prepare the aggregated results.
+        result = [
+            row['id'],
+            results_dict.get('sbj'),
+            results_dict.get('dsc'),
+            row['category']
+        ]
+
+        result_queue.put(result)
+    except Exception as e:
+        logger.warning(f"Error processing endpoint {row['id']}: {str(e)}")
+
+
+def create_remote_dataset_sparqlwrapper_void():
+    lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+    lod_frame = lod_frame.drop_duplicates(subset=['sparql_url'])
+    logger.info('Started dataset processing')
+
+    result_queue = queue.Queue()
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Create a future for each row that has a non-empty sparql_url.
+        futures = [
+            executor.submit(process_row_void, row, index, result_queue)
+            for index, row in lod_frame.iterrows() if row['sparql_url']
+        ]
+
+    results = []
+    while not result_queue.empty():
+        results.append(result_queue.get())
+
+    df = pd.DataFrame(
+        results,
+        columns=['id', 'sbj', 'dsc', 'category']
+    )
+
+    df.to_json('../data/raw/remote_void_feature_set_sparqlwrapper.json', orient='records')
+    logger.info('Finished dataset processing')
+
+create_remote_dataset_sparqlwrapper_void()
