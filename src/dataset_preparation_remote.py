@@ -1,9 +1,9 @@
-import pandas as pd
-from SPARQLWrapper import SPARQLWrapper
+import queue
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-import queue
 
+import pandas as pd
+from SPARQLWrapper import SPARQLWrapper
 from conda.common.io import as_completed
 
 from service.endpoint_lod import logger
@@ -11,7 +11,8 @@ from service.endpoint_lod import logger
 MAX_OFFSET = 900
 
 
-def select_remote_vocabularies_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_vocabularies_sparqlwrapper(endpoint, limit=100, timeout=300,
+                                             max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     vocabularies = set()
@@ -60,7 +61,7 @@ def select_remote_vocabularies_sparqlwrapper(endpoint, limit=100, timeout=300, m
                     if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
                         vocabularies.add(vocabulary_uri)
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e}")
@@ -69,7 +70,8 @@ def select_remote_vocabularies_sparqlwrapper(endpoint, limit=100, timeout=300, m
     return vocabularies
 
 
-def select_remote_class_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_class_sparqlwrapper(endpoint, limit=100, timeout=300,
+                                      max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     classes = []
@@ -105,7 +107,7 @@ def select_remote_class_sparqlwrapper(endpoint, limit=100, timeout=300, max_offs
             for binding in bindings:
                 classes.append(binding.text)
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e}")
@@ -114,7 +116,8 @@ def select_remote_class_sparqlwrapper(endpoint, limit=100, timeout=300, max_offs
     return classes
 
 
-def select_remote_label_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_label_sparqlwrapper(endpoint, limit=100, timeout=300,
+                                      max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     labels = []
@@ -149,7 +152,7 @@ def select_remote_label_sparqlwrapper(endpoint, limit=100, timeout=300, max_offs
             for binding in bindings:
                 labels.append(binding.text)
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e}")
@@ -158,7 +161,8 @@ def select_remote_label_sparqlwrapper(endpoint, limit=100, timeout=300, max_offs
     return labels
 
 
-def select_remote_tld_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_tld_sparqlwrapper(endpoint, limit=100, timeout=300,
+                                    max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     tlds = set()
@@ -200,7 +204,7 @@ def select_remote_tld_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset
                     except:
                         pass
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e}")
@@ -209,7 +213,8 @@ def select_remote_tld_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset
     return tlds
 
 
-def select_remote_property_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_property_sparqlwrapper(endpoint, limit=100, timeout=300,
+                                         max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     properties = []
@@ -244,7 +249,7 @@ def select_remote_property_sparqlwrapper(endpoint, limit=100, timeout=300, max_o
             for binding in bindings:
                 properties.append(binding.text)
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e}")
@@ -253,7 +258,8 @@ def select_remote_property_sparqlwrapper(endpoint, limit=100, timeout=300, max_o
     return properties
 
 
-def select_remote_property_names_sparqlwrapper(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_property_names_sparqlwrapper(endpoint, limit=100, timeout=300,
+                                               max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     local_property_names = []
@@ -302,7 +308,7 @@ def select_remote_property_names_sparqlwrapper(endpoint, limit=100, timeout=300,
                     local_property_names.append(local_name)
                     processed_local_names.add(local_name)
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e}")
@@ -311,7 +317,8 @@ def select_remote_property_names_sparqlwrapper(endpoint, limit=100, timeout=300,
     return local_property_names
 
 
-def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300, max_offset=MAX_OFFSET): # timeout increased to 300
+def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300,
+                                           max_offset=MAX_OFFSET):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     local_names = []
@@ -322,6 +329,7 @@ def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300, max_
             break
 
         sparql.setQuery(f"""
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             SELECT DISTINCT ?classUri
             WHERE {{
                 ?s rdf:type ?classUri .
@@ -356,13 +364,14 @@ def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300, max_
 
                 local_names.append(local_name)
 
-            offset += 100 # offset increased by 100
+            offset += 100  # offset increased by 100
 
         except Exception as e:
             logger.warning(f"Query execution error: {e.__cause__}")
             return ''
 
     return local_names
+
 
 def has_void_description(endpoint, timeout=300) -> bool:
     sparql = SPARQLWrapper(endpoint)
@@ -386,6 +395,7 @@ def has_void_description(endpoint, timeout=300) -> bool:
     except:
         return False
 
+
 def select_void_description(endpoint, timeout=300) -> []:
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
@@ -395,7 +405,7 @@ def select_void_description(endpoint, timeout=300) -> []:
           
           SELECT ?classUri WHERE {
               ?s dcterms:description ?classUri .
-          }
+          } LIMIT 10
           """)
     try:
         results = sparql.query().response.read()
@@ -409,25 +419,46 @@ def select_void_description(endpoint, timeout=300) -> []:
     except:
         return []
 
-def select_void_subject_remote(endpoint, timeout=300): # timeout increased to 300
+
+def select_void_subject_remote(endpoint, timeout=300):  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     sparql.setReturnFormat('xml')
-    sparql.setQuery("""PREFIX dcterms: <http://purl.org/dc/terms/>
-
-    SELECT  ?classUri
-    WHERE {
-        ?subject dcterms:subject ?classUri .
-    }""")
+    sparql.setQuery("""
+        PREFIX void: <http://rdfs.org/ns/void#> 
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        SELECT DISTINCT ?s 
+        WHERE {
+            ?s rdf:type void:Dataset .
+    } LIMIT 10""")
     try:
         results = sparql.query().response.read()
         root = ET.fromstring(results)
         local_names = set()
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-        bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+        bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
         for binding in bindings:
             local_names.add(binding.text)
-        return local_names
+    except:
+        return []
+
+    try:
+        class_names = set()
+        for local_name in local_names:
+            sparql.setQuery(f"""
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+
+                SELECT DISTINCT ?classUri
+                WHERE {{
+                    <{local_name}> dcterms:subject ?classUri .
+                }} LIMIT 100""")
+            results = sparql.query().response.read()
+            root = ET.fromstring(results)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+            for binding in bindings:
+                class_names.add(binding.text)
+        return class_names
     except:
         return []
 
@@ -507,8 +538,9 @@ def create_remote_dataset_sparqlwrapper():
         columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category']
     )
 
-    df.to_json('../data/raw/remote_feature_set_sparqlwrapper.json', orient='records')
+    df.to_json('../data/raw/remote/remote_feature_set_sparqlwrapper.json', orient='records')
     logger.info('Finished dataset processing')
+
 
 def process_row_void(row, index, result_queue):
     logger.info(f"Endpoint: {row['id']} Number: {index}")
@@ -571,7 +603,8 @@ def create_remote_dataset_sparqlwrapper_void():
         columns=['id', 'sbj', 'dsc', 'category']
     )
 
-    df.to_json('../data/raw/remote_void_feature_set_sparqlwrapper.json', orient='records')
+    df.to_json('../data/raw/remote/remote_void_feature_set_sparqlwrapper.json', orient='records')
     logger.info('Finished dataset processing')
+
 
 create_remote_dataset_sparqlwrapper_void()

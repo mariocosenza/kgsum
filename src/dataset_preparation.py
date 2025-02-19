@@ -8,9 +8,10 @@ from rdflib.term import _toPythonMapping
 
 from service.endpoint_lod import logger
 
+rdflib.Graph(store="Oxigraph")
 
 def force_string_converter(value):
-    return str(value)
+   return str(value)
 for dt in list(_toPythonMapping.keys()):
    _toPythonMapping[dt] = force_string_converter
 
@@ -19,9 +20,14 @@ categories = {
     'social_networking', 'user_generated'
 }
 
+# formats = {
+#    'xml', 'turtle', 'json-ld', 'ntriples', 'n3', 'trig', 'trix', 'nquads'
+# }
+
 formats = {
-    'xml', 'turtle', 'json-ld', 'ntriples', 'n3', 'trig', 'trix', 'nquads'
+    'ox-nt', 'ox-nq', 'ox-ttl', 'ox-trig', 'ox-xml'
 }
+
 
 def select_local_vocabularies(parsed_graph):
     qres = parsed_graph.query("""
@@ -113,7 +119,7 @@ def select_local_property_names(parsed_graph):
             ?subject ?property ?object .
             FILTER isIRI(?property) # Ensure it's a property URI
         }
-    """,initNs={"rdf": rdflib.RDF})
+    """, initNs={"rdf": rdflib.RDF})
 
     local_property_names = set()
     processed_local_names = set()
@@ -170,69 +176,78 @@ def select_local_void_subject(parsed_graph):
 
     return local_names
 
+
 def select_local_void_description(parsed_graph):
     qres = parsed_graph.query("""
-        SELECT ?classUri WHERE {
-                ?s dcterms:description ?classUri .
-        }""", initNs={"dcterms": 'http://purl.org/dc/terms/'}
-                        )
+        SELECT DISTINCT ?s 
+        WHERE {
+            ?s rdf:type void:Dataset .
+    } LIMIT 10""", initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
     local_names = set()
     for row in qres:
-        local_names.add(row.classUri)
+        qres = parsed_graph.query(f"""
+            SELECT ?classUri WHERE {{
+                <{row}> dcterms:description ?classUri .
+            }}""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
+        for row in qres:
+            local_names.add(row.classUri)
 
     return local_names
+
 
 def _guess_format_and_parse(path):
     g = Graph()
     for f in formats:
         try:
-             return g.parse(path, format=f)
+            return g.parse(path, format=f)
         except Exception as _:
             pass
-    return g.parse(path, format='turtle')
+    raise Exception('Format not supported')
 
 
-
-def create_local_dataset():
+def create_local_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     df = pd.DataFrame(columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category'])
     for category in categories:
         for file in listdir(f'../data/raw/rdf_dump/{category}'):
             path = f'../data/raw/rdf_dump/{category}/{file}'
             number = re.search(r'(\d+)\.rdf', path)
-            try:
-                logger.info(f'Processing graph id: {lod_frame['id'][int(number.group(1))]}')
-                result = _guess_format_and_parse(path)
-                df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
-                                   select_local_vocabularies(result),
-                                   select_local_class(result),
-                                   select_local_property(result),
-                                   select_local_class_name(result),
-                                   select_local_property_names(result),
-                                   select_local_label(result),
-                                   select_local_tld(result),
-                                   lod_frame['category'][int(number.group(1))]]
-            except Exception as e:
-                logger.warning(e)
-    df.to_json('../data/raw/local_feature_set.json', index=False)
+            if offset <= int(number.group(1)) <= limit:
+                try:
+                    logger.info(f' Processing graph id: {lod_frame['id'][int(number.group(1))]}')
+                    result = _guess_format_and_parse(path)
+                    df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
+                                       select_local_vocabularies(result),
+                                       select_local_class(result),
+                                       select_local_property(result),
+                                       select_local_class_name(result),
+                                       select_local_property_names(result),
+                                       select_local_label(result),
+                                       select_local_tld(result),
+                                       lod_frame['category'][int(number.group(1))]]
+                except Exception as e:
+                    logger.warning(e)
+    df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
 
 
-def create_local_void_dataset():
+def create_local_void_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     df = pd.DataFrame(columns=['id', 'sbj', 'dsc', 'category'])
     for category in categories:
         for file in listdir(f'../data/raw/rdf_dump/{category}'):
             path = f'../data/raw/rdf_dump/{category}/{file}'
             number = re.search(r'(\d+)\.rdf', path)
-            try:
-                result = _guess_format_and_parse(path)
-                logger.info(f'Processing graph with void id: {lod_frame['id'][int(number.group(1))]}')
-                df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
+            if offset <= int(number.group(1)) <= limit:
+                try:
+                    result = _guess_format_and_parse(path)
+                    logger.info(f'Processing graph with void id: {lod_frame['id'][int(number.group(1))]}')
+                    df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
                                    select_local_void_subject(result),
                                    select_local_void_description(result),
                                    lod_frame['category'][int(number.group(1))]]
-            except Exception as e:
-                logger.warning(e)
-    df.to_json('../data/raw/local_void_feature_set.json', index=False)
+                except Exception as e:
+                    logger.warning(e)
+    df.to_json('../data/raw/local/local_void_feature_set.json', index=False)
 
-create_local_void_dataset()
+
+create_local_dataset(offset=0, limit=100)
