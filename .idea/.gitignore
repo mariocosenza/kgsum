@@ -6,8 +6,3 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
-/vcs.xml
-/modules.xml
-/misc.xml
-/csv-editor.xml
-/KgSum.iml
