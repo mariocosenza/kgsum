@@ -1,92 +1,130 @@
 import re
 from os import listdir
-
+import os
 import pandas as pd
 import rdflib
 from rdflib import Graph
-from rdflib.term import _toPythonMapping
-
+from rdflib.plugins.sparql import prepareQuery
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from service.endpoint_lod import logger
 
+# Initialize the rdflib graph with Oxigraph store.
 rdflib.Graph(store="Oxigraph")
 
-def force_string_converter(value):
-   return str(value)
-for dt in list(_toPythonMapping.keys()):
-   _toPythonMapping[dt] = force_string_converter
 
 categories = {
     'cross_domain', 'geography', 'government', 'life_sciences', 'linguistics', 'media', 'publications',
     'social_networking', 'user_generated'
 }
 
-# formats = {
-#    'xml', 'turtle', 'json-ld', 'ntriples', 'n3', 'trig', 'trix', 'nquads'
-# }
-
 formats = {
     'ox-nt', 'ox-nq', 'ox-ttl', 'ox-trig', 'ox-xml'
 }
 
+# Precompile the regex used to extract the file number
+FILE_NUM_REGEX = re.compile(r'(\d+)\.rdf')
+
+# Precompile SPARQL queries
+Q_LOCAL_VOCABULARIES = prepareQuery("""
+    SELECT DISTINCT ?predicate
+    WHERE {
+        ?subject ?predicate ?object .
+        FILTER (STRSTARTS(STR(?predicate), "http://"))
+        FILTER (!STRSTARTS(STR(STRBEFORE(STR(?predicate), "#")), "http://www.w3.org/"))
+    } LIMIT 1000
+""")
+Q_LOCAL_CLASS = prepareQuery("""
+    SELECT DISTINCT ?classUri
+    WHERE {
+        ?classUri a ?type .
+        FILTER (?type IN (rdfs:Class, owl:Class))
+    } LIMIT 1000
+""")
+Q_LOCAL_LABEL = prepareQuery("""
+    SELECT DISTINCT ?type
+    WHERE {
+        ?class rdfs:label ?type .
+    } LIMIT 1000
+""", initNs={"rdf": rdflib.RDF})
+Q_LOCAL_TLD = prepareQuery("""
+    SELECT DISTINCT ?o
+    WHERE {
+        ?s ?p ?o .
+        FILTER(isIRI(?o))
+    } LIMIT 1000
+""")
+Q_LOCAL_PROPERTY = prepareQuery("""
+    SELECT DISTINCT ?property
+    WHERE {
+        ?subject ?property ?object .
+        FILTER isIRI(?property)
+    } LIMIT 1000
+""")
+Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
+    SELECT DISTINCT ?property
+    WHERE {
+        ?subject ?property ?object .
+        FILTER isIRI(?property)
+    } LIMIT 1000
+""")
+Q_LOCAL_CLASS_NAME = prepareQuery("""
+    SELECT DISTINCT ?classUri
+    WHERE {
+        ?s rdf:type ?classUri .
+    } LIMIT 1000
+""", initNs={"rdf": rdflib.RDF})
+Q_LOCAL_VOID_SUBJECT = prepareQuery("""
+    SELECT ?classUri
+    WHERE {
+        ?s dcterms:subject ?classUri .
+    } LIMIT 1000
+""", initNs={"dcterms": 'http://purl.org/dc/terms/'}) #Todo correct subject query to comply with correct triple format
+Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
+    SELECT DISTINCT ?s
+    WHERE {
+        ?s rdf:type void:Dataset .
+    } LIMIT 1000
+""", initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
+
+Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery(
+"""
+SELECT ?desc WHERE {
+        ?s dcterms:description ?desc .
+} LIMIT 10
+""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
+
 
 def select_local_vocabularies(parsed_graph):
-    qres = parsed_graph.query("""
-        SELECT DISTINCT ?predicate
-        WHERE {
-            ?subject ?predicate ?object .
-            FILTER (STRSTARTS(STR(?predicate), "http://"))
-            FILTER (!STRSTARTS(STR(STRBEFORE(STR(?predicate), "#")), "http://www.w3.org/"))
-        }
-    """)
+    qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
     vocabularies = set()
     for row in qres:
+        print(type(row))
         predicate_uri = str(row.predicate)
         if predicate_uri:
             if "#" in predicate_uri:
                 vocabulary_uri = predicate_uri.split("#")[0]
             elif "/" in predicate_uri:
-                vocabulary_uri = predicate_uri.split("/")
-                vocabulary_uri = "/".join(vocabulary_uri[:len(vocabulary_uri) - 1]) if len(
-                    vocabulary_uri) > 1 else predicate_uri  # Get path before last part
+                parts = predicate_uri.split("/")
+                vocabulary_uri = "/".join(parts[:-1]) if len(parts) > 1 else predicate_uri
             else:
                 vocabulary_uri = predicate_uri
-
             if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
                 vocabularies.add(vocabulary_uri)
     return vocabularies
 
 
 def select_local_class(parsed_graph):
-    qres = parsed_graph.query("""SELECT DISTINCT ?classUri
-    WHERE {
-            ?classUri a ?type .
-            FILTER (?type IN (rdfs:Class, owl:Class))
-    }""")
-    classes = []
-    for row in qres:
-        classes.append(str(row.classUri))
-    return classes
+    qres = parsed_graph.query(Q_LOCAL_CLASS)
+    return [str(row.classUri) for row in qres]
 
 
 def select_local_label(parsed_graph):
-    qres = parsed_graph.query("""SELECT DISTINCT ?type
-    WHERE {
-            ?class rdfs:label ?type .
-    }""", initNs={"rdf": rdflib.RDF})
-    labels = set()
-    for row in qres:
-        labels.add(str(row.type))
-    return labels
+    qres = parsed_graph.query(Q_LOCAL_LABEL)
+    return {str(row.type) for row in qres}
 
 
 def select_local_tld(parsed_graph):
-    qres = parsed_graph.query("""
-    SELECT DISTINCT ?o
-    WHERE {
-         ?s ?p ?o .
-        FILTER(isIRI(?o))
-    }
-    """)
+    qres = parsed_graph.query(Q_LOCAL_TLD)
     tlds = set()
     for row in qres:
         url = str(row.o)
@@ -95,66 +133,43 @@ def select_local_tld(parsed_graph):
                 tld = url.split('/')[2].split('.')[-1]
                 if 1 < len(tld) <= 10:
                     tlds.add(tld)
-            except:
+            except Exception:
                 pass
     return tlds
 
 
 def select_local_property(parsed_graph):
-    qres = parsed_graph.query("""
-    SELECT DISTINCT ?property
-    WHERE {
-        ?subject ?property ?object .
-        FILTER isIRI(?property)
-    }""")
-    properties = set()
-    for row in qres:
-        properties.add(str(row.property))
-    return properties
+    qres = parsed_graph.query(Q_LOCAL_PROPERTY)
+    return {str(row.property) for row in qres}
 
 
 def select_local_property_names(parsed_graph):
-    qres = parsed_graph.query("""
-        SELECT DISTINCT ?property WHERE {
-            ?subject ?property ?object .
-            FILTER isIRI(?property) # Ensure it's a property URI
-        }
-    """, initNs={"rdf": rdflib.RDF})
-
+    qres = parsed_graph.query(Q_LOCAL_PROPERTY_NAMES, initNs={"rdf": rdflib.RDF})
     local_property_names = set()
     processed_local_names = set()
-
     for row in qres:
         property_uri = str(row.property)
         if not property_uri:
             continue
-
         if "#" in property_uri:
             local_name = property_uri.split("#")[-1]
         elif "/" in property_uri:
             local_name = property_uri.split("/")[-1]
         else:
             local_name = property_uri
-
         if local_name and local_name not in processed_local_names:
             local_property_names.add(local_name)
             processed_local_names.add(local_name)
-
     return local_property_names
 
 
 def select_local_class_name(parsed_graph):
-    qres = parsed_graph.query("""
-        SELECT DISTINCT ?classUri WHERE {
-                ?s rdf:type ?classUri .
-        }
-        """, initNs={"rdf": rdflib.RDF})
+    qres = parsed_graph.query(Q_LOCAL_CLASS_NAME)
     local_names = set()
     for row in qres:
         class_uri = str(row.classUri)
         if not class_uri:
             continue
-
         if "#" in class_uri:
             local_name = class_uri.split("#")[-1]
         elif "/" in class_uri:
@@ -166,33 +181,13 @@ def select_local_class_name(parsed_graph):
 
 
 def select_local_void_subject(parsed_graph):
-    qres = parsed_graph.query("""
-        SELECT ?classUri WHERE {
-                ?s dcterms:subject ?classUri .
-        } """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
-    local_names = set()
-    for row in qres:
-        local_names.add(row.classUri)
-
-    return local_names
+    qres = parsed_graph.query(Q_LOCAL_VOID_SUBJECT)
+    return {row.classUri for row in qres}
 
 
 def select_local_void_description(parsed_graph):
-    qres = parsed_graph.query("""
-        SELECT DISTINCT ?s 
-        WHERE {
-            ?s rdf:type void:Dataset .
-    } LIMIT 10""", initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
-    local_names = set()
-    for row in qres:
-        qres = parsed_graph.query(f"""
-            SELECT ?classUri WHERE {{
-                <{row}> dcterms:description ?classUri .
-            }}""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
-        for row in qres:
-            local_names.add(row.classUri)
-
-    return local_names
+    qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
+    return {row.desc for row in qres}
 
 
 def _guess_format_and_parse(path):
@@ -200,54 +195,164 @@ def _guess_format_and_parse(path):
     for f in formats:
         try:
             return g.parse(path, format=f)
-        except Exception as _:
+        except Exception:
             pass
     raise Exception('Format not supported')
 
 
+
+def process_local_dataset_file(category, file, lod_frame, offset, limit):
+    path = f'../data/raw/rdf_dump/{category}/{file}'
+    match = FILE_NUM_REGEX.search(path)
+    if not match:
+        return None
+    file_num = int(match.group(1))
+    if file_num < offset or file_num > limit:
+        return None
+    try:
+        logger.info(f"Processing graph id: {lod_frame['id'][file_num]}")
+        result = _guess_format_and_parse(path)
+        row = [
+            lod_frame['id'][file_num],
+            select_local_vocabularies(result),
+            select_local_class(result),
+            select_local_property(result),
+            select_local_class_name(result),
+            select_local_property_names(result),
+            select_local_label(result),
+            select_local_tld(result),
+            lod_frame['category'][file_num]
+        ]
+        return row
+    except Exception as e:
+        logger.warning(f"Error processing file {path}: {str(e)}")
+        return None
+
+
 def create_local_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-    df = pd.DataFrame(columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category'])
+    tasks = []
     for category in categories:
-        for file in listdir(f'../data/raw/rdf_dump/{category}'):
-            path = f'../data/raw/rdf_dump/{category}/{file}'
-            number = re.search(r'(\d+)\.rdf', path)
-            if offset <= int(number.group(1)) <= limit:
+        directory = f'../data/raw/rdf_dump/{category}'
+        for file in listdir(directory):
+            tasks.append((category, file))
+
+    total_tasks = len(tasks)
+    tasks_done = 0
+    results = []
+    n_workers = os.cpu_count()
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        task_iter = iter(tasks)
+        future_to_task = {}
+        # Submit initial tasks up to the number of workers
+        for _ in range(n_workers):
+            try:
+                cat, file = next(task_iter)
+                future = executor.submit(process_local_dataset_file, cat, file, lod_frame, offset, limit)
+                future_to_task[future] = (cat, file)
+            except StopIteration:
+                break
+
+        # Process futures as they complete and schedule new tasks
+        while future_to_task:
+            done, _ = wait(future_to_task.keys(), return_when=FIRST_COMPLETED)
+            for future in done:
                 try:
-                    logger.info(f' Processing graph id: {lod_frame['id'][int(number.group(1))]}')
-                    result = _guess_format_and_parse(path)
-                    df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
-                                       select_local_vocabularies(result),
-                                       select_local_class(result),
-                                       select_local_property(result),
-                                       select_local_class_name(result),
-                                       select_local_property_names(result),
-                                       select_local_label(result),
-                                       select_local_tld(result),
-                                       lod_frame['category'][int(number.group(1))]]
+                    result = future.result()
                 except Exception as e:
-                    logger.warning(e)
+                    logger.warning(f"Task error: {e}")
+                    result = None
+                tasks_done += 1
+                logger.info(f"Progress: {tasks_done}/{total_tasks} tasks completed.")
+                if result is not None:
+                    results.append(result)
+                del future_to_task[future]
+                try:
+                    cat, file = next(task_iter)
+                    new_future = executor.submit(process_local_dataset_file, cat, file, lod_frame, offset, limit)
+                    future_to_task[new_future] = (cat, file)
+                except StopIteration:
+                    continue
+
+    df = pd.DataFrame(results, columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category'])
     df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
+
+
+def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
+    path = f'../data/raw/rdf_dump/{category}/{file}'
+    match = FILE_NUM_REGEX.search(path)
+    if not match:
+        return None
+    file_num = int(match.group(1))
+    if file_num < offset or file_num > limit:
+        return None
+    try:
+        result = _guess_format_and_parse(path)
+        logger.info(f"Processing graph with void id: {lod_frame['id'][file_num]}")
+        row = [
+            lod_frame['id'][file_num],
+            select_local_void_subject(result),
+            select_local_void_description(result),
+            lod_frame['category'][file_num]
+        ]
+        return row
+    except Exception as e:
+        logger.warning(f"Error processing file {path}: {str(e)}")
+        return None
 
 
 def create_local_void_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-    df = pd.DataFrame(columns=['id', 'sbj', 'dsc', 'category'])
+    tasks = []
     for category in categories:
-        for file in listdir(f'../data/raw/rdf_dump/{category}'):
-            path = f'../data/raw/rdf_dump/{category}/{file}'
-            number = re.search(r'(\d+)\.rdf', path)
-            if offset <= int(number.group(1)) <= limit:
+        directory = f'../data/raw/rdf_dump/{category}'
+        for file in listdir(directory):
+            tasks.append((category, file))
+
+    total_tasks = len(tasks)
+    tasks_done = 0
+    results = []
+    n_workers = os.cpu_count()
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        task_iter = iter(tasks)
+        future_to_task = {}
+        for _ in range(n_workers):
+            try:
+                cat, file = next(task_iter)
+                future = executor.submit(process_local_void_dataset_file, cat, file, lod_frame, offset, limit)
+                future_to_task[future] = (cat, file)
+            except StopIteration:
+                break
+
+        while future_to_task:
+            done, _ = wait(future_to_task.keys(), return_when=FIRST_COMPLETED)
+            for future in done:
                 try:
-                    result = _guess_format_and_parse(path)
-                    logger.info(f'Processing graph with void id: {lod_frame['id'][int(number.group(1))]}')
-                    df.loc[len(df)] = [lod_frame['id'][int(number.group(1))],
-                                   select_local_void_subject(result),
-                                   select_local_void_description(result),
-                                   lod_frame['category'][int(number.group(1))]]
+                    result = future.result()
                 except Exception as e:
-                    logger.warning(e)
-    df.to_json('../data/raw/local/local_void_feature_set.json', index=False)
+                    logger.warning(f"(Void) Task error: {e}")
+                    result = None
+                tasks_done += 1
+                logger.info(f"(Void) Progress: {tasks_done}/{total_tasks} tasks completed.")
+                if result is not None:
+                    results.append(result)
+                del future_to_task[future]
+                try:
+                    cat, file = next(task_iter)
+                    new_future = executor.submit(process_local_void_dataset_file, cat, file, lod_frame, offset, limit)
+                    future_to_task[new_future] = (cat, file)
+                except StopIteration:
+                    continue
+
+    df = pd.DataFrame(results, columns=['id', 'sbj', 'dsc', 'category'])
+    df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
 
 
-create_local_dataset(offset=0, limit=100)
+if __name__ == '__main__':
+    import multiprocessing
+    multiprocessing.freeze_support()
+    # create_local_dataset(offset=0, limit=5)
+    # To process the void dataset, call:
+    create_local_void_dataset(offset=0, limit=200)
