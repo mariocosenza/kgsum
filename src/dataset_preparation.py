@@ -1,28 +1,23 @@
-import re
-from os import listdir
 import os
+import re
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from os import listdir
+
 import pandas as pd
 import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+
 from service.endpoint_lod import logger
+from src.util import match_file_lod, CATEGORIES
 
 # Initialize the rdflib graph with Oxigraph store.
 rdflib.Graph(store="Oxigraph")
 
-
-categories = {
-    'cross_domain', 'geography', 'government', 'life_sciences', 'linguistics', 'media', 'publications',
-    'social_networking', 'user_generated'
-}
-
-formats = {
+FORMATS = {
     'ox-nt', 'ox-nq', 'ox-ttl', 'ox-trig', 'ox-xml'
 }
 
-# Precompile the regex used to extract the file number
-FILE_NUM_REGEX = re.compile(r'(\d+)\.rdf')
 
 # Precompile SPARQL queries
 Q_LOCAL_VOCABULARIES = prepareQuery("""
@@ -73,12 +68,7 @@ Q_LOCAL_CLASS_NAME = prepareQuery("""
         ?s rdf:type ?classUri .
     } LIMIT 1000
 """, initNs={"rdf": rdflib.RDF})
-Q_LOCAL_VOID_SUBJECT = prepareQuery("""
-    SELECT ?classUri
-    WHERE {
-        ?s dcterms:subject ?classUri .
-    } LIMIT 1000
-""", initNs={"dcterms": 'http://purl.org/dc/terms/'}) #Todo correct subject query to comply with correct triple format
+
 Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
     SELECT DISTINCT ?s
     WHERE {
@@ -87,11 +77,11 @@ Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
 """, initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
 
 Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery(
-"""
-SELECT ?desc WHERE {
-        ?s dcterms:description ?desc .
-} LIMIT 10
-""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
+    """
+    SELECT ?desc WHERE {
+            ?s dcterms:description ?desc .
+    } LIMIT 10
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
 
 def select_local_vocabularies(parsed_graph):
@@ -181,8 +171,18 @@ def select_local_class_name(parsed_graph):
 
 
 def select_local_void_subject(parsed_graph):
-    qres = parsed_graph.query(Q_LOCAL_VOID_SUBJECT)
-    return {row.classUri for row in qres}
+    qres = parsed_graph.query(Q_LOCAL_VOID_DESCRIPTION)
+    subject = set()
+    for row in qres:
+        result = parsed_graph.query(f"""
+            SELECT ?classUri
+        WHERE {{
+        <{row.s}> dcterms:subject ?classUri .
+        }} LIMIT 100
+        """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
+        for res in result:
+            subject.add(res.classUri)
+    return {row for row in subject}
 
 
 def select_local_void_description(parsed_graph):
@@ -192,7 +192,7 @@ def select_local_void_description(parsed_graph):
 
 def _guess_format_and_parse(path):
     g = Graph()
-    for f in formats:
+    for f in FORMATS:
         try:
             return g.parse(path, format=f)
         except Exception:
@@ -200,14 +200,10 @@ def _guess_format_and_parse(path):
     raise Exception('Format not supported')
 
 
-
 def process_local_dataset_file(category, file, lod_frame, offset, limit):
     path = f'../data/raw/rdf_dump/{category}/{file}'
-    match = FILE_NUM_REGEX.search(path)
-    if not match:
-        return None
-    file_num = int(match.group(1))
-    if file_num < offset or file_num > limit:
+    file_num = match_file_lod(file, limit, offset, lod_frame)
+    if file_num is None:
         return None
     try:
         logger.info(f"Processing graph id: {lod_frame['id'][file_num]}")
@@ -232,7 +228,7 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
 def create_local_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     tasks = []
-    for category in categories:
+    for category in CATEGORIES:
         directory = f'../data/raw/rdf_dump/{category}'
         for file in listdir(directory):
             tasks.append((category, file))
@@ -281,20 +277,18 @@ def create_local_dataset(offset=0, limit=10000):
 
 def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
     path = f'../data/raw/rdf_dump/{category}/{file}'
-    match = FILE_NUM_REGEX.search(path)
-    if not match:
+    num = match_file_lod(file, limit, offset, lod_frame)
+    if num is None:
         return None
-    file_num = int(match.group(1))
-    if file_num < offset or file_num > limit:
-        return None
+
     try:
         result = _guess_format_and_parse(path)
-        logger.info(f"Processing graph with void id: {lod_frame['id'][file_num]}")
+        logger.info(f"Processing graph with void id: {lod_frame['id'][num]}")
         row = [
-            lod_frame['id'][file_num],
+            lod_frame['id'][num],
             select_local_void_subject(result),
             select_local_void_description(result),
-            lod_frame['category'][file_num]
+            lod_frame['category'][num]
         ]
         return row
     except Exception as e:
@@ -305,7 +299,7 @@ def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
 def create_local_void_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     tasks = []
-    for category in categories:
+    for category in CATEGORIES:
         directory = f'../data/raw/rdf_dump/{category}'
         for file in listdir(directory):
             tasks.append((category, file))
@@ -352,6 +346,7 @@ def create_local_void_dataset(offset=0, limit=10000):
 
 if __name__ == '__main__':
     import multiprocessing
+
     multiprocessing.freeze_support()
     # create_local_dataset(offset=0, limit=5)
     # To process the void dataset, call:
