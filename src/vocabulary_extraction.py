@@ -17,8 +17,6 @@ def load_endpoint_list():
     return pd.read_csv("../data/raw/sparql_full_download.csv")['sparql_url']
 
 
-
-
 def find_vocabulary_tag(endpoint, limit=5):
     query_string = """
    SELECT ?vocab
@@ -43,7 +41,7 @@ def find_vocabulary_local(path: str):
     qres = result.query("""
    SELECT DISTINCT ?vocab
 WHERE {
-  ?s ?p ?vocab . # Bind ?vocab to the object of the triple
+  ?s ?p ?vocab . 
   FILTER(isIRI(?vocab)) # Ensure it's an IRI (vocabulary term)
   FILTER(!CONTAINS(STR(?vocab), "w3.org")) # Exclude results from w3.org
 }""")
