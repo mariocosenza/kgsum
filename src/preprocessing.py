@@ -1,4 +1,5 @@
 from os import listdir
+from typing import Any
 
 import pandas as pd
 import spacy
@@ -53,7 +54,7 @@ def merge_void_dataset():
     return merged_df
 
 
-def _translate_text(word_list: [], translator) -> str:
+def _translate_text(word_list: [], translator) -> Any | None:
     if len(word_list) <= 5000:
         text = ''
         for word in word_list:
