@@ -1,5 +1,4 @@
 from os import listdir
-from typing import Any
 
 import pandas as pd
 import spacy
@@ -55,35 +54,34 @@ def merge_void_dataset():
     return merged_df
 
 
+from typing import List, Optional, Any
 
-def _translate_text(word_list: [], translator) -> Any | None:
-    if word_list is None:
+
+def _translate_text(word_list: Optional[List[Optional[str]]], translator) -> Optional[str]:
+    if not word_list:
         return None
-    full_string = ''
-    for word in word_list:
-        if word is not None:
-            full_string += word + ' '
-        else:
-            full_string += 'abcd'
-    if len(full_string) <= 5000:
-        text = ''
-        for word in word_list:
-            if word is not None:
-                text += word + ' '
-        return translator.translate(text)
+
+    full_text = ' '.join(word if word is not None else 'abcd' for word in word_list)
+
+    if len(full_text) <= 4500:
+        return translator.translate(full_text)
     else:
-        size = 0
-        sliced_words = ''
-        temp_sliced_words = ''
+        translated_chunks = []
+        current_chunk = ""
+
         for word in word_list:
-            if word is not None and (5000 - size - len(word) - 2) >= 0:
-                temp_sliced_words = temp_sliced_words + word + ' '
-                size += len(word) + 1
-            elif word is not None:
-                size = 0
-                sliced_words = sliced_words + ' ' + translator.translate(temp_sliced_words) + ' ' + translator.translate(word)
-                temp_sliced_words = ''
-        return sliced_words
+            actual_word = word if word is not None else "abcd"
+            additional_length = len(actual_word) + (1 if current_chunk else 0)
+            if len(current_chunk) + additional_length <= 4500:
+                current_chunk = f"{current_chunk} {actual_word}" if current_chunk else actual_word
+            else:
+                translated_chunks.append(translator.translate(current_chunk))
+                current_chunk = actual_word
+
+        if current_chunk:
+            translated_chunks.append(translator.translate(current_chunk))
+
+        return ' '.join(translated_chunks)
 
 
 def preprocess_lab_lcn_lnp(input_frame: pd.DataFrame):
@@ -145,3 +143,5 @@ def preprocess_voc_tags(input_frame: pd.DataFrame):
 def preprocess_voc_curi_puri_tld(input_frame):
     processed_frame = pd.DataFrame()
 
+
+preprocess_lab_lcn_lnp(merge_dataset())
