@@ -27,6 +27,9 @@ def is_endpoint_working(endpoint) -> bool:
     try:
         result = sparql.query()
         str_header = result.response.headers.as_string()
+        if result.response.status >= 310:
+            return False
+
         if 'text/plain' in str_header or 'text/html' in str_header or 'application/octet-stream' in str_header:
             return False
         result.convert()
