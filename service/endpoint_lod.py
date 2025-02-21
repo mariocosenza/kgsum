@@ -1,8 +1,7 @@
 import pandas as pd
 import requests
 import logging
-
-from vocabulary_extraction import is_endpoint_working
+from src.util import is_endpoint_working
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("endpoint_lod")
@@ -35,5 +34,4 @@ def extract_sparql_or_full_download_list():
             elif frame[i]['sparql'] and is_endpoint_working(frame[i]['sparql'][0]['access_url']):
                 return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], None, frame[i]['sparql'][0]['access_url']]
 
-    return_list.to_csv("../data/raw/sparql_full_download.csv", index=False)
-
+    return_list.to_csv("../data/raw/sparql_full_download.csv", index=True)

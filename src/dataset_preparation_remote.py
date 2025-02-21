@@ -1,9 +1,7 @@
 import queue
-import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
-from SPARQLWrapper import SPARQLWrapper
 from conda.common.io import as_completed
 
 from service.endpoint_lod import logger
@@ -396,27 +394,32 @@ def has_void_description(endpoint, timeout=300) -> bool:
         return False
 
 
-def select_void_description(endpoint, timeout=300) -> []:
+from SPARQLWrapper import SPARQLWrapper
+import xml.etree.ElementTree as ET
+
+
+def select_void_description(endpoint, timeout=300) -> list:
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     sparql.setReturnFormat('xml')
     sparql.setQuery("""
           PREFIX dcterms: <http://purl.org/dc/terms/> 
-          
-          SELECT ?classUri WHERE {
-              ?s dcterms:description ?classUri .
-          } LIMIT 10
+
+          SELECT ?desc WHERE {
+              ?s dcterms:description ?desc .
+          } LIMIT 1
           """)
     try:
         results = sparql.query().response.read()
         root = ET.fromstring(results)
-        local_names = set()
+        local_descriptions = set()
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-        bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+        bindings = root.findall('.//sparql:binding[@name="desc"]/*', ns)
         for binding in bindings:
-            local_names.add(binding.text)
-        return local_names
-    except:
+            local_descriptions.add(binding.text)
+        return list(local_descriptions)
+    except Exception as e:
+        print("Error:", e)
         return []
 
 
@@ -547,8 +550,8 @@ def process_row_void(row, index, result_queue):
     endpoint = row['sparql_url']
     try:
         query_tasks = {
-            'sbj': (select_void_subject_remote, {'endpoint': endpoint, 'timeout': 300}),
             'dsc': (select_void_description, {'endpoint': endpoint, 'timeout': 300}),
+            'sbj': (select_void_subject_remote, {'endpoint': endpoint, 'timeout': 300})
         }
 
         results_dict = {}

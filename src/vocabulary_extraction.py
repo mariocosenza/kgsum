@@ -8,32 +8,13 @@ from SPARQLWrapper import SPARQLWrapper
 from rdflib import Graph
 
 from src.preprocessing import merge_dataset
+from src.util import is_endpoint_working
 
 return_formats = ['JSON', 'XML', 'TURTLE', 'N3', 'RDF', 'RDFXML', 'CSV', 'TSV', 'JSONLD']
 
 
 def load_endpoint_list():
     return pd.read_csv("../data/raw/sparql_full_download.csv")['sparql_url']
-
-
-def is_endpoint_working(endpoint) -> bool:
-    query_string = """
-      SELECT ?s ?p ?o
-   WHERE {
-      ?s ?p ?o
-   } LIMIT 1"""
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setQuery(query_string)
-    sparql.setTimeout(120)
-    try:
-        result = sparql.query()
-        str_header = result.response.headers.as_string()
-        if 'text/plain' in str_header or 'text/html' in str_header or 'application/octet-stream' in str_header:
-            return False
-        result.convert()
-        return True
-    except Exception as e:
-        return False
 
 
 def find_vocabulary_tag(endpoint, limit=5):
@@ -60,7 +41,7 @@ def find_vocabulary_local(path: str):
     qres = result.query("""
    SELECT DISTINCT ?vocab
 WHERE {
-  ?s ?p ?vocab . # Bind ?vocab to the object of the triple
+  ?s ?p ?vocab . 
   FILTER(isIRI(?vocab)) # Ensure it's an IRI (vocabulary term)
   FILTER(!CONTAINS(STR(?vocab), "w3.org")) # Exclude results from w3.org
 }""")
@@ -101,12 +82,12 @@ def find_tags_from_json():
         for voc in set(row['voc']):
             print(f'Vocabulary: {voc}')
             if voc not in response_cache:
-               response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}",
-                                        timeout=300)
-               response_cache[voc] = response_lov
-               time.sleep(0.1)
+                response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}",
+                                            timeout=300)
+                response_cache[voc] = response_lov
+                time.sleep(0.1)
             else:
-               response_lov = response_cache[voc]
+                response_lov = response_cache[voc]
             if response_lov.status_code != 404:
                 try:
                     response_dict = json.loads(response_lov.text)

@@ -1,7 +1,8 @@
 from os import listdir
+from typing import Any
 
-import spacy
 import pandas as pd
+import spacy
 from deep_translator import GoogleTranslator
 
 nlp = spacy.load("en_core_web_sm")
@@ -52,7 +53,8 @@ def merge_void_dataset():
 
     return merged_df
 
-def _translate_text(word_list: [], translator) -> str:
+
+def _translate_text(word_list: [], translator) -> Any | None:
     if len(word_list) <= 5000:
         text = ''
         for word in word_list:
@@ -68,16 +70,18 @@ def _translate_text(word_list: [], translator) -> str:
                 size += len(word)
             else:
                 size = 0
-                sliced_words = sliced_words + ' ' +  translator.translate(temp_sliced_words) + ' ' +  translator.translate(word)
+                sliced_words = sliced_words + ' ' + translator.translate(
+                    temp_sliced_words) + ' ' + translator.translate(word)
                 temp_sliced_words = ''
         return translator.translate(sliced_words)
+
 
 def preprocess_lab_lcn_lnp(input_frame: pd.DataFrame):
     translator = GoogleTranslator(source='auto', target='en')
     list_lab = list()
     list_lnp = list()
     list_lcn = list()
-    for index, row in  input_frame.iterrows(): #todo Keep in mind NoneType and data Imputation
+    for index, row in input_frame.iterrows():  # todo Keep in mind NoneType and data Imputation
         translated_lcn_row = _translate_text(row['lcn'], translator)
         translated_lab_row = _translate_text(row['lab'], translator)
         translated_lpn_row = _translate_text(row['lpn'], translator)
@@ -100,8 +104,6 @@ def preprocess_lab_lcn_lnp(input_frame: pd.DataFrame):
     }).to_json('../data/processed/lab_lcn_lnp.json')
 
 
-
-
 def preprocess_void(input_frame):
     processed_frame = pd.DataFrame()
     translator = GoogleTranslator(source='auto', target='en')
@@ -111,7 +113,6 @@ def preprocess_void(input_frame):
         cleaned_dsc_row = nlp.pipe(cleaned_dsc_row, n_process=-1)
 
 
-
 def preprocess_voc_tags(input_frame):
     for row in input_frame:
         cleaned_voc_row = nlp.pipe(row['tags'], n_process=-1)
@@ -119,6 +120,3 @@ def preprocess_voc_tags(input_frame):
 
 def preprocess_voc_curi_puri_tld(input_frame):
     processed_frame = pd.DataFrame()
-
-
-print(merge_dataset())
