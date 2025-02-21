@@ -1,333 +1,280 @@
-import queue
-from concurrent.futures import ThreadPoolExecutor
-from SPARQLWrapper import SPARQLWrapper
+import asyncio
+import logging
+import sys
 import xml.etree.ElementTree as eT
+
+import aiohttp
 import pandas as pd
-from conda.common.io import as_completed
 
-from service.endpoint_lod import logger
+MAX_OFFSET = 1000
+ENDPOINT_TIMEOUT = 600
 
-MAX_OFFSET = 900
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("dataset_preparation_remote")
 
 
-def select_remote_vocabularies_sparqlwrapper(endpoint, limit=100, timeout=300,
-                                             max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def fetch_query(session, endpoint, query, timeout):
+    async with session.post(endpoint, data={'query': query}, timeout=timeout) as response:
+        return await response.text()
+
+
+async def async_select_remote_vocabularies(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[VOC] Starting vocabulary query for endpoint: {endpoint}")
     vocabularies = set()
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             SELECT DISTINCT ?predicate
             WHERE {{
                 ?subject ?predicate ?object .
             }}
-            ORDER BY ?predicate
-            LIMIT {limit}
+            LIMIT {limit} 
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
-
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-
-            bindings = root.findall('.//sparql:binding[@name="predicate"]/sparql:uri', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                print(binding.text)
-                predicate_uri = binding.text
-                if predicate_uri:
-                    if "#" in predicate_uri:
-                        vocabulary_uri = predicate_uri.split("#")[0]
-                    elif "/" in predicate_uri:
-                        vocabulary_uri = predicate_uri.split("/")
-                        vocabulary_uri = "/".join(vocabulary_uri[:len(vocabulary_uri) - 1]) if len(
-                            vocabulary_uri) > 1 else predicate_uri
-                    elif 'HTML PUBLIC' in predicate_uri:
-                        return ''
-                    else:
-                        vocabulary_uri = predicate_uri
-
-                    if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
-                        vocabularies.add(vocabulary_uri)
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e}")
-            return ''
-
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="predicate"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[VOC] No predicate bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    predicate_uri = binding.text
+                    if predicate_uri:
+                        if "#" in predicate_uri:
+                            vocabulary_uri = predicate_uri.split("#")[0]
+                        elif "/" in predicate_uri:
+                            parts = predicate_uri.split("/")
+                            vocabulary_uri = "/".join(parts[:-1]) if len(parts) > 1 else predicate_uri
+                        else:
+                            vocabulary_uri = predicate_uri
+                        if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
+                            vocabularies.add(vocabulary_uri)
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[VOC] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(f"[VOC] Finished vocabulary query for endpoint: {endpoint} (found {len(vocabularies)} vocabularies)")
     return vocabularies
 
 
-def select_remote_class_sparqlwrapper(endpoint, limit=100, timeout=300,
-                                      max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def async_select_remote_class(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[CLS] Starting class query for endpoint: {endpoint}")
     classes = []
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX owl: <http://www.w3.org/2002/07/owl#>
             SELECT DISTINCT ?classUri
             WHERE {{
                 ?classUri a ?type .
                 FILTER (?type IN (rdfs:Class, owl:Class))
             }}
-            ORDER BY ?classUri
-            LIMIT {limit}
+            LIMIT {limit} 
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
-
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                classes.append(binding.text)
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e}")
-            return ''
-
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[CLS] No class bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    classes.append(binding.text)
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[CLS] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(f"[CLS] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
     return classes
 
 
-def select_remote_label_sparqlwrapper(endpoint, limit=100, timeout=300,
-                                      max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def async_select_remote_label(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[LAB] Starting label query for endpoint: {endpoint}")
     labels = []
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT DISTINCT ?type
+            SELECT ?label
             WHERE {{
-                ?class rdfs:label ?type .
+                ?item rdfs:label ?label .
+                FILTER(langMatches(lang(?label), "en"))
             }}
-            ORDER BY ?type
-            LIMIT {limit}
+            LIMIT {limit} 
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
+            """
+            bindings = []
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
+            except:
+                logger.debug(f"[LAB] No label bindings found at offset {offset}.")
 
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
 
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="type"]/sparql:literal', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                labels.append(binding.text)
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e}")
-            return ''
-
+            try:
+                if not bindings:
+                    logger.debug(f"[LAB] No label bindings found at offset {offset} with filter; trying fallback.")
+                    query = f"""
+                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                    SELECT ?label
+                    WHERE {{
+                        ?item rdfs:label ?label .
+                    }}
+                    LIMIT {limit} 
+                    OFFSET {offset}
+                    """
+                    result_text = await fetch_query(session, endpoint, query, timeout)
+                    root = eT.fromstring(result_text)
+                    bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
+                if not bindings:
+                    logger.debug(f"[LAB] No label bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    labels.append(binding.text)
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[LAB] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(f"[LAB] Finished label query for endpoint: {endpoint} (found {len(labels)} labels)")
     return labels
 
 
-def select_remote_tld_sparqlwrapper(endpoint, limit=100, timeout=300,
-                                    max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def async_select_remote_tld(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[TLD] Starting TLD query for endpoint: {endpoint}")
     tlds = set()
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             SELECT DISTINCT ?o
             WHERE {{
                 ?s ?p ?o .
                 FILTER(isIRI(?o))
             }}
-            ORDER BY ?o
-            LIMIT {limit}
+            LIMIT {limit} 
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
-
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                url = binding.text
-                if url and (url.startswith('http') or url.startswith('https')):
-                    try:
-                        tld = url.split('/')[2].split('.')[-1]
-                        if 1 < len(tld) <= 10:
-                            tlds.add(tld)
-                    except:
-                        pass
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e}")
-            return ''
-
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[TLD] No TLD bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    url = binding.text
+                    if url and (url.startswith('http') or url.startswith('https')):
+                        try:
+                            tld = url.split('/')[2].split('.')[-1]
+                            if 1 < len(tld) <= 10:
+                                tlds.add(tld)
+                        except Exception as e:
+                            logger.debug(f"[TLD] Error parsing TLD for URL {url}: {e}")
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[TLD] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(f"[TLD] Finished TLD query for endpoint: {endpoint} (found {len(tlds)} TLDs)")
     return tlds
 
 
-def select_remote_property_sparqlwrapper(endpoint, limit=100, timeout=300,
-                                         max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def async_select_remote_property(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[PROP] Starting property query for endpoint: {endpoint}")
     properties = []
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             SELECT DISTINCT ?property
             WHERE {{
                 ?subject ?property ?object .
                 FILTER isIRI(?property)
             }}
-            ORDER BY ?property
-            LIMIT {limit}
+            LIMIT {limit} 
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
-
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                properties.append(binding.text)
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e}")
-            return ''
-
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[PROP] No property bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    properties.append(binding.text)
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[PROP] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(f"[PROP] Finished property query for endpoint: {endpoint} (found {len(properties)} properties)")
     return properties
 
 
-def select_remote_property_names_sparqlwrapper(endpoint, limit=100, timeout=300,
-                                               max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def async_select_remote_property_names(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[PNAME] Starting property name query for endpoint: {endpoint}")
     local_property_names = []
-    processed_local_names = set()
+    processed = set()
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             SELECT DISTINCT ?property
             WHERE {{
                 ?subject ?property ?object .
                 FILTER isIRI(?property)
             }}
-            ORDER BY ?property
             LIMIT {limit}
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
-
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                property_uri = binding.text
-                if not property_uri:
-                    continue
-
-                if "#" in property_uri:
-                    local_name = property_uri.split("#")[-1]
-                elif "/" in property_uri:
-                    local_name = property_uri.split("/")[-1]
-                else:
-                    local_name = property_uri
-
-                if local_name and local_name not in processed_local_names:
-                    local_property_names.append(local_name)
-                    processed_local_names.add(local_name)
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e}")
-            return ''
-
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[PNAME] No property name bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    prop_uri = binding.text
+                    if not prop_uri:
+                        continue
+                    if "#" in prop_uri:
+                        local_name = prop_uri.split("#")[-1]
+                    elif "/" in prop_uri:
+                        local_name = prop_uri.split("/")[-1]
+                    else:
+                        local_name = prop_uri
+                    if local_name and local_name not in processed:
+                        local_property_names.append(local_name)
+                        processed.add(local_name)
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[PNAME] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(
+        f"[PNAME] Finished property name query for endpoint: {endpoint} (found {len(local_property_names)} names)")
     return local_property_names
 
 
-def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300,
-                                           max_offset=MAX_OFFSET):  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
+async def async_select_remote_class_name(endpoint, limit=10, timeout=300, max_offset=MAX_OFFSET):
+    logger.info(f"[CNAME] Starting class name query for endpoint: {endpoint}")
     local_names = []
     offset = 0
-
-    while True:
-        if offset >= max_offset:
-            break
-
-        sparql.setQuery(f"""
+    async with aiohttp.ClientSession() as session:
+        while offset < max_offset:
+            query = f"""
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             SELECT DISTINCT ?classUri
             WHERE {{
@@ -336,286 +283,238 @@ def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300,
             ORDER BY ?classUri
             LIMIT {limit}
             OFFSET {offset}
-        """)
-        sparql.setReturnFormat('xml')
-
-        try:
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
-
-            if not bindings:
-                break
-
-            for binding in bindings:
-                class_uri = binding.text
-                if not class_uri:
-                    continue
-
-                if "#" in class_uri:
-                    local_name = class_uri.split("#")[-1]
-                elif "/" in class_uri:
-                    local_name = class_uri.split("/")[-1]
-                else:
-                    local_name = class_uri
-
-                local_names.append(local_name)
-
-            offset += 100  # offset increased by 100
-
-        except Exception as e:
-            logger.warning(f"Query execution error: {e.__cause__}")
-            return ''
-
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[CNAME] No class name bindings found at offset {offset}.")
+                    break
+                for binding in bindings:
+                    class_uri = binding.text
+                    if not class_uri:
+                        continue
+                    if "#" in class_uri:
+                        local_name = class_uri.split("#")[-1]
+                    elif "/" in class_uri:
+                        local_name = class_uri.split("/")[-1]
+                    else:
+                        local_name = class_uri
+                    local_names.append(local_name)
+                offset += 100
+            except Exception as e:
+                logger.warning(f"[CNAME] Query execution error: {e}. Endpoint: {endpoint}")
+                return ''
+    logger.info(f"[CNAME] Finished class name query for endpoint: {endpoint} (found {len(local_names)} names)")
     return local_names
 
 
-def _has_void_file(endpoint, timeout=300) -> bool | str:
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
-    sparql.setReturnFormat('xml')
-    sparql.setQuery(f"""
+async def async_has_void_file(endpoint, timeout=300):
+    logger.info(f"[VOID] Checking for VOID file at endpoint: {endpoint}")
+    query = f"""
           PREFIX void: <http://rdfs.org/ns/void#>
           SELECT DISTINCT ?s
-          WHERE {{ ?s a void:Dataset ; 
-            void:sparqlEndpoint <{endpoint}> . }}
-           LIMIT 1""")
-    try:
-        results = sparql.query().response.read()
-        root = eT.fromstring(results)
-        ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-        bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
-        if bindings:
-            for binding in bindings:
-                return binding.text
-        return False
-    except:
-        return False
+          WHERE {{ 
+              ?s a void:Dataset ; 
+              void:sparqlEndpoint <{endpoint}> .
+          }}
+           LIMIT 1
+    """
+    async with aiohttp.ClientSession() as session:
+        try:
+            result_text = await fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
+            if bindings:
+                for binding in bindings:
+                    logger.info(f"[VOID] VOID file found: {binding.text}")
+                    return binding.text
+            return False
+        except Exception as e:
+            logger.warning(f"[VOID] Error checking for VOID file at endpoint: {endpoint}: {e}")
+            return False
 
 
-
-
-
-def select_void_description(endpoint, timeout=300, void_file=False) -> list:
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
-    sparql.setReturnFormat('xml')
-    sparql.setQuery("""
+async def async_select_void_description(endpoint, timeout=300, void_file=False):
+    logger.info(f"[VDESC] Starting VOID description query for endpoint: {endpoint}")
+    query = """
           PREFIX dcterms: <http://purl.org/dc/terms/> 
-
           SELECT ?desc WHERE {
               ?s dcterms:description ?desc .
           } LIMIT 1
-          """)
-    try:
-        results = sparql.query().response.read()
-        root = eT.fromstring(results)
-        local_descriptions = set()
-        ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-        bindings = root.findall('.//sparql:binding[@name="desc"]/*', ns)
-        for binding in bindings:
-            local_descriptions.add(binding.text)
-        if not bindings and not void_file:
-            uri = _has_void_file(endpoint)
-            if uri:
-                return select_void_subject_remote(uri, timeout, True)
-        return list(local_descriptions)
-    except Exception as e:
-        print("Error:", e)
-        return []
+    """
+    async with aiohttp.ClientSession() as session:
+        try:
+            result_text = await fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            descriptions = {binding.text for binding in root.findall('.//sparql:binding[@name="desc"]/*', ns)}
+            if not descriptions and not void_file:
+                uri = await async_has_void_file(endpoint, timeout)
+                if uri:
+                    return await async_select_void_subject_remote(uri, timeout, True)
+            logger.info(f"[VDESC] Finished VOID description query for endpoint: {endpoint}")
+            return list(descriptions)
+        except Exception as e:
+            logger.warning(f"[VDESC] Error in VOID description query: {e}")
+            return []
 
 
-def select_void_subject_remote(endpoint, timeout=300, void_file=False) -> list:  # timeout increased to 300
-    sparql = SPARQLWrapper(endpoint)
-    sparql.setTimeout(timeout)
-    sparql.setReturnFormat('xml')
-    sparql.setQuery("""
+async def async_select_void_subject_remote(endpoint, timeout=300, void_file=False):
+    logger.info(f"[VSUBJ] Starting VOID subject query for endpoint: {endpoint}")
+    query = """
         PREFIX void: <http://rdfs.org/ns/void#> 
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         SELECT DISTINCT ?s 
         WHERE {
             ?s rdf:type void:Dataset .
-    } LIMIT 100""")
-    try:
-        results = sparql.query().response.read()
-        root = eT.fromstring(results)
-        local_names = set()
-        ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-        bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
-        for binding in bindings:
-            local_names.add(binding.text)
-        if not bindings and not void_file:
-            uri = _has_void_file(endpoint)
-            if uri:
-                return select_void_subject_remote(uri, timeout, True)
-    except:
-        return []
-
-    try:
+        } LIMIT 100
+    """
+    async with aiohttp.ClientSession() as session:
+        try:
+            result_text = await fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            local_names = {binding.text for binding in root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)}
+            if not local_names and not void_file:
+                uri = await async_has_void_file(endpoint, timeout)
+                if uri:
+                    return await async_select_void_subject_remote(uri, timeout, True)
+        except Exception as e:
+            logger.warning(f"[VSUBJ] VOID subject query error for endpoint: {endpoint}: {e}")
+            return []
         class_names = set()
         for local_name in local_names:
-            sparql.setQuery(f"""
+            query2 = f"""
                 PREFIX dcterms: <http://purl.org/dc/terms/>
-
                 SELECT DISTINCT ?classUri
                 WHERE {{
                     <{local_name}> dcterms:subject ?classUri .
-                }} LIMIT 100""")
-            results = sparql.query().response.read()
-            root = eT.fromstring(results)
-            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
-            for binding in bindings:
-                class_names.add(binding.text)
+                }} LIMIT 100
+            """
+            try:
+                result_text = await fetch_query(session, endpoint, query2, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+                for binding in bindings:
+                    class_names.add(binding.text)
+            except Exception as e:
+                logger.warning(f"[VSUBJ] Error processing VOID subjects for {local_name} at endpoint {endpoint}: {e}")
+        logger.info(f"[VSUBJ] Finished VOID subject query for endpoint: {endpoint}")
         return list(class_names)
-    except:
-        return []
 
 
-def process_row(row, index, result_queue):
-    logger.info(f"Endpoint: {row['id']} Number: {index}")
+
+async def process_endpoint(row):
     endpoint = row['sparql_url']
+    logger.info(f"[PROC] Processing endpoint {row['id']}")
+    tasks = {
+        'voc': async_select_remote_vocabularies(endpoint),
+        'curi': async_select_remote_class(endpoint),
+        'puri': async_select_remote_property(endpoint),
+        'lcn': async_select_remote_class_name(endpoint),
+        'lpn': async_select_remote_property_names(endpoint),
+        'lab': async_select_remote_label(endpoint),
+        'tld': async_select_remote_tld(endpoint)
+    }
+    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+    result_dict = dict(zip(tasks.keys(), results))
+    logger.info(f"[PROC] Finished processing endpoint {row['id']}")
+    return [row['id'], result_dict.get('voc'), result_dict.get('curi'),
+            result_dict.get('puri'), result_dict.get('lcn'), result_dict.get('lpn'),
+            result_dict.get('lab'), result_dict.get('tld'), row['category']]
+
+
+async def process_endpoint_void(row):
+    endpoint = row['sparql_url']
+    logger.info(f"[VOID-PROC] Processing VOID endpoint {row['id']}")
+    tasks = {
+        'sbj': async_select_void_subject_remote(endpoint),
+        'dsc': async_select_void_description(endpoint)
+    }
+    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+    result_dict = dict(zip(tasks.keys(), results))
+    logger.info(f"[VOID-PROC] Finished processing VOID endpoint {row['id']}")
+    return [row['id'], result_dict.get('sbj'), result_dict.get('dsc'), row['category']]
+
+
+async def main_normal():
+    logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
     try:
-        # Define a dictionary mapping a label to its corresponding query function call.
-        query_tasks = {
-            'voc': (select_remote_vocabularies_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-            'curi': (select_remote_class_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-            'puri': (select_remote_property_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-            'lcn': (select_remote_class_name_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-            'lpn': (select_remote_property_names_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-            'lab': (select_remote_label_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-            'tld': (select_remote_tld_sparqlwrapper, {'endpoint': endpoint, 'timeout': 300}),
-        }
-
-        results_dict = {}
-
-        with ThreadPoolExecutor(max_workers=7) as executor:
-            future_to_key = {
-                executor.submit(func, **params): key
-                for key, (func, params) in query_tasks.items()
-            }
-
-            for future in as_completed(future_to_key):
-                key = future_to_key[future]
-                try:
-                    results_dict[key] = future.result()
-                except Exception as e:
-                    logger.warning(f"Error in task {key} for endpoint {row['id']}: {str(e)}")
-                    results_dict[key] = ''  # or handle error appropriately
-
-        # Prepare the aggregated results.
-        result = [
-            row['id'],
-            results_dict.get('voc'),
-            results_dict.get('curi'),
-            results_dict.get('puri'),
-            results_dict.get('lcn'),
-            results_dict.get('lpn'),
-            results_dict.get('lab'),
-            results_dict.get('tld'),
-            row['category']
-        ]
-
-        result_queue.put(result)
+        lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     except Exception as e:
-        logger.warning(f"Error processing endpoint {row['id']}: {str(e)}")
-
-
-def create_remote_dataset_sparqlwrapper():
-    lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+        logger.error(f"Error reading CSV file: {e}")
+        sys.exit(1)
     lod_frame = lod_frame.drop_duplicates(subset=['sparql_url'])
-    logger.info('Started dataset processing')
-
-    result_queue = queue.Queue()
-
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        # Create a future for each row that has a non-empty sparql_url.
-        futures = [
-            executor.submit(process_row, row, index, result_queue)
-            for index, row in lod_frame.iterrows() if row['sparql_url']
-        ]
-        # Wait for all futures to complete.
-        for future in futures:
-            future.result()
-
+    tasks = [
+        asyncio.wait_for(process_endpoint(row), timeout=ENDPOINT_TIMEOUT)
+        for _, row in lod_frame.iterrows() if row['sparql_url']
+    ]
+    total = len(tasks)
+    logger.info(f"[MAIN] Total endpoints to process: {total}")
     results = []
-    while not result_queue.empty():
-        results.append(result_queue.get())
-
+    processed = 0
+    for coro in asyncio.as_completed(tasks):
+        try:
+            res = await coro
+            if res is not None:
+                results.append(res)
+        except asyncio.TimeoutError:
+            logger.warning("[MAIN] Timeout processing an endpoint.")
+        except Exception as e:
+            logger.warning(f"[MAIN] Error processing an endpoint: {e}")
+        processed += 1
+        logger.info(f"[MAIN] Processed {processed}/{total} endpoints")
     df = pd.DataFrame(
         results,
         columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category']
     )
-
     df.to_json('../data/raw/remote/remote_feature_set_sparqlwrapper.json', orient='records')
-    logger.info('Finished dataset processing')
+    logger.info("[MAIN] Finished asynchronous remote dataset processing (normal mode).")
 
 
-def process_row_void(row, index, result_queue):
-    logger.info(f"Endpoint: {row['id']} Number: {index}")
-    endpoint = row['sparql_url']
+async def main_void():
+    logger.info("[VOID-MAIN] Starting asynchronous VOID dataset processing.")
     try:
-        query_tasks = {
-            'dsc': (select_void_description, {'endpoint': endpoint, 'timeout': 300}),
-            'sbj': (select_void_subject_remote, {'endpoint': endpoint, 'timeout': 300})
-        }
-
-        results_dict = {}
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future_to_key = {
-                executor.submit(func, **params): key
-                for key, (func, params) in query_tasks.items()
-            }
-
-            for future in as_completed(future_to_key):
-                key = future_to_key[future]
-                try:
-                    results_dict[key] = future.result()
-                except Exception as e:
-                    logger.warning(f"Error in task {key} for endpoint {row['id']}: {str(e)}")
-                    results_dict[key] = ''  # or handle error appropriately
-
-        # Prepare the aggregated results.
-        result = [
-            row['id'],
-            results_dict.get('sbj'),
-            results_dict.get('dsc'),
-            row['category']
-        ]
-
-        result_queue.put(result)
+        lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     except Exception as e:
-        logger.warning(f"Error processing endpoint {row['id']}: {str(e)}")
-
-
-def create_remote_dataset_sparqlwrapper_void():
-    lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+        logger.error(f"Error reading CSV file: {e}")
+        sys.exit(1)
     lod_frame = lod_frame.drop_duplicates(subset=['sparql_url'])
-    logger.info('Started dataset processing')
-
-    result_queue = queue.Queue()
-
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        # Create a future for each row that has a non-empty sparql_url.
-        futures = [
-            executor.submit(process_row_void, row, index, result_queue)
-            for index, row in lod_frame.iterrows() if row['sparql_url']
-        ]
-
+    tasks = [
+        asyncio.wait_for(process_endpoint_void(row), timeout=ENDPOINT_TIMEOUT)
+        for _, row in lod_frame.iterrows() if row['sparql_url']
+    ]
+    total = len(tasks)
+    logger.info(f"[VOID-MAIN] Total VOID endpoints to process: {total}")
     results = []
-    while not result_queue.empty():
-        results.append(result_queue.get())
-
+    processed = 0
+    for coro in asyncio.as_completed(tasks):
+        try:
+            res = await coro
+            if res is not None:
+                results.append(res)
+        except asyncio.TimeoutError:
+            logger.warning("[VOID-MAIN] Timeout processing a VOID endpoint.")
+        except Exception as e:
+            logger.warning(f"[VOID-MAIN] Error processing a VOID endpoint: {e}")
+        processed += 1
+        logger.info(f"[VOID-MAIN] Processed {processed}/{total} VOID endpoints")
     df = pd.DataFrame(
         results,
         columns=['id', 'sbj', 'dsc', 'category']
     )
-
     df.to_json('../data/raw/remote/remote_void_feature_set_sparqlwrapper.json', orient='records')
-    logger.info('Finished dataset processing')
+    logger.info("[VOID-MAIN] Finished asynchronous VOID dataset processing.")
 
 
-create_remote_dataset_sparqlwrapper_void()
+if __name__ == '__main__':
+    #  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
+    #   if mode == "void":
+    # asyncio.run(main_void())
+    # else:
+    asyncio.run(main_normal())
