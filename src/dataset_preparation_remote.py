@@ -1,7 +1,7 @@
 import queue
 from concurrent.futures import ThreadPoolExecutor
 from SPARQLWrapper import SPARQLWrapper
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as eT
 import pandas as pd
 from conda.common.io import as_completed
 
@@ -34,7 +34,7 @@ def select_remote_vocabularies_sparqlwrapper(endpoint, limit=100, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
 
             bindings = root.findall('.//sparql:binding[@name="predicate"]/sparql:uri', ns)
@@ -95,7 +95,7 @@ def select_remote_class_sparqlwrapper(endpoint, limit=100, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
 
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
@@ -140,7 +140,7 @@ def select_remote_label_sparqlwrapper(endpoint, limit=100, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
 
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="type"]/sparql:literal', ns)
@@ -185,7 +185,7 @@ def select_remote_tld_sparqlwrapper(endpoint, limit=100, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
 
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
@@ -237,7 +237,7 @@ def select_remote_property_sparqlwrapper(endpoint, limit=100, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
 
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
@@ -283,7 +283,7 @@ def select_remote_property_names_sparqlwrapper(endpoint, limit=100, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
 
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
@@ -341,7 +341,7 @@ def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300,
 
         try:
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
 
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
@@ -384,7 +384,7 @@ def _has_void_file(endpoint, timeout=300) -> bool | str:
            LIMIT 1""")
     try:
         results = sparql.query().response.read()
-        root = ET.fromstring(results)
+        root = eT.fromstring(results)
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
         bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
         if bindings:
@@ -411,7 +411,7 @@ def select_void_description(endpoint, timeout=300, void_file=False) -> list:
           """)
     try:
         results = sparql.query().response.read()
-        root = ET.fromstring(results)
+        root = eT.fromstring(results)
         local_descriptions = set()
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
         bindings = root.findall('.//sparql:binding[@name="desc"]/*', ns)
@@ -440,7 +440,7 @@ def select_void_subject_remote(endpoint, timeout=300, void_file=False) -> list: 
     } LIMIT 100""")
     try:
         results = sparql.query().response.read()
-        root = ET.fromstring(results)
+        root = eT.fromstring(results)
         local_names = set()
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
         bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
@@ -464,12 +464,12 @@ def select_void_subject_remote(endpoint, timeout=300, void_file=False) -> list: 
                     <{local_name}> dcterms:subject ?classUri .
                 }} LIMIT 100""")
             results = sparql.query().response.read()
-            root = ET.fromstring(results)
+            root = eT.fromstring(results)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
             for binding in bindings:
                 class_names.add(binding.text)
-        return class_names
+        return list(class_names)
     except:
         return []
 
