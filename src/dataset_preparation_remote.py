@@ -1,6 +1,7 @@
 import queue
 from concurrent.futures import ThreadPoolExecutor
-
+from SPARQLWrapper import SPARQLWrapper
+import xml.etree.ElementTree as ET
 import pandas as pd
 from conda.common.io import as_completed
 
@@ -371,34 +372,33 @@ def select_remote_class_name_sparqlwrapper(endpoint, limit=10, timeout=300,
     return local_names
 
 
-def has_void_description(endpoint, timeout=300) -> bool:
+def _has_void_file(endpoint, timeout=300) -> bool | str:
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     sparql.setReturnFormat('xml')
-    sparql.setQuery("""
-           PREFIX void: <http://rdfs.org/ns/void#> 
-           
-           SELECT ?classUri WHERE {
-               ?s void:dataset ?classUri .
-           }
-           """)
+    sparql.setQuery(f"""
+          PREFIX void: <http://rdfs.org/ns/void#>
+          SELECT DISTINCT ?s
+          WHERE {{ ?s a void:Dataset ; 
+            void:sparqlEndpoint <{endpoint}> . }}
+           LIMIT 1""")
     try:
         results = sparql.query().response.read()
         root = ET.fromstring(results)
         ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-        bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+        bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
         if bindings:
-            return True
+            for binding in bindings:
+                return binding.text
         return False
     except:
         return False
 
 
-from SPARQLWrapper import SPARQLWrapper
-import xml.etree.ElementTree as ET
 
 
-def select_void_description(endpoint, timeout=300) -> list:
+
+def select_void_description(endpoint, timeout=300, void_file=False) -> list:
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     sparql.setReturnFormat('xml')
@@ -417,13 +417,17 @@ def select_void_description(endpoint, timeout=300) -> list:
         bindings = root.findall('.//sparql:binding[@name="desc"]/*', ns)
         for binding in bindings:
             local_descriptions.add(binding.text)
+        if not bindings and not void_file:
+            uri = _has_void_file(endpoint)
+            if uri:
+                return select_void_subject_remote(uri, timeout, True)
         return list(local_descriptions)
     except Exception as e:
         print("Error:", e)
         return []
 
 
-def select_void_subject_remote(endpoint, timeout=300):  # timeout increased to 300
+def select_void_subject_remote(endpoint, timeout=300, void_file=False) -> list:  # timeout increased to 300
     sparql = SPARQLWrapper(endpoint)
     sparql.setTimeout(timeout)
     sparql.setReturnFormat('xml')
@@ -433,7 +437,7 @@ def select_void_subject_remote(endpoint, timeout=300):  # timeout increased to 3
         SELECT DISTINCT ?s 
         WHERE {
             ?s rdf:type void:Dataset .
-    } LIMIT 10""")
+    } LIMIT 100""")
     try:
         results = sparql.query().response.read()
         root = ET.fromstring(results)
@@ -442,6 +446,10 @@ def select_void_subject_remote(endpoint, timeout=300):  # timeout increased to 3
         bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
         for binding in bindings:
             local_names.add(binding.text)
+        if not bindings and not void_file:
+            uri = _has_void_file(endpoint)
+            if uri:
+                return select_void_subject_remote(uri, timeout, True)
     except:
         return []
 

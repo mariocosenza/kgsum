@@ -1,5 +1,4 @@
 import os
-import re
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from os import listdir
 
@@ -34,13 +33,13 @@ Q_LOCAL_CLASS = prepareQuery("""
         ?classUri a ?type .
         FILTER (?type IN (rdfs:Class, owl:Class))
     } LIMIT 1000
-""")
+""", initNs={'rdfs': '', 'owl': 'http://www.w3.org/2002/07/owl#'})
 Q_LOCAL_LABEL = prepareQuery("""
     SELECT DISTINCT ?type
     WHERE {
         ?class rdfs:label ?type .
     } LIMIT 1000
-""", initNs={"rdf": rdflib.RDF})
+""", initNs={"rdfs": 'http://www.w3.org/2001/XMLSchema#'})
 Q_LOCAL_TLD = prepareQuery("""
     SELECT DISTINCT ?o
     WHERE {
@@ -80,7 +79,7 @@ Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery(
     """
     SELECT ?desc WHERE {
             ?s dcterms:description ?desc .
-    } LIMIT 10
+    } LIMIT 1
     """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
 
