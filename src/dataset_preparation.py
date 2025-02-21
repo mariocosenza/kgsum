@@ -1,3 +1,4 @@
+import logging
 import os
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from os import listdir
@@ -7,8 +8,10 @@ import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
 
-from service.endpoint_lod import logger
 from src.util import match_file_lod, CATEGORIES
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("dataset_preparation")
 
 # Initialize the rdflib graph with Oxigraph store.
 rdflib.Graph(store="Oxigraph")
@@ -16,7 +19,6 @@ rdflib.Graph(store="Oxigraph")
 FORMATS = {
     'ox-nt', 'ox-nq', 'ox-ttl', 'ox-trig', 'ox-xml'
 }
-
 
 # Precompile SPARQL queries
 Q_LOCAL_VOCABULARIES = prepareQuery("""
@@ -40,6 +42,15 @@ Q_LOCAL_LABEL = prepareQuery("""
         ?class rdfs:label ?type .
     } LIMIT 1000
 """, initNs={"rdfs": 'http://www.w3.org/2001/XMLSchema#'})
+
+Q_LOCAL_LABEL_EN = prepareQuery("""
+    SELECT DISTINCT ?type
+    WHERE {
+         ?item rdfs:label ?type .
+            FILTER(langMatches(lang(?type), "en"))
+    } LIMIT 1000
+""", initNs={"rdfs": 'http://www.w3.org/2001/XMLSchema#'})
+
 Q_LOCAL_TLD = prepareQuery("""
     SELECT DISTINCT ?o
     WHERE {
@@ -108,7 +119,9 @@ def select_local_class(parsed_graph):
 
 
 def select_local_label(parsed_graph):
-    qres = parsed_graph.query(Q_LOCAL_LABEL)
+    qres = parsed_graph.query(Q_LOCAL_LABEL_EN)
+    if not qres:
+        qres = parsed_graph.query(Q_LOCAL_LABEL)
     return {str(row.type) for row in qres}
 
 
