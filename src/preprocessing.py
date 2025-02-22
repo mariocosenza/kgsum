@@ -1,147 +1,160 @@
+import logging
 from os import listdir
 
 import pandas as pd
 import spacy
-from deep_translator import GoogleTranslator
+from spacy.language import Language
+from spacy_langdetect import LanguageDetector
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Create a spaCy language detector factory.
+@Language.factory("language_detector")
+def get_lang_detector(nlp, name):
+    return LanguageDetector()
+
+# Load the main spaCy pipeline (for language detection).
 nlp = spacy.load("en_core_web_sm")
+nlp.add_pipe("language_detector", last=True)
 
+# Load language-specific pipelines.
+pipeline_dict = {}
+try:
+    pipeline_dict["en"] = spacy.load("en_core_web_sm")
+except Exception as e:
+    logger.error("Error loading English pipeline: %s", e)
+try:
+    pipeline_dict["it"] = spacy.load("it_core_news_sm")
+except Exception as e:
+    logger.error("Error loading Italian pipeline: %s", e)
+try:
+    pipeline_dict["es"] = spacy.load("es_core_news_sm")
+except Exception as e:
+    logger.error("Error loading Spanish pipeline: %s", e)
+try:
+    pipeline_dict["de"] = spacy.load("de_core_news_sm")
+except Exception as e:
+    logger.error("Error loading German pipeline: %s", e)
+try:
+    pipeline_dict["fr"] = spacy.load("fr_core_news_sm")
+except Exception as e:
+    logger.error("Error loading French pipeline: %s", e)
 
+try:
+    fallback_pipeline = spacy.load("xx_ent_wiki_sm")
+except Exception as e:
+    logger.error("Error loading multilingual pipeline: %s", e)
+    fallback_pipeline = pipeline_dict.get("en")
+
+def process_text(text: str) -> str:
+    if not text:
+        return ""
+    doc = nlp(text)
+    lang = doc._.language.get("language", "en")
+    chosen_nlp = pipeline_dict.get(lang, fallback_pipeline)
+    docs = list(chosen_nlp.pipe([text]))
+    return docs[0].text if docs else ""
 
 def merge_dataset() -> pd.DataFrame:
     local_frames = []
-    for file in listdir('../data/raw/local'):
-        if 'local_feature_set' in file:
-            local_frames.append(pd.read_json(f'../data/raw/local/{file}'))
-
+    for file in listdir("../data/raw/local"):
+        if "local_feature_set" in file:
+            local_frames.append(pd.read_json(f"../data/raw/local/{file}"))
     remote_frames = []
-    for file in listdir('../data/raw/remote'):
-        if 'remote_feature_set' in file:
-            remote_frames.append(pd.read_json(f'../data/raw/remote/{file}'))
+    for file in listdir("../data/raw/remote"):
+        if "remote_feature_set" in file:
+            remote_frames.append(pd.read_json(f"../data/raw/remote/{file}"))
 
-    # Concatenate all frames from local and remote directories.
-    # If either list is empty, use an empty DataFrame.
     df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
     df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
 
-    # Combine the two DataFrames.
     merged_df = pd.concat([df_local, df_remote], ignore_index=True)
-
-    # Drop duplicates based on the "id" column.
-    # When duplicates occur, the row from the remote (later in the concatenation) is kept.
-    merged_df = merged_df.drop_duplicates(subset='id', keep='last')
+    merged_df = merged_df.drop_duplicates(subset="id", keep="last")
 
     return merged_df
-
 
 def merge_void_dataset():
+    """Merge local and remote void datasets."""
     local_frames = []
-    for file in listdir('../data/raw/local'):
-        if 'local_void_feature_set' in file:
-            local_frames.append(pd.read_json(f'../data/raw/local/{file}'))
-
+    for file in listdir("../data/raw/local"):
+        if "local_void_feature_set" in file:
+            local_frames.append(pd.read_json(f"../data/raw/local/{file}"))
     remote_frames = []
-    for file in listdir('../data/raw/remote'):
-        if 'remote_void_feature_set' in file:
-            remote_frames.append(pd.read_json(f'../data/raw/remote/{file}'))
+    for file in listdir("../data/raw/remote"):
+        if "remote_void_feature_set" in file:
+            remote_frames.append(pd.read_json(f"../data/raw/remote/{file}"))
 
     df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
     df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
 
     merged_df = pd.concat([df_local, df_remote], ignore_index=True)
-    merged_df = merged_df.drop_duplicates(subset='id', keep='last')
+    merged_df = merged_df.drop_duplicates(subset="id", keep="last")
 
     return merged_df
 
+def process_row(row, index: int, total: int):
+    logger.info("Processing row %d/%d started.", index, total)
 
-from typing import List, Optional, Any
+    lab_text = process_text(" ".join(word if word is not None else "" for word in row.get("lab", []))) if row.get("lab") else ""
+    lcn_text = process_text(" ".join(word if word is not None else "" for word in row.get("lcn", []))) if row.get("lcn") else ""
+    lnp_text = process_text(" ".join(word if word is not None else "" for word in row.get("lpn", []))) if row.get("lpn") else ""
 
-
-def _translate_text(word_list: Optional[List[Optional[str]]], translator) -> Optional[str]:
-    if not word_list:
-        return None
-
-    full_text = ' '.join(word if word is not None else 'abcd' for word in word_list)
-
-    if len(full_text) <= 4500:
-        return translator.translate(full_text)
-    else:
-        translated_chunks = []
-        current_chunk = ""
-
-        for word in word_list:
-            actual_word = word if word is not None else "abcd"
-            additional_length = len(actual_word) + (1 if current_chunk else 0)
-            if len(current_chunk) + additional_length <= 4500:
-                current_chunk = f"{current_chunk} {actual_word}" if current_chunk else actual_word
-            else:
-                translated_chunks.append(translator.translate(current_chunk))
-                current_chunk = actual_word
-
-        if current_chunk:
-            translated_chunks.append(translator.translate(current_chunk))
-
-        return ' '.join(translated_chunks)
-
+    logger.info("Processing row %d/%d completed.", index, total)
+    return lab_text, lcn_text, lnp_text
 
 def preprocess_lab_lcn_lnp(input_frame: pd.DataFrame):
-    translator = GoogleTranslator(source='auto', target='en')
-    list_lab = list()
-    list_lnp = list()
-    list_lcn = list()
-    for index, row in input_frame.iterrows():
-        cleaned_lab_row = ''
-        cleaned_lpn_row = ''
-        cleaned_lcn_row = ''
-        if not row['lcn'] == []:
-            translated_lcn_row = _translate_text(row['lcn'], translator)
-            if translated_lcn_row is not None:
-                cleaned_lcn_row = [word.text for word in nlp(translated_lcn_row) if not word.like_url]
-                cleaned_lcn_row = nlp.pipe(cleaned_lcn_row, n_process=-1)
-        if not row['lab'] == []:
-            print(row['lab'])
-            translated_lab_row = _translate_text(row['lab'], translator)
-            if translated_lab_row is not None:
-                cleaned_lab_row = [word.text for word in nlp(translated_lab_row) if not word.like_url]
-                cleaned_lab_row = nlp.pipe(cleaned_lab_row, n_process=-1)
-        if not row['lpn'] == []:
-            translated_lpn_row = _translate_text(row['lpn'], translator)
-            if translated_lpn_row is not None:
-                cleaned_lpn_row = [word.text for word in nlp(translated_lpn_row) if not word.like_url]
-                cleaned_lpn_row = nlp.pipe(cleaned_lpn_row, n_process=-1)
+    total_rows = len(input_frame)
+    processed_lab = []
+    processed_lcn = []
+    processed_lnp = []
 
-
-        list_lab.append(cleaned_lab_row)
-        list_lnp.append(cleaned_lpn_row)
-        list_lcn.append(cleaned_lcn_row)
-
-    pd.DataFrame({
+    for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
+        lab_text, lcn_text, lnp_text = process_row(row, i, total_rows)
+        processed_lab.append(lab_text)
+        processed_lcn.append(lcn_text)
+        processed_lnp.append(lnp_text)
+    out_df = pd.DataFrame({
         "id": input_frame["id"],
         "category": input_frame["category"],
-        "lcn": list_lcn,
-        "lab": list_lab,
-        "lnp": list_lnp
-    }).to_json('../data/processed/lab_lcn_lnp.json')
+        "lab": processed_lab,
+        "lcn": processed_lcn,
+        "lnp": processed_lnp
+    })
 
+    out_df.to_json("../data/processed/lab_lcn_lnp.json")
+    logger.info("Processing complete: %d/%d", total_rows, total_rows)
 
-def preprocess_void(input_frame):
-    processed_frame = pd.DataFrame()
-    translator = GoogleTranslator(source='auto', target='en')
-    for row in input_frame:
-        if row['dsc']:
-            translated_dsc_row = _translate_text(row['dsc'], translator)
-            cleaned_dsc_row = [word.text for word in nlp(translated_dsc_row) if not word.like_url]
-            cleaned_dsc_row = nlp.pipe(cleaned_dsc_row, n_process=-1)
+def process_void_row(row, index: int, total: int) -> str:
+    logger.info("Processing void row %d/%d started.", index, total)
 
+    result = process_text(" ".join(word if word is not None else "" for word in row.get("dsc", []))) if row.get("dsc") else ""
+
+    logger.info("Processing void row %d/%d completed.", index, total)
+    return result
+
+def preprocess_void(input_frame: pd.DataFrame):
+    total_rows = len(input_frame)
+    processed_void = []
+
+    for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
+        processed_void.append(process_void_row(row, i, total_rows))
+    pd.DataFrame({"void": processed_void}).to_json("../data/processed/void.json")
+
+    logger.info("Void processing complete: %d/%d", total_rows, total_rows)
 
 def preprocess_voc_tags(input_frame: pd.DataFrame):
     frame = input_frame.dropna()
-    frame.to_json('../data/processed/voc_tags.json')
-
-
+    frame.to_json("../data/processed/voc_tags.json")
+    logger.info("voc tags processing complete.")
 
 def preprocess_voc_curi_puri_tld(input_frame):
     processed_frame = pd.DataFrame()
+    processed_frame.to_json("../data/processed/voc_curi_puri_tld.json")
+    logger.info("voc curi puri tld processing complete.")
 
-
-preprocess_lab_lcn_lnp(merge_dataset())
+#if __name__ == "__main__":
+#    from multiprocessing import freeze_support
+#    freeze_support()
+#    df = merge_dataset()
+#    preprocess_lab_lcn_lnp(df)
