@@ -35,21 +35,21 @@ Q_LOCAL_CLASS = prepareQuery("""
         ?classUri a ?type .
         FILTER (?type IN (rdfs:Class, owl:Class))
     } LIMIT 1000
-""", initNs={'rdfs': '', 'owl': 'http://www.w3.org/2002/07/owl#'})
+""", initNs={'rdfs': 'http://www.w3.org/2000/01/rdf-schema#', 'owl': 'http://www.w3.org/2002/07/owl#'})
 Q_LOCAL_LABEL = prepareQuery("""
     SELECT DISTINCT ?type
     WHERE {
         ?class rdfs:label ?type .
     } LIMIT 1000
-""", initNs={"rdfs": 'http://www.w3.org/2001/XMLSchema#'})
+""", initNs={"rdfs": 'http://www.w3.org/2000/01/rdf-schema#'})
 
 Q_LOCAL_LABEL_EN = prepareQuery("""
     SELECT DISTINCT ?type
     WHERE {
          ?item rdfs:label ?type .
-            FILTER(langMatches(lang(?type), "en"))
+         FILTER(langMatches(lang(?type), "en"))
     } LIMIT 1000
-""", initNs={"rdfs": 'http://www.w3.org/2001/XMLSchema#'})
+""", initNs={"rdfs": 'http://www.w3.org/2000/01/rdf-schema#'})
 
 Q_LOCAL_TLD = prepareQuery("""
     SELECT DISTINCT ?o
@@ -83,7 +83,7 @@ Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
     SELECT DISTINCT ?s
     WHERE {
         ?s rdf:type void:Dataset .
-    } LIMIT 1000
+    } LIMIT 100
 """, initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
 
 Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery(
@@ -98,7 +98,6 @@ def select_local_vocabularies(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
     vocabularies = set()
     for row in qres:
-        print(type(row))
         predicate_uri = str(row.predicate)
         if predicate_uri:
             if "#" in predicate_uri:
@@ -120,7 +119,7 @@ def select_local_class(parsed_graph):
 
 def select_local_label(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_LABEL_EN)
-    if not qres:
+    if len(qres) < 2:
         qres = parsed_graph.query(Q_LOCAL_LABEL)
     return {str(row.type) for row in qres}
 
@@ -356,10 +355,10 @@ def create_local_void_dataset(offset=0, limit=10000):
     df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
 
 
-if __name__ == '__main__':
-    import multiprocessing
+#if __name__ == '__main__':
+    #import multiprocessing
 
-    multiprocessing.freeze_support()
-    # create_local_dataset(offset=0, limit=5)
+    #multiprocessing.freeze_support()
+    #create_local_dataset(offset=0, limit=200)
     # To process the void dataset, call:
-    create_local_void_dataset(offset=0, limit=200)
+    #create_local_void_dataset(offset=0, limit=200)
