@@ -21,7 +21,6 @@ def find_tags_from_json(df: pd.DataFrame):
                 response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}",
                                             timeout=300)
                 response_cache[voc] = response_lov
-                time.sleep(0.1)
             else:
                 response_lov = response_cache[voc]
             if response_lov.status_code == 200:
@@ -98,7 +97,6 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
                 print(frozenset_set)
                 return response_lov
         cache_dict[clean_uri] = ''
-        time.sleep(0.1)
         response_lov = ''
     else:
         response_lov = cache_dict[clean_uri]
@@ -106,4 +104,4 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
     return response_lov
 
 df = merge_dataset()
-find_tags_from_json_curi_puri(df)
+find_tags_from_json(df)
