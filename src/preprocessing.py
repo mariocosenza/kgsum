@@ -48,7 +48,7 @@ except Exception as e:
     fallback_pipeline = pipeline_dict.get("en")
 
 def process_text(text: str) -> str:
-    if not text:
+    if not text or len(text) > 100000:
         return ""
     doc = nlp(text)
     lang = doc._.language.get("language", "en")
@@ -148,13 +148,11 @@ def preprocess_voc_tags(input_frame: pd.DataFrame):
     frame.to_json("../data/processed/voc_tags.json")
     logger.info("voc tags processing complete.")
 
-def preprocess_voc_curi_puri_tld(input_frame):
+def preprocess_voc_curi_puri_tld(input_frame: pd.DataFrame):
     processed_frame = pd.DataFrame()
     processed_frame.to_json("../data/processed/voc_curi_puri_tld.json")
     logger.info("voc curi puri tld processing complete.")
 
-#if __name__ == "__main__":
-#    from multiprocessing import freeze_support
-#    freeze_support()
-#    df = merge_dataset()
-#    preprocess_lab_lcn_lnp(df)
+if __name__ == "__main__":
+    df = merge_dataset()
+    preprocess_lab_lcn_lnp(df)
