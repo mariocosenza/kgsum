@@ -1,20 +1,25 @@
 import json
+import logging
+import os
 import re
-import time
-
 import pandas as pd
 import requests
+from SPARQLWrapper import SPARQLWrapper, JSON
 
 from src.preprocessing import merge_dataset
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("vocabulary_extraction")
+
 CLEAN_URI = re.compile(r'^([^#]+)?')
+LOCAL_ENDPOINT_LOV = os.environ['LOCAL_ENDPOINT_LOV']
 
 
-def find_tags_from_json(df: pd.DataFrame):
+def find_tags_from_json(data_frame: pd.DataFrame):
     response_df = pd.DataFrame(columns=['id', 'tags', 'voc','category'])
     subject_list = []
     response_cache = {}
-    for index, row in df.iterrows():
+    for index, row in data_frame.iterrows():
         for voc in set(row['voc']):
             print(f'Vocabulary: {voc}')
             if voc not in response_cache:
@@ -41,43 +46,7 @@ def find_tags_from_json(df: pd.DataFrame):
                 except Exception as e:
                     print(e)
 
-
     return subject_list
-
-def find_tags_from_json_curi_puri(df: pd.DataFrame):
-    response_curi_puri = pd.DataFrame(columns=['id', 'curi', 'puri' 'tags_curi', 'tags_puri', 'tags_voc', 'category'])
-
-    curi_dict = {}
-    puri_dict = {}
-
-    for index, row in df.iterrows():
-        list_curi_tags = set()
-        list_puri_tags = set()
-
-        for curi in row['curi']:
-            response_lov = _get_lov_search_result(curi, curi_dict)
-            if response_lov != '':
-                list_curi_tags.add(response_lov)
-            else:
-                list_curi_tags.add(None)
-
-        for puri in row['puri']:
-            response_lov = _get_lov_search_result(puri, puri_dict)
-            if response_lov != '':
-                list_puri_tags.add(response_lov)
-            else:
-                list_puri_tags.add(None)
-
-        response_curi_puri.loc[len(response_curi_puri)] = {
-            'id': row['id'],
-            'curi': row['curi'],
-            'puri': row['puri'],
-            'tags_curi': list_curi_tags,
-            'tags_puri': list_puri_tags,
-            'category': row['category']
-        }
-
-    response_curi_puri.to_json('../data/raw/curi_puri_tags.json', orient='records', index=False)
 
 def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
     clean_uri = CLEAN_URI.search(uri)
@@ -103,5 +72,68 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
 
     return response_lov
 
-df = merge_dataset()
-find_tags_from_json(df)
+
+def find_voc_local(data_frame: pd.DataFrame):
+    sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
+    sparql.setReturnFormat(JSON)
+    response_df = pd.DataFrame(columns=['id', 'tags', 'voc','category'])
+    for index, row in data_frame.iterrows():
+        for voc in row['voc']:
+                try:
+                    sparql.setQuery(f"""
+                    PREFIX dcat: <http://www.w3.org/ns/dcat#>
+                    SELECT ?o WHERE {{
+                    <{voc}> dcat:keyword ?o .
+                    }} LIMIT 10 """)
+                    res = sparql.query().convert()
+
+                    response_df.loc[len(response_df)] = {
+                        'id': row['id'],
+                        'tags': {term['o']['value'] for term in res['results']['bindings']},
+                        'voc': voc,
+                        'category': row['category']
+                    }
+
+                except Exception as e:
+                    logger.info(f'Invalid uri: {e}')
+                    pass
+
+    return response_df
+
+def _process_row(row_column):
+    sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
+    sparql.setReturnFormat(JSON)
+    for curi in row_column:
+        try:
+            sparql.setQuery(f"""
+                        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                        SELECT ?o WHERE {{
+                        <{curi}> rdfs:comment ?o
+    	                FILTER(langMatches(lang(?o), "en"))
+                        }} LIMIT 5""")
+
+            res = sparql.query().convert()
+            return {term['o']['value'] for term in res['results']['bindings']},
+        except Exception as e:
+            logger.info(f'Invalid uri: {e}')
+            pass
+
+
+def find_local_curi_puri_comments(data_frame: pd.DataFrame):
+    response_df = pd.DataFrame(columns=['id', 'curi', 'puri', 'curi_comments', 'puri_comments', 'category'])
+    for index, row in data_frame.iterrows():
+            response_df.loc[len(response_df)] = {
+                'id': row['id'],
+                'curi': row['curi'],
+                'puri': row['puri'],
+                'curi_comments': _process_row(row['curi']),
+                'puri_comments': _process_row(row['puri']),
+                'category': row['category']
+            }
+
+    return response_df
+
+
+
+find_local_curi_puri_comments(merge_dataset())
+
