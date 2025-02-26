@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation_remote")
 
 
-async def fetch_query(session, endpoint, query, timeout):
+async def _fetch_query(session, endpoint, query, timeout):
     async with session.post(endpoint, data={'query': query}, timeout=timeout) as response:
         return await response.text()
 
@@ -33,7 +33,7 @@ async def async_select_remote_vocabularies(endpoint, limit=100, timeout=300, max
             OFFSET {offset}
             """
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="predicate"]/sparql:uri', ns)
@@ -78,7 +78,7 @@ async def async_select_remote_class(endpoint, limit=100, timeout=300, max_offset
             OFFSET {offset}
             """
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
@@ -113,7 +113,7 @@ async def async_select_remote_label(endpoint, limit=100, timeout=300, max_offset
             """
             bindings = []
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
@@ -133,7 +133,7 @@ async def async_select_remote_label(endpoint, limit=100, timeout=300, max_offset
                     LIMIT {limit} 
                     OFFSET {offset}
                     """
-                    result_text = await fetch_query(session, endpoint, query, timeout)
+                    result_text = await _fetch_query(session, endpoint, query, timeout)
                     root = eT.fromstring(result_text)
                     bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
                 if not bindings:
@@ -148,6 +148,33 @@ async def async_select_remote_label(endpoint, limit=100, timeout=300, max_offset
     logger.info(f"[LAB] Finished label query for endpoint: {endpoint} (found {len(labels)} labels)")
     return labels
 
+async def async_select_remote_title(endpoint, timeout=300):
+    logger.info(f"[TITLE] Starting class query for endpoint: {endpoint}")
+    title = ''
+    offset = 0
+    async with aiohttp.ClientSession() as session:
+            query = f"""
+               PREFIX dcterms: <http://purl.org/dc/terms/> 
+               SELECT ?classUri
+               WHERE {{
+                  ?type dcterms:title ?classUri .
+               }} LIMIT 1
+               """
+            try:
+                result_text = await _fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+                bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+                if not bindings:
+                    logger.debug(f"[TITLE] No class bindings found at offset {offset}.")
+                else:
+                    for binding in bindings:
+                        title = binding.text
+            except Exception as e:
+                logger.warning(f"[TITLE] Query execution error: {e}. Endpoint: {endpoint}")
+                return title
+    logger.info(f"[TITLE] Finished class query for endpoint: {endpoint} (found {len(title)} title)")
+    return title
 
 async def async_select_remote_tld(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
     logger.info(f"[TLD] Starting TLD query for endpoint: {endpoint}")
@@ -165,7 +192,7 @@ async def async_select_remote_tld(endpoint, limit=100, timeout=300, max_offset=M
             OFFSET {offset}
             """
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
@@ -205,7 +232,7 @@ async def async_select_remote_property(endpoint, limit=100, timeout=300, max_off
             OFFSET {offset}
             """
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
@@ -239,7 +266,7 @@ async def async_select_remote_property_names(endpoint, limit=100, timeout=300, m
             OFFSET {offset}
             """
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
@@ -285,7 +312,7 @@ async def async_select_remote_class_name(endpoint, limit=10, timeout=300, max_of
             OFFSET {offset}
             """
             try:
-                result_text = await fetch_query(session, endpoint, query, timeout)
+                result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
@@ -324,7 +351,7 @@ async def async_has_void_file(endpoint, timeout=300):
     """
     async with aiohttp.ClientSession() as session:
         try:
-            result_text = await fetch_query(session, endpoint, query, timeout)
+            result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)
@@ -348,7 +375,7 @@ async def async_select_void_description(endpoint, timeout=300, void_file=False):
     """
     async with aiohttp.ClientSession() as session:
         try:
-            result_text = await fetch_query(session, endpoint, query, timeout)
+            result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             descriptions = {binding.text for binding in root.findall('.//sparql:binding[@name="desc"]/*', ns)}
@@ -375,7 +402,7 @@ async def async_select_void_subject_remote(endpoint, timeout=300, void_file=Fals
     """
     async with aiohttp.ClientSession() as session:
         try:
-            result_text = await fetch_query(session, endpoint, query, timeout)
+            result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             local_names = {binding.text for binding in root.findall('.//sparql:binding[@name="s"]/sparql:uri', ns)}
@@ -396,7 +423,7 @@ async def async_select_void_subject_remote(endpoint, timeout=300, void_file=Fals
                 }} LIMIT 100
             """
             try:
-                result_text = await fetch_query(session, endpoint, query2, timeout)
+                result_text = await _fetch_query(session, endpoint, query2, timeout)
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
@@ -511,10 +538,36 @@ async def main_void():
     df.to_json('../data/raw/remote/remote_void_feature_set_sparqlwrapper.json', orient='records')
     logger.info("[VOID-MAIN] Finished asynchronous VOID dataset processing.")
 
+async def process_endpoint_full_inplace(endpoint) -> pd.DataFrame:
+    row = {'sparql_url': endpoint, 'id': '', 'category': ''}
+    void_endpoint = await async_has_void_file(endpoint)
+    if void_endpoint:
+        title = await async_select_remote_title(void_endpoint)
+    else:
+        title = await async_select_remote_title(endpoint)
+    if title == '':
+        title = endpoint
+
+    data = await process_endpoint(row)
+    data_void = await process_endpoint_void(row)
+
+    return pd.DataFrame({
+        'title': title,
+        'subject': data_void[0],
+        'description': data_void[1],
+        'vocabulary': data[1],
+        'class': data[2],
+        'property': data[3],
+        'cname': data[4],
+        'pname': data[5],
+        'label': data[6],
+        'tld': data[7]
+    })
 
 if __name__ == '__main__':
     #  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
     #   if mode == "void":
     # asyncio.run(main_void())
     # else:
-    asyncio.run(main_normal())
+    #asyncio.run(main_normal())
+    asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))

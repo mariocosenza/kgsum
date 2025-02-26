@@ -93,6 +93,13 @@ Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery(
     } LIMIT 1
     """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
+Q_LOCAL_DCTERMS_TITLE = prepareQuery(
+    """
+    SELECT ?desc WHERE {
+            ?s dcterms:title ?desc .
+    } LIMIT 1
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
+
 
 def select_local_vocabularies(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
@@ -200,6 +207,10 @@ def select_local_void_description(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
     return {row.desc for row in qres}
 
+def select_local_void_title(parsed_graph):
+    qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
+    return {row.desc for row in qres}
+
 
 def _guess_format_and_parse(path):
     g = Graph()
@@ -233,6 +244,40 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
         return row
     except Exception as e:
         logger.warning(f"Error processing file {path}: {str(e)}")
+        return None
+
+def process_file_full_inplace(file_path):
+    if file_path is None:
+        return None
+    try:
+        logger.info(f"Processing graph id: {file_path}")
+        result = _guess_format_and_parse(file_path)
+        row = [
+            select_local_void_title(result),
+            select_local_void_subject(result),
+            select_local_void_description(result),
+            select_local_vocabularies(result),
+            select_local_class(result),
+            select_local_property(result),
+            select_local_class_name(result),
+            select_local_property_names(result),
+            select_local_label(result),
+            select_local_tld(result),
+        ]
+        return pd.DataFrame({
+            'title': row[0],
+            'subject': row[1],
+            'description': row[2],
+            'vocabulary': row[3],
+            'class': row[4],
+            'property': row[5],
+            'cname': row[6],
+            'pname': row[7],
+            'label': row[8],
+            'tld': row[9]
+        })
+    except Exception as e:
+        logger.warning(f"Error processing file {file_path}: {str(e)}")
         return None
 
 
@@ -353,7 +398,6 @@ def create_local_void_dataset(offset=0, limit=10000):
 
     df = pd.DataFrame(results, columns=['id', 'sbj', 'dsc', 'category'])
     df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
-
 
 #if __name__ == '__main__':
     #import multiprocessing
