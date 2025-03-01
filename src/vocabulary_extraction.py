@@ -2,11 +2,10 @@ import json
 import logging
 import os
 import re
+
 import pandas as pd
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
-
-from src.preprocessing import merge_dataset
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vocabulary_extraction")
@@ -16,10 +15,13 @@ LOCAL_ENDPOINT_LOV = os.environ['LOCAL_ENDPOINT_LOV']
 
 
 def find_tags_from_json(data_frame: pd.DataFrame):
-    response_df = pd.DataFrame(columns=['id', 'tags', 'voc','category'])
+    response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
     subject_list = []
     response_cache = {}
     for index, row in data_frame.iterrows():
+        all_vocs = []
+        all_tags = []
+
         for voc in set(row['voc']):
             print(f'Vocabulary: {voc}')
             if voc not in response_cache:
@@ -28,6 +30,7 @@ def find_tags_from_json(data_frame: pd.DataFrame):
                 response_cache[voc] = response_lov
             else:
                 response_lov = response_cache[voc]
+
             if response_lov.status_code == 200:
                 try:
                     response_dict = json.loads(response_lov.text)
@@ -37,23 +40,30 @@ def find_tags_from_json(data_frame: pd.DataFrame):
                         if 'Vocabularies' not in tag and 'Metadata' not in tag and 'FRBR' not in tag:
                             subject_list.append(tag)
                             frame_tags.append(tag)
-                    response_df.loc[len(response_df)] = {
-                        'id': row['id'],
-                        'tags': frame_tags,
-                        'voc': voc,
-                        'category': row['category']
-                    }
+
+                    if frame_tags:
+                        all_vocs.append(voc)
+                        all_tags.extend(frame_tags)
                 except Exception as e:
                     print(e)
 
+        if all_vocs:
+            response_df.loc[len(response_df)] = {
+                'id': row['id'],
+                'tags': all_tags,
+                'voc': all_vocs,
+                'category': row['category']
+            }
+
     return subject_list
+
 
 def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
     clean_uri = CLEAN_URI.search(uri)
     clean_uri = clean_uri.group(1)
     if clean_uri not in cache_dict:
         response_lov = requests.get(f"https://lov.linkeddata.es/dataset/lov/api/v2/term/search?q={uri}",
-                                 timeout=300)
+                                    timeout=300)
         if response_lov.status_code == 200:
             key_set = set()
             for keys in json.loads(response_lov.text)['aggregations']['tags']['buckets']:
@@ -76,64 +86,75 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
 def find_voc_local(data_frame: pd.DataFrame):
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
-    response_df = pd.DataFrame(columns=['id', 'tags', 'voc','category'])
+    response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
+
     for index, row in data_frame.iterrows():
+        all_tags = set()
+        all_vocs = []
+
         for voc in row['voc']:
-                try:
-                    sparql.setQuery(f"""
-                    PREFIX dcat: <http://www.w3.org/ns/dcat#>
-                    SELECT ?o WHERE {{
-                    <{voc}> dcat:keyword ?o .
-                    }} LIMIT 10 """)
-                    res = sparql.query().convert()
+            try:
+                sparql.setQuery(f"""
+                PREFIX dcat: <http://www.w3.org/ns/dcat#>
+                SELECT ?o WHERE {{
+                <{voc}> dcat:keyword ?o .
+                }} LIMIT 10 """)
+                res = sparql.query().convert()
 
-                    response_df.loc[len(response_df)] = {
-                        'id': row['id'],
-                        'tags': {term['o']['value'] for term in res['results']['bindings']},
-                        'voc': voc,
-                        'category': row['category']
-                    }
+                voc_tags = {term['o']['value'] for term in res['results']['bindings']}
+                if voc_tags:
+                    all_tags.update(voc_tags)
+                    all_vocs.append(voc)
 
-                except Exception as e:
-                    logger.info(f'Invalid uri: {e}')
-                    pass
+            except Exception as e:
+                logger.info(f'Invalid uri: {e}')
+                pass
 
-    return response_df
-
-def _process_row(row_column):
-    sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
-    sparql.setReturnFormat(JSON)
-    for curi in row_column:
-        try:
-            sparql.setQuery(f"""
-                        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                        SELECT ?o WHERE {{
-                        <{curi}> rdfs:comment ?o
-    	                FILTER(langMatches(lang(?o), "en"))
-                        }} LIMIT 5""")
-
-            res = sparql.query().convert()
-            return {term['o']['value'] for term in res['results']['bindings']},
-        except Exception as e:
-            logger.info(f'Invalid uri: {e}')
-            pass
-
-
-def find_local_curi_puri_comments(data_frame: pd.DataFrame):
-    response_df = pd.DataFrame(columns=['id', 'curi', 'puri', 'curi_comments', 'puri_comments', 'category'])
-    for index, row in data_frame.iterrows():
+        if all_vocs:
             response_df.loc[len(response_df)] = {
                 'id': row['id'],
-                'curi': row['curi'],
-                'puri': row['puri'],
-                'curi_comments': _process_row(row['curi']),
-                'puri_comments': _process_row(row['puri']),
+                'tags': all_tags,
+                'voc': all_vocs,
                 'category': row['category']
             }
 
     return response_df
 
 
+def _process_row(row_column):
+    sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
+    sparql.setReturnFormat(JSON)
+    all_comments = set()
 
-find_local_curi_puri_comments(merge_dataset())
+    for curi in row_column:
+        try:
+            sparql.setQuery(f"""
+                        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                        SELECT ?o WHERE {{
+                        <{curi}> rdfs:comment ?o
+                        FILTER(langMatches(lang(?o), "en"))
+                        }} LIMIT 5""")
 
+            res = sparql.query().convert()
+            comments = {term['o']['value'] for term in res['results']['bindings']}
+            all_comments.update(comments)
+        except Exception as e:
+            logger.info(f'Invalid uri: {e}')
+            pass
+
+    return all_comments if all_comments else None
+
+
+def find_local_curi_puri_comments(data_frame: pd.DataFrame):
+    response_df = pd.DataFrame(columns=['id', 'curi', 'puri', 'curi_comments', 'puri_comments', 'category'])
+    for index, row in data_frame.iterrows():
+        response_df.loc[len(response_df)] = {
+            'id': row['id'],
+            'curi': row['curi'],
+            'puri': row['puri'],
+            'curi_comments': _process_row(row['curi']),
+            'puri_comments': _process_row(row['puri']),
+            'category': row['category']
+        }
+
+    return response_df
