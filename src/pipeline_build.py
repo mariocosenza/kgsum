@@ -11,7 +11,6 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.naive_bayes import MultinomialNB
 
-
 class ClassifierType(Enum):
     SVM = auto()
     NAIVE_BAYES = auto()
@@ -20,7 +19,7 @@ class ClassifierType(Enum):
 class KnowledgeGraphClassifier:
     def __init__(self, classifier_type: ClassifierType = ClassifierType.SVM):
         self.classifier_type = classifier_type
-        self.vectorizer = TfidfVectorizer(max_features=1000, lowercase=True, ngram_range=(1, 2))
+        self.vectorizer = TfidfVectorizer(max_features=10000, lowercase=True, ngram_range=(1, 2))
         self.model = None
 
     def _get_param_grid(self: "KnowledgeGraphClassifier") -> Dict[str, List[Any]]:
@@ -48,11 +47,13 @@ class KnowledgeGraphClassifier:
     def _prepare_features(self: "KnowledgeGraphClassifier", frame: pd.DataFrame,
                           feature_labels: str | List[str]) -> pd.Series:
         if isinstance(feature_labels, str):
-            return frame[feature_labels]
+            return frame[feature_labels].apply(lambda x: str(x) if not isinstance(x, str) else x)
 
-        combined_features = frame[feature_labels[0]].copy()
+        # Convert all columns to strings first
+        combined_features = frame[feature_labels[0]].apply(lambda x: str(x) if not isinstance(x, str) else x).copy()
         for feature in feature_labels[1:]:
-            combined_features = combined_features + " " + frame[feature]
+            combined_features = combined_features + " " + frame[feature].apply(
+                lambda x: str(x) if not isinstance(x, str) else x)
 
         return combined_features
 
@@ -183,3 +184,5 @@ def remove_empty_rows(frame: pd.DataFrame, labels: List[str] | str) -> pd.DataFr
         result = result[result[label] != '']
 
     return result
+
+
