@@ -194,10 +194,10 @@ def preprocess_lab_lcn_lnp(input_frame: pd.DataFrame) -> pd.DataFrame:
         "category": input_frame["category"],
         "lab": processed_lab,
         "lcn": processed_lcn,
-        "lnp": processed_lnp
+        "lpn": processed_lnp
     })
 
-    out_df.to_json(f"{PROCESSED_DIR}/lab_lcn_lnp.json")
+    out_df.to_json(f"{PROCESSED_DIR}/lab_lcn_lpn.json")
     logger.info("Processing complete: %d/%d", total_rows, total_rows)
     return out_df
 
@@ -208,45 +208,13 @@ def analyze_uri_metadata(row, index: int, total: int) -> Dict[str, any]:
     result = {
         "id": row.get("id", ""),
         "category": row.get("category", ""),
-        "namespaces": set(),
         "tlds": set()
     }
 
-    # Keep original curi and puri values
     result["curi"] = row.get("curi", [])
     result["puri"] = row.get("puri", [])
     result["voc"] = row.get("voc", [])
-
-    if result["curi"]:
-        for uri in result["curi"]:
-            if uri is not None and isinstance(uri, str):
-                uri_info = analyze_uri(uri)
-                if uri_info["namespace"]:
-                    result["namespaces"].add(uri_info["namespace"])
-                if uri_info["tld"]:
-                    result["tlds"].add(uri_info["tld"])
-
-    if result["puri"]:
-        for uri in result["puri"]:
-            if uri is not None and isinstance(uri, str):
-                uri_info = analyze_uri(uri)
-                if uri_info["namespace"]:
-                    result["namespaces"].add(uri_info["namespace"])
-                if uri_info["tld"]:
-                    result["tlds"].add(uri_info["tld"])
-
-    if result["voc"]:
-        for uri in result["voc"]:
-            if uri is not None and isinstance(uri, str):
-                uri_info = analyze_uri(uri)
-                if uri_info["namespace"]:
-                    result["namespaces"].add(uri_info["namespace"])
-                if uri_info["tld"]:
-                    result["tlds"].add(uri_info["tld"])
-
-    # Convert sets to lists for JSON serialization
-    result["namespaces"] = list(result["namespaces"])
-    result["tlds"] = list(result["tlds"])
+    result["tld"] = row.get("tld", [])
 
     logger.info("Analyzing URI metadata for row %d/%d completed.", index, total)
     return result
@@ -265,11 +233,10 @@ def preprocess_voc_curi_puri_tld(input_frame: pd.DataFrame) -> pd.DataFrame:
         "curi": [row["curi"] for row in processed_rows],
         "puri": [row["puri"] for row in processed_rows],
         "voc": [row["voc"] for row in processed_rows],
-        "namespaces": [row["namespaces"] for row in processed_rows],
-        "tlds": [row["tlds"] for row in processed_rows]
+        "tlds": [row["tld"] for row in processed_rows]
     })
 
-    processed_df.to_json(f"{PROCESSED_DIR}/voc_curi_puri_tld.json")
+    processed_df.to_json(f"{PROCESSED_DIR}/voc_curi_puri_tlds.json")
     logger.info("URI processing complete: %d/%d", total_rows, total_rows)
     return processed_df
 
