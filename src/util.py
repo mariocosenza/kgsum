@@ -57,6 +57,7 @@ def match_file_lod(file, limit, offset, lod_frame) -> int | None:
     if num == -1:
         return None
 
+
 def rename_new_file(offset):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     for category in CATEGORIES:
@@ -67,4 +68,5 @@ def rename_new_file(offset):
             if match:
                 file_num = int(match.group(1))
                 if file_num > offset:
-                    os.rename(path, f'../data/raw/rdf_dump/{category}/{file_num}-{hashlib.sha256(lod_frame['id'][file_num].encode()).hexdigest()}.rdf')
+                    os.rename(path,
+                              f'../data/raw/rdf_dump/{category}/{file_num}-{hashlib.sha256(lod_frame['id'][file_num].encode()).hexdigest()}.rdf')

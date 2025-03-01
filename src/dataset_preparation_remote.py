@@ -120,7 +120,6 @@ async def async_select_remote_label(endpoint, limit=100, timeout=300, max_offset
             except:
                 logger.debug(f"[LAB] No label bindings found at offset {offset}.")
 
-
             try:
                 if not bindings:
                     logger.debug(f"[LAB] No label bindings found at offset {offset} with filter; trying fallback.")
@@ -148,33 +147,35 @@ async def async_select_remote_label(endpoint, limit=100, timeout=300, max_offset
     logger.info(f"[LAB] Finished label query for endpoint: {endpoint} (found {len(labels)} labels)")
     return labels
 
+
 async def async_select_remote_title(endpoint, timeout=300):
     logger.info(f"[TITLE] Starting class query for endpoint: {endpoint}")
     title = ''
     offset = 0
     async with aiohttp.ClientSession() as session:
-            query = f"""
+        query = f"""
                PREFIX dcterms: <http://purl.org/dc/terms/> 
                SELECT ?classUri
                WHERE {{
                   ?type dcterms:title ?classUri .
                }} LIMIT 1
                """
-            try:
-                result_text = await _fetch_query(session, endpoint, query, timeout)
-                root = eT.fromstring(result_text)
-                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-                bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
-                if not bindings:
-                    logger.debug(f"[TITLE] No class bindings found at offset {offset}.")
-                else:
-                    for binding in bindings:
-                        title = binding.text
-            except Exception as e:
-                logger.warning(f"[TITLE] Query execution error: {e}. Endpoint: {endpoint}")
-                return title
+        try:
+            result_text = await _fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+            if not bindings:
+                logger.debug(f"[TITLE] No class bindings found at offset {offset}.")
+            else:
+                for binding in bindings:
+                    title = binding.text
+        except Exception as e:
+            logger.warning(f"[TITLE] Query execution error: {e}. Endpoint: {endpoint}")
+            return title
     logger.info(f"[TITLE] Finished class query for endpoint: {endpoint} (found {len(title)} title)")
     return title
+
 
 async def async_select_remote_tld(endpoint, limit=100, timeout=300, max_offset=MAX_OFFSET):
     logger.info(f"[TLD] Starting TLD query for endpoint: {endpoint}")
@@ -435,7 +436,6 @@ async def async_select_void_subject_remote(endpoint, timeout=300, void_file=Fals
         return list(class_names)
 
 
-
 async def process_endpoint(row):
     endpoint = row['sparql_url']
     logger.info(f"[PROC] Processing endpoint {row['id']}")
@@ -538,6 +538,7 @@ async def main_void():
     df.to_json('../data/raw/remote/remote_void_feature_set_sparqlwrapper.json', orient='records')
     logger.info("[VOID-MAIN] Finished asynchronous VOID dataset processing.")
 
+
 async def process_endpoint_full_inplace(endpoint) -> pd.DataFrame:
     row = {'sparql_url': endpoint, 'id': '', 'category': ''}
     void_endpoint = await async_has_void_file(endpoint)
@@ -564,10 +565,11 @@ async def process_endpoint_full_inplace(endpoint) -> pd.DataFrame:
         'tld': data[7]
     })
 
+
 if __name__ == '__main__':
     #  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
     #   if mode == "void":
     # asyncio.run(main_void())
     # else:
-    #asyncio.run(main_normal())
+    # asyncio.run(main_normal())
     asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))

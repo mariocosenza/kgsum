@@ -207,6 +207,7 @@ def select_local_void_description(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
     return {row.desc for row in qres}
 
+
 def select_local_void_title(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
     return {row.desc for row in qres}
@@ -245,6 +246,7 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
     except Exception as e:
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
+
 
 def process_file_full_inplace(file_path):
     if file_path is None:
@@ -399,10 +401,10 @@ def create_local_void_dataset(offset=0, limit=10000):
     df = pd.DataFrame(results, columns=['id', 'sbj', 'dsc', 'category'])
     df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
 
-#if __name__ == '__main__':
-    #import multiprocessing
+# if __name__ == '__main__':
+# import multiprocessing
 
-    #multiprocessing.freeze_support()
-    #create_local_dataset(offset=0, limit=200)
-    # To process the void dataset, call:
-    #create_local_void_dataset(offset=0, limit=200)
+# multiprocessing.freeze_support()
+# create_local_dataset(offset=0, limit=200)
+# To process the void dataset, call:
+# create_local_void_dataset(offset=0, limit=200)
