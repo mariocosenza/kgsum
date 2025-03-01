@@ -1,85 +1,185 @@
-from enum import Enum
+import os
 import pickle
+from enum import Enum, auto
+from typing import List, Dict, Any, Optional
+
+import numpy as np
 import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import KFold
-from sklearn.naive_bayes import MultinomialNB
 from sklearn import svm
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import GridSearchCV
-from src.dataset_cleanup import remove_empty_rows
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.naive_bayes import MultinomialNB
 
 
-class Classifier(Enum):
-    SVM='SVM',
-    NB='NB'
+class ClassifierType(Enum):
+    SVM = auto()
+    NAIVE_BAYES = auto()
 
 
-def find_best_parameters_svm(frame: pd.DataFrame, feature_labels: str | list, estimator=Classifier.SVM):
-    kf = KFold(n_splits=2, random_state=7, shuffle=True)
-    vectorizer = TfidfVectorizer(max_features=1000, lowercase=True, ngram_range=(1,2))
-    frame = frame.reset_index(drop=True)
-    if isinstance(feature_labels, list):
-        data_x = pd.DataFrame
-        list_length = len(feature_labels)
-        temp_frame = pd.DataFrame()
-        for index, feature  in enumerate(feature_labels):
-            if index <= list_length - 2:
-               temp_frame['unified'] = frame[feature] + frame[feature_labels[index + 1]]
-            else:
-                data_x = frame
-                data_x['unified'] = temp_frame['unified']
-                for feat in feature_labels:
-                    data_x.drop(feat, axis=1, inplace=True)
-                data_x = data_x['unified']
-    else:
-        data_x = frame[feature_labels]
+class KnowledgeGraphClassifier:
+    def __init__(self, classifier_type: ClassifierType = ClassifierType.SVM):
+        self.classifier_type = classifier_type
+        self.vectorizer = TfidfVectorizer(max_features=1000, lowercase=True, ngram_range=(1, 2))
+        self.model = None
 
-    param_grid_svm = {
-        "C": [1.0, 0.5, 1.5],
-        "degree": [3, 4, 5]
-    }
+    def _get_param_grid(self: "KnowledgeGraphClassifier") -> Dict[str, List[Any]]:
+        if self.classifier_type == ClassifierType.SVM:
+            return {
+                "C": [0.1, 0.5, 1.0, 1.5, 2.0, 5.0],
+                "kernel": ["linear", "rbf", "poly", "sigmoid"],
+                "degree": [2, 3, 4, 5],
+                "gamma": ["scale", "auto", 0.1, 0.01, 0.001],
+                "class_weight": ["balanced", None]
+            }
+        else:
+            return {
+                "alpha": [0.01, 0.1, 0.5, 1.0, 2.0],
+                "fit_prior": [True, False],
+                "class_prior": [None, [0.3, 0.7], [0.5, 0.5]],
+            }
 
-    param_grid = {
-        "alpha": [0.1, 1.0]
-       # "fit_prior" = fit_prior,
-       # "class_prior" = class_prior,
-       # "force_alpha" = force_alpha,
-    }
+    def _get_base_estimator(self: "KnowledgeGraphClassifier"):
+        if self.classifier_type == ClassifierType.SVM:
+            return svm.SVC(probability=True)
+        else:
+            return MultinomialNB()
 
-    if estimator == Classifier.SVM:
-        grid = GridSearchCV(estimator=svm.SVC(), param_grid=param_grid_svm)
-    else:
-        grid = GridSearchCV(estimator=MultinomialNB(), param_grid=param_grid)
-    frame = frame.reset_index(drop=True)
-    data_y = frame['category']
+    def _prepare_features(self: "KnowledgeGraphClassifier", frame: pd.DataFrame,
+                          feature_labels: str | List[str]) -> pd.Series:
+        if isinstance(feature_labels, str):
+            return frame[feature_labels]
 
-    for train_index, test_index in kf.split(data_x):
-        x_train, x_test = data_x[train_index], data_x[test_index]
-        y_train, y_test = data_y[train_index], data_y[test_index]
+        combined_features = frame[feature_labels[0]].copy()
+        for feature in feature_labels[1:]:
+            combined_features = combined_features + " " + frame[feature]
 
-        x_train = vectorizer.fit_transform(x_train)
-        x_test = vectorizer.transform(x_test)
-        grid.fit(x_train.toarray(), y_train)
-        y_pred = grid.predict(x_test.toarray())
-        score = grid.score(x_test.toarray(), y_test)
+        return combined_features
 
-        print(score)
-        print(y_pred)
+    def train(self: "KnowledgeGraphClassifier",
+              frame: pd.DataFrame,
+              feature_labels: str | List[str],
+              target_label: str = 'category',
+              cv_folds: int = 5) -> Dict[str, Any]:
+        frame = frame.reset_index(drop=True)
 
-    return grid
+        data_x = self._prepare_features(frame, feature_labels)
+        data_y = frame[target_label]
 
-def save_model(model: GridSearchCV, label):
-    with open(f'../data/trained/model-{label}.pkl', 'wb') as f:
-        pickle.dump(model, f)
+        kf = KFold(n_splits=cv_folds, random_state=42, shuffle=True)
 
-def load_model(label) -> GridSearchCV:
-    with open(f'../data/trained/model-{label}.pkl', 'rb') as f:
-            return pickle.load(f)
+        grid = GridSearchCV(
+            estimator=self._get_base_estimator(),
+            param_grid=self._get_param_grid(),
+            cv=kf,
+            scoring='f1_weighted',
+            return_train_score=True,
+            verbose=1,
+            n_jobs=-1
+        )
 
-def predict(data):
-    return trained_model.predict(data)
+        x_vectorized = self.vectorizer.fit_transform(data_x)
+
+        grid.fit(x_vectorized, data_y)
+
+        self.model = grid
+
+        cv_scores = cross_val_score(
+            grid.best_estimator_,
+            x_vectorized,
+            data_y,
+            cv=kf,
+            scoring='f1_weighted'
+        )
+
+        results = {
+            'best_params': grid.best_params_,
+            'best_score': grid.best_score_,
+            'cv_scores': cv_scores,
+            'cv_mean': np.mean(cv_scores),
+            'cv_std': np.std(cv_scores),
+            'feature_labels': feature_labels,
+            'classifier_type': self.classifier_type
+        }
+
+        return results
+
+    def predict(self: "KnowledgeGraphClassifier", data: str | List[str] | pd.Series | pd.DataFrame,
+                feature_labels: Optional[str | List[str]] = None) -> np.ndarray:
+        if self.model is None:
+            raise ValueError("Model not trained. Call train() first.")
+
+        if isinstance(data, pd.DataFrame) and feature_labels is not None:
+            processed_data = self._prepare_features(data, feature_labels)
+        elif isinstance(data, pd.Series) or isinstance(data, list) or isinstance(data, str):
+            processed_data = data
+        else:
+            raise ValueError("Invalid data format. Provide DataFrame with feature_labels, Series, list, or string.")
+
+        if isinstance(processed_data, str):
+            processed_data = [processed_data]
+
+        x_vectorized = self.vectorizer.transform(processed_data)
+
+        return self.model.predict(x_vectorized)
+
+    def predict_proba(self: "KnowledgeGraphClassifier", data: str | List[str] | pd.Series | pd.DataFrame,
+                      feature_labels: Optional[str | List[str]] = None) -> np.ndarray:
+        if self.model is None:
+            raise ValueError("Model not trained. Call train() first.")
+
+        if isinstance(data, pd.DataFrame) and feature_labels is not None:
+            processed_data = self._prepare_features(data, feature_labels)
+        elif isinstance(data, pd.Series) or isinstance(data, list) or isinstance(data, str):
+            processed_data = data
+        else:
+            raise ValueError("Invalid data format. Provide DataFrame with feature_labels, Series, list, or string.")
+
+        if isinstance(processed_data, str):
+            processed_data = [processed_data]
+
+        x_vectorized = self.vectorizer.transform(processed_data)
+
+        return self.model.predict_proba(x_vectorized)
+
+    def save(self: "KnowledgeGraphClassifier", filepath: str = None):
+        if self.model is None:
+            raise ValueError("No trained model to save.")
+
+        if filepath is None:
+            os.makedirs('../data/trained', exist_ok=True)
+            filepath = f'../data/trained/model-{self.classifier_type.name}.pkl'
+
+        with open(filepath, 'wb') as f:
+            pickle.dump({
+                'model': self.model,
+                'vectorizer': self.vectorizer,
+                'classifier_type': self.classifier_type
+            }, f)
+
+    @classmethod
+    def load(cls, filepath: str = None,
+             classifier_type: ClassifierType = ClassifierType.SVM) -> "KnowledgeGraphClassifier":
+        if filepath is None:
+            filepath = f'../data/trained/model-{classifier_type.name}.pkl'
+
+        with open(filepath, 'rb') as f:
+            data = pickle.load(f)
+
+        instance = cls(classifier_type=data['classifier_type'])
+        instance.model = data['model']
+        instance.vectorizer = data['vectorizer']
+
+        return instance
 
 
-trained_model = GridSearchCV
-#save_model(find_best_parameters_svm(remove_empty_rows(pd.read_json('../data/processed/lab_lcn_lnp.json'), 'lcn'), ['lab', 'lcn', 'lnp'], estimator=Classifier.NB), Classifier.NB)
-#trained_model = load_model(Classifier.NB)
+def remove_empty_rows(frame: pd.DataFrame, labels: List[str] | str) -> pd.DataFrame:
+    if isinstance(labels, str):
+        labels = [labels]
+
+    result = frame.copy()
+
+    for label in labels:
+        result = result[result[label] != '']
+
+    return result
