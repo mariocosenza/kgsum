@@ -14,7 +14,7 @@ model.train(pd.read_json(model_data_path), 'lab')
 async def predict_category_remote(sparql):
     result = await process_endpoint_full_inplace(sparql)
     processed = process_label_feature(list(result['label']))
-    return model.predict(processed)
+    return model.predict(processed)[0]
 
 def predict_category_local(file_path):
     result = process_endpoint_full_inplace(file_path)
