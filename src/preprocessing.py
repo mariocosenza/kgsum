@@ -1,8 +1,7 @@
 import logging
-import os
 import re
 from os import listdir, path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple, Any
 
 import pandas as pd
 import spacy
@@ -56,10 +55,6 @@ DATA_DIR = "../data"
 RAW_DIR = f"{DATA_DIR}/raw"
 PROCESSED_DIR = f"{DATA_DIR}/processed"
 
-for directory in [DATA_DIR, RAW_DIR, PROCESSED_DIR]:
-    if not path.exists(directory):
-        os.makedirs(directory)
-        logger.info(f"Created directory: {directory}")
 
 URI_FRAGMENT_PATTERN = re.compile(r'[#/]([^#/]+)$')
 URI_NAMESPACE_PATTERN = re.compile(r'^(.*?)[#/][^#/]+$')
@@ -270,6 +265,87 @@ def preprocess_voc_tags(input_frame: pd.DataFrame) -> pd.DataFrame:
     frame.to_json(f"{PROCESSED_DIR}/voc_tags.json")
     logger.info("Vocabulary tags processing complete.")
     return frame
+
+
+
+# Individual feature processing functions
+
+def process_label_feature(lab_input: str | List[Any] | None) -> str:
+    if lab_input is None:
+        return ""
+    normalized_text = normalize_text_list(lab_input)
+    return process_text(normalized_text)
+
+
+def process_local_name_feature(lcn_input: str | List[Any] | None) -> str:
+    if lcn_input is None:
+        return ""
+    normalized_text = normalize_text_list(lcn_input)
+    return process_text(normalized_text)
+
+
+def process_property_name_feature(lpn_input: str | List[Any] | None) -> str:
+    if lpn_input is None:
+        return ""
+    normalized_text = normalize_text_list(lpn_input)
+    return process_text(normalized_text)
+
+
+def process_void_description_feature(dsc_input: str | List[Any] | None) -> str:
+    if dsc_input is None:
+        return ""
+    normalized_text = normalize_text_list(dsc_input)
+    return process_text(normalized_text)
+
+
+def process_class_uri_feature(curi_input: str | List[str] | None) -> List[Dict[str, str]]:
+    if curi_input is None:
+        return []
+
+    if isinstance(curi_input, str):
+        curi_input = [curi_input]
+
+    return [analyze_uri(uri) for uri in curi_input if uri]
+
+
+def process_property_uri_feature(puri_input: str | List[str] | None) -> List[Dict[str, str]]:
+    if puri_input is None:
+        return []
+
+    if isinstance(puri_input, str):
+        puri_input = [puri_input]
+
+    return [analyze_uri(uri) for uri in puri_input if uri]
+
+
+def process_vocabulary_feature(voc_input: str | List[str] | None) -> List[Dict[str, str]]:
+    if voc_input is None:
+        return []
+
+    if isinstance(voc_input, str):
+        voc_input = [voc_input]
+
+    return [analyze_uri(uri) for uri in voc_input if uri]
+
+
+def process_tld_feature(tld_input: str | List[str] | None) -> List[str]:
+    if tld_input is None:
+        return []
+
+    if isinstance(tld_input, str):
+        return [tld_input] if tld_input else []
+
+    return [str(tld) for tld in tld_input if tld is not None]
+
+
+def process_tag_feature(tags_input: str | List[str] | None) -> List[str]:
+    if tags_input is None:
+        return []
+
+    if isinstance(tags_input, str):
+        return [tag.strip() for tag in re.split(r'[,;|]', tags_input) if tag.strip()]
+
+    return [str(tag).strip() for tag in tags_input if tag is not None]
 
 
 def main():
