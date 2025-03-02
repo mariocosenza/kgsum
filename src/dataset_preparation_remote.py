@@ -539,7 +539,7 @@ async def main_void():
     logger.info("[VOID-MAIN] Finished asynchronous VOID dataset processing.")
 
 
-async def process_endpoint_full_inplace(endpoint) -> pd.DataFrame:
+async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None | list]:
     row = {'sparql_url': endpoint, 'id': '', 'category': ''}
     void_endpoint = await async_has_void_file(endpoint)
     if void_endpoint:
@@ -552,7 +552,7 @@ async def process_endpoint_full_inplace(endpoint) -> pd.DataFrame:
     data = await process_endpoint(row)
     data_void = await process_endpoint_void(row)
 
-    return pd.DataFrame({
+    return {
         'title': title,
         'subject': data_void[0],
         'description': data_void[1],
@@ -563,13 +563,13 @@ async def process_endpoint_full_inplace(endpoint) -> pd.DataFrame:
         'pname': data[5],
         'label': data[6],
         'tld': data[7]
-    })
+    }
 
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
     #  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
     #   if mode == "void":
     # asyncio.run(main_void())
     # else:
     # asyncio.run(main_normal())
-    asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))
+    #asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))

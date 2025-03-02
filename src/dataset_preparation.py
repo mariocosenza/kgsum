@@ -248,36 +248,39 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
         return None
 
 
-def process_file_full_inplace(file_path):
+def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] | None:
     if file_path is None:
         return None
     try:
         logger.info(f"Processing graph id: {file_path}")
         result = _guess_format_and_parse(file_path)
-        row = [
-            select_local_void_title(result),
-            select_local_void_subject(result),
-            select_local_void_description(result),
-            select_local_vocabularies(result),
-            select_local_class(result),
-            select_local_property(result),
-            select_local_class_name(result),
-            select_local_property_names(result),
-            select_local_label(result),
-            select_local_tld(result),
-        ]
-        return pd.DataFrame({
-            'title': row[0],
-            'subject': row[1],
-            'description': row[2],
-            'vocabulary': row[3],
-            'class': row[4],
-            'property': row[5],
-            'cname': row[6],
-            'pname': row[7],
-            'label': row[8],
-            'tld': row[9]
-        })
+
+        # Get all the values
+        title = select_local_void_title(result)
+        subject = select_local_void_subject(result)
+        description = select_local_void_description(result)
+        vocabulary = select_local_vocabularies(result)
+        class_val = select_local_class(result)
+        property_val = select_local_property(result)
+        cname = select_local_class_name(result)
+        pname = select_local_property_names(result)
+        label = select_local_label(result)
+        tld = select_local_tld(result)
+
+
+        return {
+                'title': [title],
+                'subject': [subject],
+                'description': [description],
+                'vocabulary': [vocabulary],
+                'class': [class_val],
+                'property': [property_val],
+                'cname': [cname],
+                'pname': [pname],
+                'label': [label],
+                'tld': [tld]
+        }
+
     except Exception as e:
         logger.warning(f"Error processing file {file_path}: {str(e)}")
         return None
