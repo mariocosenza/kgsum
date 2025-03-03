@@ -1,7 +1,8 @@
 import pandas as pd
 import os
 
-from src.dataset_preparation_remote import process_endpoint_full_inplace
+from src.dataset_preparation import process_local_dataset_file, process_file_full_inplace
+from src.dataset_preparation_remote import process_endpoint_full_inplace, process_endpoint
 from src.pipeline_build import KnowledgeGraphClassifier
 from src.preprocessing import process_label_feature
 
@@ -17,4 +18,6 @@ async def predict_category_remote(sparql):
     return model.predict(processed)[0]
 
 def predict_category_local(file_path):
-    result = process_endpoint_full_inplace(file_path)
+    result =  process_file_full_inplace(file_path)
+    processed = process_label_feature(list(result['label']))
+    return model.predict(processed)[0]

@@ -1,0 +1,6 @@
+ALLOWED_EXTENSIONS = {'xml', 'trig', 'ttl', 'nq', 'nt'}
+UPLOAD_FOLDER = 'C:/Users/proge/Downloads'
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
