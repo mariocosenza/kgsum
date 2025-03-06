@@ -158,3 +158,32 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
         }
 
     return response_df
+
+
+def find_local_curi_puri_comments_combined(uri_list: list) -> list:
+    comments = _process_row(uri_list)
+    return list(comments) if comments else []
+
+
+def find_voc_local_combined(voc_list: list) -> list:
+    sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
+    sparql.setReturnFormat(JSON)
+    all_tags = set()
+
+    for voc in voc_list:
+        try:
+            sparql.setQuery(f"""
+            PREFIX dcat: <http://www.w3.org/ns/dcat#>
+            SELECT ?o WHERE {{
+                <{voc}> dcat:keyword ?o .
+            }} LIMIT 10
+            """)
+            res = sparql.query().convert()
+            voc_tags = {term['o']['value'] for term in res['results']['bindings']}
+            if voc_tags:
+                all_tags.update(voc_tags)
+        except Exception as e:
+            logger.info(f'Invalid uri: {e}')
+            continue
+
+    return list(all_tags)
