@@ -553,18 +553,17 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
     data_void = await process_endpoint_void(row)
 
     return {
-        'title': title,
-        'subject': data_void[0],
-        'description': data_void[1],
+        'id': title,
+        'sbj': data_void[0],
+        'dsc': data_void[1],
         'vocabulary': data[1],
-        'class': data[2],
-        'property': data[3],
-        'cname': data[4],
-        'pname': data[5],
-        'label': data[6],
-        'tld': data[7]
+        'curi': data[2],
+        'puri': data[3],
+        'lcn': data[4],
+        'lpn': data[5],
+        'lab': data[6],
+        'tlds': data[7]
     }
-
 
 #if __name__ == '__main__':
     #  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
