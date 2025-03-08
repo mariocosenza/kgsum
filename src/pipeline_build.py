@@ -92,7 +92,8 @@ def train_multiple_models(training_data: pd.DataFrame,
 
         # Check that there are at least two unique classes in the target.
         if df_feature[target_label].nunique() < 2:
-            print(f"Skipping feature '{feature}': target label '{target_label}' has only one unique class: {df_feature[target_label].unique()}")
+            print(
+                f"Skipping feature '{feature}': target label '{target_label}' has only one unique class: {df_feature[target_label].unique()}")
             continue
 
         print(f"Training model for feature '{feature}' with {len(df_feature)} examples.")
@@ -160,7 +161,8 @@ class KnowledgeGraphClassifier:
 
         # Check if there are at least two unique classes.
         if data_y.nunique() < 2:
-            raise ValueError(f"Training data has only one unique class: {data_y.unique()}. At least two classes are required.")
+            raise ValueError(
+                f"Training data has only one unique class: {data_y.unique()}. At least two classes are required.")
 
         kf = KFold(n_splits=cv_folds, random_state=1, shuffle=True)
         grid = GridSearchCV(
@@ -249,3 +251,37 @@ class KnowledgeGraphClassifier:
         instance.model = data['model']
         instance.vectorizer = data['vectorizer']
         return instance
+
+
+def save_multiple_models(models: Dict[str, KnowledgeGraphClassifier],
+                         training_results: Dict[str, Any],
+                         filepath: Optional[str] = None) -> None:
+    """
+    Saves the dictionary of trained models and their training results to a pickle file.
+    """
+    if filepath is None:
+        os.makedirs('../data/trained', exist_ok=True)
+        filepath = '../data/trained/multiple_models.pkl'
+    with open(filepath, 'wb') as f:
+        pickle.dump({
+            'models': models,
+            'training_results': training_results
+        }, f)
+    print(f"Multiple models saved to {filepath}")
+
+
+def load_multiple_models(filepath: Optional[str] = None) -> Tuple[Dict[str, KnowledgeGraphClassifier], Dict[str, Any]]:
+    """
+    Loads the dictionary of trained models and their training results from a pickle file.
+
+    Returns:
+        Tuple containing:
+            - models (Dict[str, KnowledgeGraphClassifier]): The trained models.
+            - training_results (Dict[str, Any]): The corresponding training results.
+    """
+    if filepath is None:
+        filepath = '../data/trained/multiple_models.pkl'
+    with open(filepath, 'rb') as f:
+        data = pickle.load(f)
+    print(f"Multiple models loaded from {filepath}")
+    return data['models'], data['training_results']
