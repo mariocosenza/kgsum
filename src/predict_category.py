@@ -1,23 +1,44 @@
+import asyncio
+
 import pandas as pd
-import os
+from src.pipeline_build import train_multiple_models, predict_category_multi
+from src.dataset_preparation_remote import process_endpoint_full_inplace
+from src.dataset_preparation import process_file_full_inplace
+from src.preprocessing import process_all_from_input
 
-from src.dataset_preparation import process_local_dataset_file, process_file_full_inplace
-from src.dataset_preparation_remote import process_endpoint_full_inplace, process_endpoint
-from src.pipeline_build import KnowledgeGraphClassifier
-from src.preprocessing import process_label_feature
+combined_df = pd.read_json('../data/processed/combined.json')
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
+feature_columns = ["lab", "lcn", "lpn", "sbj", "dsc"]
 
-model = KnowledgeGraphClassifier()
-model_data_path = os.path.join(current_dir, '..', 'data', 'processed', 'lab_lcn_lpn.json')
-model.train(pd.read_json(model_data_path), 'lab')
 
-async def predict_category_remote(sparql):
+models, training_results = train_multiple_models(
+    combined_df,
+    feature_columns,
+    target_label="category"
+)
+
+print("Global models trained. Training results:")
+for feature, metrics in training_results.items():
+    print(f"Feature: {feature}, CV Mean: {metrics['cv_mean']:.3f}, Best Params: {metrics['best_params']}")
+
+
+
+async def predict_category_remote_multi(sparql):
     result = await process_endpoint_full_inplace(sparql)
-    processed = process_label_feature(list(result['label']))
-    return model.predict(processed)[0]
 
-def predict_category_local(file_path):
-    result =  process_file_full_inplace(file_path)
-    processed = process_label_feature(list(result['label']))
-    return model.predict(processed)[0]
+    result = process_all_from_input(result)
+
+    print(predict_category_multi(models, result))
+    return predict_category_multi(models, result)
+
+
+def predict_category_local_multi(file_path):
+    result = process_file_full_inplace(file_path)
+
+    result = process_all_from_input(result)
+
+    return predict_category_multi(models, result)
+
+
+if __name__ == "__main__":
+    asyncio.run(predict_category_remote_multi('http://river.styx.org/sparql'))
