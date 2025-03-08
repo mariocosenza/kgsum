@@ -1,7 +1,7 @@
 import logging
 import re
-from os import listdir, path
-from typing import Dict, List, Tuple, Any
+from os import listdir
+from typing import Dict, List, Tuple, Any, Union
 
 import pandas as pd
 import spacy
@@ -55,7 +55,6 @@ DATA_DIR = "../data"
 RAW_DIR = f"{DATA_DIR}/raw"
 PROCESSED_DIR = f"{DATA_DIR}/processed"
 
-
 URI_FRAGMENT_PATTERN = re.compile(r'[#/]([^#/]+)$')
 URI_NAMESPACE_PATTERN = re.compile(r'^(.*?)[#/][^#/]+$')
 TLD_PATTERN = re.compile(r'^(?:https?://)?(?:www\.)?([^/]+)')
@@ -63,31 +62,25 @@ TLD_PATTERN = re.compile(r'^(?:https?://)?(?:www\.)?([^/]+)')
 
 def analyze_uri(uri: str) -> Dict[str, str]:
     result = {"namespace": "", "local_name": "", "tld": ""}
-
     if not uri or not isinstance(uri, str):
         return result
-
     fragment_match = URI_FRAGMENT_PATTERN.search(uri)
     if fragment_match:
         result["local_name"] = fragment_match.group(1)
-
     namespace_match = URI_NAMESPACE_PATTERN.search(uri)
     if namespace_match:
         result["namespace"] = namespace_match.group(1)
     else:
         result["namespace"] = uri
-
     tld_match = TLD_PATTERN.search(uri)
     if tld_match:
         result["tld"] = tld_match.group(1)
-
     return result
 
 
 def process_text(text: str) -> str:
     if not text or not isinstance(text, str) or len(text) > 100000:
         return ""
-
     try:
         doc = nlp(text)
         lang = doc._.language.get("language", "en")
@@ -102,10 +95,8 @@ def process_text(text: str) -> str:
 def normalize_text_list(text_list) -> str:
     if not text_list:
         return ""
-
     if isinstance(text_list, str):
         return text_list
-
     return " ".join(str(word) for word in text_list if word is not None)
 
 
@@ -117,7 +108,6 @@ def merge_dataset() -> pd.DataFrame:
                 local_frames.append(pd.read_json(f"{RAW_DIR}/local/{file}"))
             except Exception as e:
                 logger.error(f"Error reading file {file}: {e}")
-
     remote_frames = []
     for file in listdir(f"{RAW_DIR}/remote"):
         if "remote_feature_set" in file:
@@ -125,13 +115,10 @@ def merge_dataset() -> pd.DataFrame:
                 remote_frames.append(pd.read_json(f"{RAW_DIR}/remote/{file}"))
             except Exception as e:
                 logger.error(f"Error reading file {file}: {e}")
-
     df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
     df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
-
     merged_df = pd.concat([df_local, df_remote], ignore_index=True)
     merged_df = merged_df.drop_duplicates(subset="id", keep="last")
-
     return merged_df
 
 
@@ -143,7 +130,6 @@ def merge_void_dataset() -> pd.DataFrame:
                 local_frames.append(pd.read_json(f"{RAW_DIR}/local/{file}"))
             except Exception as e:
                 logger.error(f"Error reading void file {file}: {e}")
-
     remote_frames = []
     for file in listdir(f"{RAW_DIR}/remote"):
         if "remote_void_feature_set" in file:
@@ -151,201 +137,112 @@ def merge_void_dataset() -> pd.DataFrame:
                 remote_frames.append(pd.read_json(f"{RAW_DIR}/remote/{file}"))
             except Exception as e:
                 logger.error(f"Error reading void file {file}: {e}")
-
     df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
     df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
-
     merged_df = pd.concat([df_local, df_remote], ignore_index=True)
     merged_df = merged_df.drop_duplicates(subset="id", keep="last")
-
     return merged_df
 
 
 def process_row(row, index: int, total: int) -> Tuple[str, str, str]:
-    logger.info("Processing row %d/%d started.", index, total)
-
+    logger.info("Processing row %d/%d for lab/lcn/lpn started.", index, total)
     lab_text = process_text(normalize_text_list(row.get("lab", [])))
     lcn_text = process_text(normalize_text_list(row.get("lcn", [])))
     lnp_text = process_text(normalize_text_list(row.get("lpn", [])))
-
-    logger.info("Processing row %d/%d completed.", index, total)
+    logger.info("Processing row %d/%d for lab/lcn/lpn completed.", index, total)
     return lab_text, lcn_text, lnp_text
 
 
-def preprocess_lab_lcn_lnp(input_frame: pd.DataFrame) -> pd.DataFrame:
+def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
     total_rows = len(input_frame)
-    processed_lab = []
-    processed_lcn = []
-    processed_lnp = []
-
+    combined_rows = []
     for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
+        logger.info("Processing row %d/%d started.", i, total_rows)
+        # Process text-based features
         lab_text, lcn_text, lnp_text = process_row(row, i, total_rows)
-        processed_lab.append(lab_text)
-        processed_lcn.append(lcn_text)
-        processed_lnp.append(lnp_text)
-
-    out_df = pd.DataFrame({
-        "id": input_frame["id"],
-        "category": input_frame["category"],
-        "lab": processed_lab,
-        "lcn": processed_lcn,
-        "lpn": processed_lnp
-    })
-
-    out_df.to_json(f"{PROCESSED_DIR}/lab_lcn_lpn.json")
-    logger.info("Processing complete: %d/%d", total_rows, total_rows)
-    return out_df
-
-
-def analyze_uri_metadata(row, index: int, total: int) -> Dict[str, any]:
-    logger.info("Analyzing URI metadata for row %d/%d started.", index, total)
-
-    result = {
-        "id": row.get("id", ""),
-        "category": row.get("category", ""),
-        "tlds": set()
-    }
-
-    result["curi"] = row.get("curi", [])
-    result["puri"] = row.get("puri", [])
-    result["voc"] = row.get("voc", [])
-    result["tld"] = row.get("tld", [])
-
-    logger.info("Analyzing URI metadata for row %d/%d completed.", index, total)
-    return result
+        # Retrieve URI fields directly from the row
+        curi = row.get("curi", [])
+        puri = row.get("puri", [])
+        voc = row.get("voc", [])
+        tld = row.get("tld", [])
+        combined_rows.append({
+            "id": row.get("id", ""),
+            "category": row.get("category", ""),
+            "lab": lab_text,
+            "lcn": lcn_text,
+            "lpn": lnp_text,
+            "curi": curi,
+            "puri": puri,
+            "voc": voc,
+            "tlds": tld,
+        })
+        logger.info("Processing row %d/%d completed.", i, total_rows)
+    combined_df = pd.DataFrame(combined_rows)
+    logger.info("Combined processing complete: %d/%d.", total_rows, total_rows)
+    return combined_df
 
 
-def preprocess_voc_curi_puri_tld(input_frame: pd.DataFrame) -> pd.DataFrame:
-    total_rows = len(input_frame)
-    processed_rows = []
-
-    for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
-        processed_rows.append(analyze_uri_metadata(row, i, total_rows))
-
-    processed_df = pd.DataFrame({
-        "id": [row["id"] for row in processed_rows],
-        "category": [row["category"] for row in processed_rows],
-        "curi": [row["curi"] for row in processed_rows],
-        "puri": [row["puri"] for row in processed_rows],
-        "voc": [row["voc"] for row in processed_rows],
-        "tlds": [row["tld"] for row in processed_rows]
-    })
-
-    processed_df.to_json(f"{PROCESSED_DIR}/voc_curi_puri_tlds.json")
-    logger.info("URI processing complete: %d/%d", total_rows, total_rows)
-    return processed_df
-
-
-def process_void_row(row, index: int, total: int) -> str:
+def process_void_row(row, index: int, total: int) -> dict:
     logger.info("Processing void row %d/%d started.", index, total)
-    result = process_text(normalize_text_list(row.get("dsc", [])))
+    dsc_text = process_text(normalize_text_list(row.get("dsc", [])))
+    sbj_text = process_text(normalize_text_list(row.get("sbj", [])))
     logger.info("Processing void row %d/%d completed.", index, total)
-    return result
+    return {"sbj": sbj_text, "dsc": dsc_text}
 
 
 def preprocess_void(input_frame: pd.DataFrame) -> pd.DataFrame:
     total_rows = len(input_frame)
-    processed_void = []
-
+    processed_rows = []
     for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
-        processed_void.append(process_void_row(row, i, total_rows))
-
+        processed_rows.append(process_void_row(row, i, total_rows))
     out_df = pd.DataFrame({
-        "id": input_frame["id"] if "id" in input_frame.columns else range(len(processed_void)),
-        "void": processed_void
+        "id": input_frame["id"] if "id" in input_frame.columns else list(range(len(processed_rows))),
+        "sbj": [r["sbj"] for r in processed_rows],
+        "dsc": [r["dsc"] for r in processed_rows]
     })
-
-    out_df.to_json(f"{PROCESSED_DIR}/void.json")
-    logger.info("Void processing complete: %d/%d", total_rows, total_rows)
+    logger.info("Void processing complete: %d/%d.", total_rows, total_rows)
     return out_df
 
 
-def preprocess_voc_tags(input_frame: pd.DataFrame) -> pd.DataFrame:
-    frame = input_frame.dropna(subset=["id", "tags", "voc"])
-    frame.to_json(f"{PROCESSED_DIR}/voc_tags.json")
-    logger.info("Vocabulary tags processing complete.")
-    return frame
+def combine_with_void(combined_df: pd.DataFrame, void_df: pd.DataFrame) -> pd.DataFrame:
+    merged_final = pd.merge(
+        combined_df, void_df, on="id", how="outer", suffixes=("", "_dup")
+    )
+
+    # Drop duplicate columns that came with the '_dup' suffix.
+    dup_cols = [col for col in merged_final.columns if col.endswith("_dup")]
+    merged_final.drop(columns=dup_cols, inplace=True)
+
+    merged_final = merged_final.drop_duplicates(subset="id")
+    merged_final = merged_final.dropna(subset=["category"])
+
+    logger.info("Final combined processing complete.")
+    return merged_final
 
 
+def process_all_from_input(input_data: Union[pd.DataFrame, Dict[str, Any]]) -> Dict[str, List[Any]]:
+    # Convert dict to DataFrame if needed.
+    if isinstance(input_data, dict):
+        converted = {}
+        for key, value in input_data.items():
+            if not isinstance(value, list):
+                converted[key] = [value]
+            else:
+                converted[key] = value
+        max_len = max(len(v) for v in converted.values())
+        padded = {key: value + [None] * (max_len - len(value)) for key, value in converted.items()}
+        df = pd.DataFrame(padded)
+    elif isinstance(input_data, pd.DataFrame):
+        df = input_data
+    else:
+        raise ValueError("Input data must be either a dict or a pandas DataFrame")
 
-# Individual feature processing functions
-
-def process_label_feature(lab_input: str | List[Any] | None) -> str:
-    if lab_input is None:
-        return ""
-    normalized_text = normalize_text_list(lab_input)
-    return process_text(normalized_text)
-
-
-def process_local_name_feature(lcn_input: str | List[Any] | None) -> str:
-    if lcn_input is None:
-        return ""
-    normalized_text = normalize_text_list(lcn_input)
-    return process_text(normalized_text)
-
-
-def process_property_name_feature(lpn_input: str | List[Any] | None) -> str:
-    if lpn_input is None:
-        return ""
-    normalized_text = normalize_text_list(lpn_input)
-    return process_text(normalized_text)
-
-
-def process_void_description_feature(dsc_input: str | List[Any] | None) -> str:
-    if dsc_input is None:
-        return ""
-    normalized_text = normalize_text_list(dsc_input)
-    return process_text(normalized_text)
-
-
-def process_class_uri_feature(curi_input: str | List[str] | None) -> List[Dict[str, str]]:
-    if curi_input is None:
-        return []
-
-    if isinstance(curi_input, str):
-        curi_input = [curi_input]
-
-    return [analyze_uri(uri) for uri in curi_input if uri]
-
-
-def process_property_uri_feature(puri_input: str | List[str] | None) -> List[Dict[str, str]]:
-    if puri_input is None:
-        return []
-
-    if isinstance(puri_input, str):
-        puri_input = [puri_input]
-
-    return [analyze_uri(uri) for uri in puri_input if uri]
-
-
-def process_vocabulary_feature(voc_input: str | List[str] | None) -> List[Dict[str, str]]:
-    if voc_input is None:
-        return []
-
-    if isinstance(voc_input, str):
-        voc_input = [voc_input]
-
-    return [analyze_uri(uri) for uri in voc_input if uri]
-
-
-def process_tld_feature(tld_input: str | List[str] | None) -> List[str]:
-    if tld_input is None:
-        return []
-
-    if isinstance(tld_input, str):
-        return [tld_input] if tld_input else []
-
-    return [str(tld) for tld in tld_input if tld is not None]
-
-
-def process_tag_feature(tags_input: str | List[str] | None) -> List[str]:
-    if tags_input is None:
-        return []
-
-    if isinstance(tags_input, str):
-        return [tag.strip() for tag in re.split(r'[,;|]', tags_input) if tag.strip()]
-
-    return [str(tag).strip() for tag in tags_input if tag is not None]
+    logger.info("Converted input data to DataFrame with %d rows", len(df))
+    combined_df = preprocess_combined(df)
+    void_df = preprocess_void(df)
+    merged_df = combine_with_void(combined_df, void_df)
+    logger.info("Full processing completed")
+    return merged_df.to_dict(orient='list')
 
 
 def main():
@@ -354,16 +251,22 @@ def main():
     df = merge_dataset()
     logger.info(f"Merged dataset: {len(df)} rows")
 
-    lab_lcn_lnp_df = preprocess_lab_lcn_lnp(df)
-    logger.info(f"Processed labels and names: {len(lab_lcn_lnp_df)} rows")
+    combined_df = preprocess_combined(df)
+    logger.info(f"Combined processing complete: {len(combined_df)} rows")
 
-    uri_df = preprocess_voc_curi_puri_tld(df)
-    logger.info(f"Processed URIs: {len(uri_df)} rows")
+    void_df = preprocess_void(merge_void_dataset())
+    logger.info(f"Void processing complete: {len(void_df)} rows")
 
-    void_df = merge_void_dataset()
-    if not void_df.empty:
-        void_processed_df = preprocess_void(void_df)
-        logger.info(f"Processed void dataset: {len(void_processed_df)} rows")
+    # Merge the combined and void DataFrames
+    final_df = combine_with_void(combined_df, void_df)
+    logger.info(f"Final merged dataframe has {len(final_df)} rows")
 
-    logger.info("Preprocessing workflow completed")
+    # Save final output to combined.json in the PROCESSED_DIR.
+    output_path = f"{PROCESSED_DIR}/combined.json"
+    final_df.to_json(output_path)
+    logger.info("Preprocessing workflow completed. Output saved to %s", output_path)
 
+
+
+if __name__ == "__main__":
+    main()
