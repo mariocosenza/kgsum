@@ -157,6 +157,11 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
             'category': row['category']
         }
 
+
+    response_df['comments'] = response_df['curi_comments'] + response_df['puri_comments']
+    response_df.drop('curi_comments', inplace=True)
+    response_df.drop('puri_comments', inplace=True)
+
     return response_df
 
 
@@ -187,3 +192,12 @@ def find_voc_local_combined(voc_list: list) -> list:
             continue
 
     return list(all_tags)
+
+
+def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
+    comments_df = find_local_curi_puri_comments(data_frame)
+    voc_tags_df = find_voc_local(data_frame)
+
+    merged_df = pd.merge(comments_df, voc_tags_df, on=['id', 'category'], how='left')
+
+    return merged_df
