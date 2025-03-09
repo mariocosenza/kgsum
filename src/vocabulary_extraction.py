@@ -157,7 +157,6 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
             'category': row['category']
         }
 
-
     response_df['comments'] = response_df['curi_comments'] + response_df['puri_comments']
     response_df.drop('curi_comments', inplace=True)
     response_df.drop('puri_comments', inplace=True)

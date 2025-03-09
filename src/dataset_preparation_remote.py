@@ -565,10 +565,10 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
         'tlds': data[7]
     }
 
-#if __name__ == '__main__':
-    #  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
-    #   if mode == "void":
-    # asyncio.run(main_void())
-    # else:
-    # asyncio.run(main_normal())
-    #asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))
+# if __name__ == '__main__':
+#  mode = sys.argv[1] if len(sys.argv) > 1 else "normal"
+#   if mode == "void":
+# asyncio.run(main_void())
+# else:
+# asyncio.run(main_normal())
+# asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))

@@ -268,16 +268,16 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         tld = select_local_tld(result)
 
         return {
-                'id': [title],
-                'sbj': [subject],
-                'dsc': [description],
-                'voc': [vocabulary],
-                'curi': [class_val],
-                'puri': [property_val],
-                'lcn': [cname],
-                'lpn': [pname],
-                'lab': [label],
-                'tlds': [tld]
+            'id': [title],
+            'sbj': [subject],
+            'dsc': [description],
+            'voc': [vocabulary],
+            'curi': [class_val],
+            'puri': [property_val],
+            'lcn': [cname],
+            'lpn': [pname],
+            'lab': [label],
+            'tlds': [tld]
         }
 
     except Exception as e:

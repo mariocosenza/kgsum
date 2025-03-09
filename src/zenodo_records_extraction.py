@@ -77,6 +77,7 @@ def get_zenodo_records(g_client):
     df = df.sort_values(by="title", ascending=True)
     return df
 
+
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     df_zenodo = get_zenodo_records(client)
