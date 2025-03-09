@@ -30,3 +30,4 @@ jobs:
           body: This is an auto-generated PR with fixes.
           labels: automated pr
           branch: python-code-format-patches
+          base: main
