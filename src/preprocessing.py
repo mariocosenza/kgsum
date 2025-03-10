@@ -280,8 +280,11 @@ def main():
     void_df = preprocess_void(merge_void_dataset())
     logger.info(f"Void processing complete: {len(void_df)} rows")
 
+    lov_data = preprocess_lov_data(pd.read_json('../data/raw/lov_cloud/voc_cmt.json'))
+    logger.info(f"LOV processing complete: {len(lov_data)} rows")
+
     # Merge the combined and void DataFrames
-    final_df = combine_with_void(combined_df, void_df)
+    final_df = combine_with_void_and_lov_data(combined_df, void_df, lov_df=lov_data)
     logger.info(f"Final merged dataframe has {len(final_df)} rows")
 
     # Save final output to combined.json in the PROCESSED_DIR.
