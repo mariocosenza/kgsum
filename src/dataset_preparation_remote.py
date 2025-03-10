@@ -391,6 +391,54 @@ async def async_select_void_description(endpoint, timeout=300, void_file=False):
             return []
 
 
+async def async_select_void_license(endpoint, timeout=300, void_file=False):
+    logger.info(f"[VDESC] Starting VOID description query for endpoint: {endpoint}")
+    query = """
+          PREFIX dcterms: <http://purl.org/dc/terms/> 
+          SELECT ?desc WHERE {
+              ?s dcterms:license ?desc .
+          } LIMIT 1
+    """
+    async with aiohttp.ClientSession() as session:
+        try:
+            result_text = await _fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            descriptions = {binding.text for binding in root.findall('.//sparql:binding[@name="desc"]/*', ns)}
+            if not descriptions and not void_file:
+                uri = await async_has_void_file(endpoint, timeout)
+                if uri:
+                    return await async_select_void_subject_remote(uri, timeout, True)
+            logger.info(f"[VDESC] Finished VOID description query for endpoint: {endpoint}")
+            return list(descriptions)
+        except Exception as e:
+            logger.warning(f"[VDESC] Error in VOID description query: {e}")
+            return []
+
+async def async_select_void_creator(endpoint, timeout=300, void_file=False):
+    logger.info(f"[VDESC] Starting VOID description query for endpoint: {endpoint}")
+    query = """
+          PREFIX dcterms: <http://purl.org/dc/terms/> 
+          SELECT ?desc WHERE {
+              ?s dcterms:creator ?desc .
+          } LIMIT 1
+    """
+    async with aiohttp.ClientSession() as session:
+        try:
+            result_text = await _fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            descriptions = {binding.text for binding in root.findall('.//sparql:binding[@name="desc"]/*', ns)}
+            if not descriptions and not void_file:
+                uri = await async_has_void_file(endpoint, timeout)
+                if uri:
+                    return await async_select_void_subject_remote(uri, timeout, True)
+            logger.info(f"[VDESC] Finished VOID description query for endpoint: {endpoint}")
+            return list(descriptions)
+        except Exception as e:
+            logger.warning(f"[VDESC] Error in VOID description query: {e}")
+            return []
+
 async def async_select_void_subject_remote(endpoint, timeout=300, void_file=False):
     logger.info(f"[VSUBJ] Starting VOID subject query for endpoint: {endpoint}")
     query = """
@@ -446,7 +494,9 @@ async def process_endpoint(row):
         'lcn': async_select_remote_class_name(endpoint),
         'lpn': async_select_remote_property_names(endpoint),
         'lab': async_select_remote_label(endpoint),
-        'tld': async_select_remote_tld(endpoint)
+        'tld': async_select_remote_tld(endpoint),
+        'creator': async_select_void_creator(endpoint),
+        'license': async_select_void_license(endpoint)
     }
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
     result_dict = dict(zip(tasks.keys(), results))
@@ -562,7 +612,9 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
         'lcn': data[4],
         'lpn': data[5],
         'lab': data[6],
-        'tlds': data[7]
+        'tlds': data[7],
+        'creator': data[8],
+        'license': data[9]
     }
 
 # if __name__ == '__main__':

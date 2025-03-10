@@ -100,6 +100,27 @@ Q_LOCAL_DCTERMS_TITLE = prepareQuery(
     } LIMIT 1
     """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
+Q_LOCAL_VOID_SPARQL = prepareQuery("""
+    SELECT DISTINCT ?sparql
+    WHERE {
+        ?s void:sparqlEndpoint ?o.
+    } LIMIT 2
+""", initNs={"void": 'http://rdfs.org/ns/void#'})
+
+Q_LOCAL_DCTERMS_CREATOR = prepareQuery(
+    """
+    SELECT ?desc WHERE {
+            ?s dcterms:creator ?creator .
+    } LIMIT 5
+""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
+
+Q_LOCAL_DCTERMS_LICENSE = prepareQuery(
+    """
+    SELECT ?desc WHERE {
+            ?s dcterms:license ?license .
+    } LIMIT 1
+""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
+
 
 def select_local_vocabularies(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
@@ -149,6 +170,18 @@ def select_local_tld(parsed_graph):
 def select_local_property(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_PROPERTY)
     return {str(row.property) for row in qres}
+
+def select_local_endpoint(parsed_graph):
+    qres = parsed_graph.query(Q_LOCAL_VOID_SPARQL)
+    return {str(row.sparql) for row in qres}
+
+def select_local_creator(parsed_graph):
+    qres = parsed_graph.query(Q_LOCAL_DCTERMS_CREATOR)
+    return {str(row.creator) for row in qres}
+
+def select_local_license(parsed_graph):
+    qres = parsed_graph.query(Q_LOCAL_DCTERMS_LICENSE)
+    return {str(row.license) for row in qres}
 
 
 def select_local_property_names(parsed_graph):
@@ -240,6 +273,9 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
             select_local_property_names(result),
             select_local_label(result),
             select_local_tld(result),
+            select_local_endpoint(result),
+            select_local_creator(result),
+            select_local_license(result),
             lod_frame['category'][file_num]
         ]
         return row
@@ -266,6 +302,7 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         pname = select_local_property_names(result)
         label = select_local_label(result)
         tld = select_local_tld(result)
+        sparql = select_local_endpoint(result)
 
         return {
             'id': [title],
@@ -277,6 +314,7 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
             'lcn': [cname],
             'lpn': [pname],
             'lab': [label],
+            'sparql': [sparql],
             'tlds': [tld]
         }
 
@@ -331,7 +369,7 @@ def create_local_dataset(offset=0, limit=10000):
                 except StopIteration:
                     continue
 
-    df = pd.DataFrame(results, columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'category'])
+    df = pd.DataFrame(results, columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'category'])
     df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
 
 
