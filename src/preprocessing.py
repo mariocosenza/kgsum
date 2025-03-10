@@ -219,6 +219,9 @@ def combine_with_void(combined_df: pd.DataFrame, void_df: pd.DataFrame) -> pd.Da
     logger.info("Final combined processing complete.")
     return merged_final
 
+def combine_with_void_and_lov_data(combined_df: pd.DataFrame, void_df: pd.DataFrame, lov_df: pd.DataFrame) -> pd.DataFrame:
+    return combine_with_void(combine_with_void(combined_df, void_df), lov_df)
+
 
 def process_all_from_input(input_data: Union[pd.DataFrame, Dict[str, Any]]) -> Dict[str, List[Any]]:
     # Convert dict to DataFrame if needed.
@@ -243,6 +246,26 @@ def process_all_from_input(input_data: Union[pd.DataFrame, Dict[str, Any]]) -> D
     merged_df = combine_with_void(combined_df, void_df)
     logger.info("Full processing completed")
     return merged_df.to_dict(orient='list')
+
+def process_lov_data_row(row, index: int, total: int) -> dict:
+    logger.info("Processing lov row %d/%d started.", index, total)
+    tags = row.get("tags", [])
+    comments  = process_text(normalize_text_list(row.get("comments", [])))
+    logger.info("Processing lov row %d/%d completed.", index, total)
+    return {"tags": tags, "comments": comments}
+
+def preprocess_lov_data(input_frame: pd.DataFrame) -> pd.DataFrame:
+    total_rows = len(input_frame)
+    processed_rows = []
+    for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
+        processed_rows.append(process_lov_data_row(row, i, total_rows))
+    out_df = pd.DataFrame({
+        "id": input_frame["id"] if "id" in input_frame.columns else list(range(len(processed_rows))),
+        "tags": [r["tags"] for r in processed_rows],
+        "comments": [r["comments"] for r in processed_rows]
+    })
+    logger.info("Lov processing complete: %d/%d.", total_rows, total_rows)
+    return out_df
 
 
 def main():
