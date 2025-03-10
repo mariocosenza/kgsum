@@ -4,7 +4,7 @@ import pickle
 import logging
 from collections import Counter
 from enum import Enum, auto
-from typing import Any, BinaryIO, Tuple
+from typing import Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -257,8 +257,7 @@ class KnowledgeGraphClassifier:
 def save_multiple_models(
     models: dict[str, KnowledgeGraphClassifier],
     training_results: dict[str, Any],
-    filepath: str | None = None,
-) -> None:
+    filepath: str | None = None) -> None:
     if filepath is None:
         os.makedirs('../data/trained', exist_ok=True)
         filepath = '../data/trained/multiple_models.pkl'
