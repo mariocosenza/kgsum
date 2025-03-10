@@ -7,10 +7,14 @@ import pandas as pd
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
 
+from src.preprocessing import merge_dataset
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vocabulary_extraction")
 
 CLEAN_URI = re.compile(r'^([^#]+)?')
+IS_URI = re.compile(
+    "^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\.[a-zA-Z0-9()]{1,6}\\b(?:[-a-zA-Z0-9()@:%_\\+.~#?&\\/=]*)$")
 LOCAL_ENDPOINT_LOV = os.environ['LOCAL_ENDPOINT_LOV']
 
 
@@ -93,12 +97,14 @@ def find_voc_local(data_frame: pd.DataFrame):
         all_vocs = []
 
         for voc in row['voc']:
+            logger.info(f'Processing voc {voc}')
             try:
                 sparql.setQuery(f"""
                 PREFIX dcat: <http://www.w3.org/ns/dcat#>
                 SELECT ?o WHERE {{
-                <{voc}> dcat:keyword ?o .
-                }} LIMIT 10 """)
+                    <{voc}> dcat:keyword ?o .
+                }} LIMIT 10
+                """)
                 res = sparql.query().convert()
 
                 voc_tags = {term['o']['value'] for term in res['results']['bindings']}
@@ -124,23 +130,24 @@ def find_voc_local(data_frame: pd.DataFrame):
 def _process_row(row_column):
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
-    all_comments = set()
+    all_comments = list()
 
     for curi in row_column:
-        try:
-            sparql.setQuery(f"""
+        if IS_URI.match(curi):
+            try:
+                sparql.setQuery(f"""
                         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                         SELECT ?o WHERE {{
                         <{curi}> rdfs:comment ?o
                         FILTER(langMatches(lang(?o), "en"))
                         }} LIMIT 5""")
 
-            res = sparql.query().convert()
-            comments = {term['o']['value'] for term in res['results']['bindings']}
-            all_comments.update(comments)
-        except Exception as e:
-            logger.info(f'Invalid uri: {e}')
-            pass
+                res = sparql.query().convert()
+                comments = {term['o']['value'] for term in res['results']['bindings']}
+                all_comments.append(comments)
+            except Exception as e:
+                logger.info(f'Invalid uri: {e}')
+                pass
 
     return all_comments if all_comments else None
 
@@ -148,6 +155,7 @@ def _process_row(row_column):
 def find_local_curi_puri_comments(data_frame: pd.DataFrame):
     response_df = pd.DataFrame(columns=['id', 'curi', 'puri', 'curi_comments', 'puri_comments', 'category'])
     for index, row in data_frame.iterrows():
+        logger.info(f'Processing curi and puri in row: {index}')
         response_df.loc[len(response_df)] = {
             'id': row['id'],
             'curi': row['curi'],
@@ -157,10 +165,7 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
             'category': row['category']
         }
 
-    response_df['comments'] = response_df['curi_comments'] + response_df['puri_comments']
-    response_df.drop('curi_comments', inplace=True)
-    response_df.drop('puri_comments', inplace=True)
-
+    response_df['comments'] = response_df['curi_comments'] +  response_df['puri_comments']
     return response_df
 
 
@@ -175,6 +180,7 @@ def find_voc_local_combined(voc_list: list) -> list:
     all_tags = set()
 
     for voc in voc_list:
+        logger.info(f'Processing voc {voc}')
         try:
             sparql.setQuery(f"""
             PREFIX dcat: <http://www.w3.org/ns/dcat#>
@@ -194,9 +200,18 @@ def find_voc_local_combined(voc_list: list) -> list:
 
 
 def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
-    comments_df = find_local_curi_puri_comments(data_frame)
+    logger.info('Started processing lov data')
     voc_tags_df = find_voc_local(data_frame)
+    comments_df = find_local_curi_puri_comments(data_frame)
 
     merged_df = pd.merge(comments_df, voc_tags_df, on=['id', 'category'], how='left')
-
+    logger.info('Finished processing lov data')
     return merged_df
+
+
+def main():
+    find_comments_and_voc_tags(merge_dataset()).to_json('../data/raw/lov_cloud/voc_cmt.json')
+
+
+if __name__ == '__main__':
+    main()
