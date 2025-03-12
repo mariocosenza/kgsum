@@ -36,66 +36,66 @@ def generate_profile(endpoint=None, file=None) -> dict:
 
 
 async def store_profile(profile: pd.DataFrame, category: str):
-    return
-    # try:
-    #     await _fetch_query(f"""
-    #     PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-    #     PREFIX dcat: <http://www.w3.org/ns/dcat#>
-    #     PREFIX owl: <http://www.w3.org/2002/07/owl#>
-    #     PREFIX dcterms: <http://purl.org/dc/terms/>
-    #     PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-    #     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    #     PREFIX foaf: <http://xmlns.com/foaf/0.1/>
-    #
-    #     INSERT DATA {{
-    #     {iri} rdf:type dcat:dataset .
-    #     {iri} dcterms:title "{title}" .
-    #     {iri} dcterms:language "{language}" .
-    #     {iri} dcterms:description "{description}" .
-    #     {iri} dcterms:creator "{creator}" .
-    #     {iri} dcterms:license "{license}" .
-    #     {iri} dcterms:endpointURL "{url}" .
-    #     {iri} dcat:theme "{category}" .
-    #     }}
-    #     """)
-    # except:
-    #     return
-    #
-    # triple = ''
-    # keywords = ''
-    # subjects = ''
-    # for voc in profile:
-    #     if IS_URI.match(voc):
-    #         triple = triple + f"{iri} void:vocabulary <{voc}> . \n"
-    #
-    # for keyword in profile:
-    #     keywords = keywords + f'{iri} dcat:keyword "{keyword}" .\n '
-    #
-    # for subject in profile:
-    #     if IS_URI.match(subject):
-    #         subjects = subjects + f'{iri} dcterms:subject <{subject}> .\n '
-    #
-    # try:
-    #     await _fetch_query(f"""
-    #              PREFIX void: <http://rdfs.org/ns/void#>
-    #              PREFIX dcat: <http://www.w3.org/ns/dcat#>
-    #              INSERT DATA {{
-    #                  {triple}
-    #                  {keywords}
-    #              }}
-    #             """)
-    # except:
-    #     pass
-    #
-    # try:
-    #     await _fetch_query(f"""
-    #              PREFIX dcterms: <http://purl.org/dc/terms/>
-    #              INSERT DATA {{
-    #                  {subjects}
-    #              }}
-    #              """)
-    # except:
-    #     pass
+    iri = profile['id']
+    try:
+        await _fetch_query(f"""
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        PREFIX dcat: <http://www.w3.org/ns/dcat#>
+        PREFIX owl: <http://www.w3.org/2002/07/owl#>
+        PREFIX dcterms: <http://purl.org/dc/terms/>
+        PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+        INSERT DATA {{
+        {iri} rdf:type dcat:dataset .
+        {iri} dcterms:title "{profile['title']}" .
+        {iri} dcterms:language "{'language'}" .
+        {iri} dcterms:description "{profile['dsc']}" .
+        {iri} dcterms:creator "{profile['creator']}" .
+        {iri} dcterms:license "{profile['license']}" .
+        {iri} dcterms:endpointURL "{profile['sparql']}" .
+        {iri} dcat:theme "{category}" .
+        }}
+        """)
+    except:
+        return
+
+    triple = ''
+    keywords = ''
+    subjects = ''
+    for voc in profile['voc']:
+        if IS_URI.match(voc):
+            triple = triple + f"{iri} void:vocabulary <{voc}> . \n"
+
+    for keyword in profile['tags']:
+        keywords = keywords + f'{iri} dcat:keyword "{keyword}" .\n '
+
+    for subject in profile['sbj']:
+        if IS_URI.match(subject):
+            subjects = subjects + f'{iri} dcterms:subject <{subject}> .\n '
+
+    try:
+        await _fetch_query(f"""
+                 PREFIX void: <http://rdfs.org/ns/void#>
+                 PREFIX dcat: <http://www.w3.org/ns/dcat#>
+                 INSERT DATA {{
+                     {triple}
+                     {keywords}
+                 }}
+                """)
+    except:
+        pass
+
+    try:
+        await _fetch_query(f"""
+                 PREFIX dcterms: <http://purl.org/dc/terms/>
+                 INSERT DATA {{
+                     {subjects}
+                 }}
+                 """)
+    except:
+        pass
 
 async def generate_and_store_profile(endpoint=None, file=None):
     row = generate_profile(endpoint=endpoint, file=file)
