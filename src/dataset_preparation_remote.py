@@ -488,13 +488,14 @@ async def process_endpoint(row):
     endpoint = row['sparql_url']
     logger.info(f"[PROC] Processing endpoint {row['id']}")
     tasks = {
+        'title': async_select_remote_title(endpoint),
         'voc': async_select_remote_vocabularies(endpoint),
         'curi': async_select_remote_class(endpoint),
         'puri': async_select_remote_property(endpoint),
         'lcn': async_select_remote_class_name(endpoint),
         'lpn': async_select_remote_property_names(endpoint),
         'lab': async_select_remote_label(endpoint),
-        'tld': async_select_remote_tld(endpoint),
+        'tlds': async_select_remote_tld(endpoint),
         'sparql': row['sparql_url'],
         'creator': async_select_void_creator(endpoint),
         'license': async_select_void_license(endpoint)
@@ -605,15 +606,17 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
 
     return {
         'id': title,
+        'title': title,
         'sbj': data_void[0],
         'dsc': data_void[1],
-        'vocabulary': data[1],
+        'voc': data[1],
         'curi': data[2],
         'puri': data[3],
         'lcn': data[4],
         'lpn': data[5],
         'lab': data[6],
         'tlds': data[7],
+        'sparql': endpoint,
         'creator': data[8],
         'license': data[9]
     }

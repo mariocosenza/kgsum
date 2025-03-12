@@ -1,5 +1,6 @@
 import logging
 import os
+import uuid
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from os import listdir
 
@@ -306,8 +307,16 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         creator = select_local_creator(result)
         license = select_local_license(result)
 
+        if not title or title == '':
+            if sparql is not None:
+                title = sparql
+            else:
+                title = uuid.uuid4()
+
+
         return {
             'id': [title],
+            'title': [title],
             'sbj': [subject],
             'dsc': [description],
             'voc': [vocabulary],
