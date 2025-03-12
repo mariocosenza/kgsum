@@ -303,6 +303,8 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         label = select_local_label(result)
         tld = select_local_tld(result)
         sparql = select_local_endpoint(result)
+        creator = select_local_creator(result)
+        license = select_local_license(result)
 
         return {
             'id': [title],
@@ -315,7 +317,9 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
             'lpn': [pname],
             'lab': [label],
             'sparql': [sparql],
-            'tlds': [tld]
+            'tlds': [tld],
+            'creator': [creator],
+            'license': [license]
         }
 
     except Exception as e:

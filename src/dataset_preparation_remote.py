@@ -495,6 +495,7 @@ async def process_endpoint(row):
         'lpn': async_select_remote_property_names(endpoint),
         'lab': async_select_remote_label(endpoint),
         'tld': async_select_remote_tld(endpoint),
+        'sparql': row['sparql_url'],
         'creator': async_select_void_creator(endpoint),
         'license': async_select_void_license(endpoint)
     }
