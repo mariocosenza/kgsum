@@ -165,6 +165,7 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
         puri = row.get("puri", [])
         voc = row.get("voc", [])
         tld = row.get("tld", [])
+        sparql = row.get('sparql', [])
         combined_rows.append({
             "id": row.get("id", ""),
             "category": row.get("category", ""),
@@ -175,6 +176,9 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
             "puri": puri,
             "voc": voc,
             "tlds": tld,
+            'sparql': sparql,
+            'creator': row.get("creator", ""),
+            'license': row.get("license", "")
         })
         logger.info("Processing row %d/%d completed.", i, total_rows)
     combined_df = pd.DataFrame(combined_rows)

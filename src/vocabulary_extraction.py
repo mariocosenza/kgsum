@@ -105,26 +105,26 @@ def find_voc_local(data_frame: pd.DataFrame):
     for index, row in data_frame.iterrows():
         all_tags = set()
         all_vocs = []
-        for voc in row['voc']:
+        for voc in set(row['voc']):
             logger.info(f'Processing voc {voc}')
-            try:
-                sparql.setQuery(f"""
-                PREFIX dcat: <http://www.w3.org/ns/dcat#>
-                SELECT ?o WHERE {{
-                    <{voc}> dcat:keyword ?o .
-                }} LIMIT 10
-                """)
-                res = sparql.query().convert()
-                # Wait a short moment between queries
-                time.sleep(1)
-                voc_tags = {term['o']['value'] for term in res['results']['bindings']}
-                if voc_tags:
-                    all_tags.update(voc_tags)
-                    all_vocs.append(voc)
-            except Exception as e:
-                logger.error(f'Error processing voc {voc}: {e}')
-                time.sleep(2)
-                continue
+            if IS_URI.match(voc):
+                try:
+                    sparql.setQuery(f"""
+                    PREFIX dcat: <http://www.w3.org/ns/dcat#>
+                    SELECT ?o WHERE {{
+                         <{voc}> dcat:keyword ?o .
+                    }} LIMIT 10
+                    """)
+                    res = sparql.query().convert()
+                    # Wait a short moment between queries
+                    voc_tags = {term['o']['value'] for term in res['results']['bindings']}
+                    if voc_tags:
+                        all_tags.update(voc_tags)
+                        all_vocs.append(voc)
+                except Exception as e:
+                    logger.error(f'Error processing voc {voc}: {e}')
+                    time.sleep(2)
+                    continue
         if all_vocs:
             response_df.loc[len(response_df)] = {
                 'id': row['id'],
@@ -135,7 +135,7 @@ def find_voc_local(data_frame: pd.DataFrame):
     return response_df
 
 
-def _process_row(row_column):
+def _process_row(row_column: set) -> list[str] | None:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     all_comments = []
@@ -150,8 +150,6 @@ def _process_row(row_column):
                         }} LIMIT 5
                         """)
                 res = sparql.query().convert()
-                # Sleep briefly between queries to reduce load
-                time.sleep(1)
                 comments = {term['o']['value'] for term in res['results']['bindings']}
                 all_comments.append(list(comments))
             except Exception as e:
@@ -165,12 +163,14 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
     response_df = pd.DataFrame(columns=['id', 'curi', 'puri', 'curi_comments', 'puri_comments', 'category'])
     for index, row in data_frame.iterrows():
         logger.info(f'Processing curi and puri in row: {index}')
-        curi_comments = _process_row(row['curi'])
-        puri_comments = _process_row(row['puri'])
+        curi_set = set(row['curi'])
+        puri_set = set(row['puri'])
+        curi_comments = _process_row(curi_set)
+        puri_comments = _process_row(puri_set)
         response_df.loc[len(response_df)] = {
             'id': row['id'],
-            'curi': row['curi'],
-            'puri': row['puri'],
+            'curi': curi_set,
+            'puri': puri_set,
             'curi_comments': curi_comments,
             'puri_comments': puri_comments,
             'category': row['category']
@@ -191,6 +191,7 @@ def find_voc_local_combined(voc_list: list) -> list:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     all_tags = set()
+    voc_list = set(voc_list)
     for voc in voc_list:
         logger.info(f'Processing voc {voc}')
         try:
