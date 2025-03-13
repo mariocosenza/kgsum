@@ -10,9 +10,12 @@ FILE_NUM_REGEX = re.compile(r'(\d+).*\.rdf$')
 FILE_STRING_REGEX = re.compile(r'-(.*)\.')
 
 CATEGORIES = {
-    'cross_domain', 'geography', 'government', 'life_sciences', 'linguistics', 'media', 'publications',
-    'social_networking', 'user_generated'
+    'cross_domain', 'geography', 'government', 'life_sciences',
+    'linguistics', 'media', 'publications', 'social_networking', 'user_generated'
 }
+LOD_CATEGORY = CATEGORIES
+
+
 
 
 def is_endpoint_working(endpoint) -> bool:

@@ -6,10 +6,7 @@ import pandas as pd
 import requests
 from google import genai
 
-LOD_CATEGORY = {
-    'cross_domain', 'geography', 'government', 'life_sciences',
-    'linguistics', 'media', 'publications', 'social_networking', 'user_generated'
-}
+from src.util import LOD_CATEGORY
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

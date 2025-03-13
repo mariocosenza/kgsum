@@ -6,7 +6,7 @@ from pandas.core.interchange.dataframe_protocol import DataFrame
 
 from src.dataset_preparation import process_file_full_inplace
 from src.dataset_preparation_remote import process_endpoint_full_inplace
-from src.vocabulary_extraction import IS_URI
+from src.dataset_extraction.vocabulary_extraction import IS_URI
 from src.predict_category import predict_category_multi
 
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
