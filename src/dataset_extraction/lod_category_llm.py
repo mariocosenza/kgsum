@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from itertools import count
 
 import pandas as pd
 from google import genai
@@ -27,7 +28,7 @@ def predict_category_from_lod_description() -> pd.DataFrame:
     for col in df.columns:
         logger.info(f'Processing id: {col}')
         # Enforce rate limiting: max 15 calls per minute
-        if calls_in_minute >= 15:
+        if calls_in_minute >= 10:
             elapsed = time.time() - minute_start
             if elapsed < 60:
                 time.sleep(60 - elapsed)
@@ -36,12 +37,13 @@ def predict_category_from_lod_description() -> pd.DataFrame:
 
         try:
             result = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.0-flash-thinking-exp-01-21",
                 contents=(
                     f"Given the following description and keywords, find a category given this data. "
                     f"Only respond with the category and no other words. "
                     f"Be precise and use your reasoning. "
                     f"Use the same category format. "
+                    f"Data identified by {col}. "
                     f"Categories: {LOD_CATEGORY}. "
                     f"Description: {df[col]['description']}"
                     f"Keywords: {df[col]['keywords']}. "
@@ -62,10 +64,13 @@ def predict_category_from_lod_description() -> pd.DataFrame:
 
         records.append(result_dict)
 
-        if result.text.strip() == df[col]['domain']:
+        if result.text.strip() in df[col]['domain']:
             hit += 1
-        else:
+        elif df[col]['domain'] not in '':
             miss += 1
+
+        if miss >= 1:
+            logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / miss}%')
 
         calls_in_minute += 1
 
