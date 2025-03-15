@@ -15,10 +15,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation")
 
 # Initialize the rdflib graph with Oxigraph store.
-rdflib.Graph(store="Oxigraph")
+#rdflib.Graph(store="Oxigraph")
 
 FORMATS = {
-    'ox-nt', 'ox-nq', 'ox-ttl', 'ox-trig', 'ox-xml'
+    'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'
 }
 
 # Precompile SPARQL queries
@@ -31,12 +31,14 @@ Q_LOCAL_VOCABULARIES = prepareQuery("""
     } LIMIT 1000
 """)
 Q_LOCAL_CLASS = prepareQuery("""
-    SELECT DISTINCT ?classUri
-    WHERE {
-        ?classUri a ?type .
-        FILTER (?type IN (rdfs:Class, owl:Class))
-    } LIMIT 1000
-""", initNs={'rdfs': 'http://www.w3.org/2000/01/rdf-schema#', 'owl': 'http://www.w3.org/2002/07/owl#'})
+        SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
+        WHERE {
+        ?instance a ?classUri .
+        }
+        GROUP BY ?classUri
+        ORDER BY DESC(?instanceCount)
+        LIMIT 1000
+""")
 Q_LOCAL_LABEL = prepareQuery("""
     SELECT DISTINCT ?type
     WHERE {
@@ -60,12 +62,17 @@ Q_LOCAL_TLD = prepareQuery("""
     } LIMIT 1000
 """)
 Q_LOCAL_PROPERTY = prepareQuery("""
-    SELECT DISTINCT ?property
-    WHERE {
-        ?subject ?property ?object .
-        FILTER isIRI(?property)
-    } LIMIT 1000
-""")
+        SELECT ?property (COUNT(?s) AS ?usageCount)
+        WHERE {{
+            ?s ?property ?o .
+  
+            # Optional: Filter out rdf:type if you want to exclude it
+            # FILTER (?property != rdf:type)
+         }}
+        GROUP BY ?property
+        ORDER BY DESC(?usageCount)
+        LIMIT 1000
+""", initNs={"rdf": rdflib.RDF})
 Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
     SELECT DISTINCT ?property
     WHERE {
@@ -397,6 +404,7 @@ def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
         logger.info(f"Processing graph with void id: {lod_frame['id'][num]}")
         row = [
             lod_frame['id'][num],
+            select_local_void_title(result),
             select_local_void_subject(result),
             select_local_void_description(result),
             lod_frame['category'][num]
@@ -451,13 +459,12 @@ def create_local_void_dataset(offset=0, limit=10000):
                 except StopIteration:
                     continue
 
-    df = pd.DataFrame(results, columns=['id', 'sbj', 'dsc', 'category'])
+    df = pd.DataFrame(results, columns=['id', 'title', 'sbj', 'dsc', 'category'])
     df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
 
-# if __name__ == '__main__':
-# import multiprocessing
-
-# multiprocessing.freeze_support()
-# create_local_dataset(offset=0, limit=200)
+if __name__ == '__main__':
+    import multiprocessing
+    multiprocessing.freeze_support()
+    create_local_dataset(offset=0, limit=200)
 # To process the void dataset, call:
 # create_local_void_dataset(offset=0, limit=200)
