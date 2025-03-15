@@ -13,7 +13,10 @@ CATEGORIES = {
     'cross_domain', 'geography', 'government', 'life_sciences',
     'linguistics', 'media', 'publications', 'social_networking', 'user_generated'
 }
-LOD_CATEGORY = CATEGORIES
+LOD_CATEGORY = {
+    'geography', 'government', 'life_sciences',
+    'linguistics', 'media', 'publications', 'social_networking'
+}
 
 
 
