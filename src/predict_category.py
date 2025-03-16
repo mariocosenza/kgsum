@@ -1,20 +1,16 @@
-import asyncio
-
 import pandas as pd
-
-from src.dataset_preparation import process_file_full_inplace
-from src.dataset_preparation_remote import process_endpoint_full_inplace
-from src.pipeline_build import train_multiple_models, predict_category_multi
-from src.preprocessing import process_all_from_input
+import src.pipeline_build
+from src.pipeline_build import ClassifierType
 
 combined_df = pd.read_json('../data/processed/combined.json')
 
 feature_columns = ["lab", "lcn", "lpn", "sbj", "dsc"]
 
-models, training_results = train_multiple_models(
+models, training_results = src.pipeline_build.train_multiple_models(
     combined_df,
     feature_columns,
-    target_label="category"
+    target_label="category",
+    classifier_type=ClassifierType.SVM
 )
 
 print("Global models trained. Training results:")
@@ -23,7 +19,7 @@ for feature, metrics in training_results.items():
 
 
 def predict_category_multi(processed_data):
-    return predict_category_multi(models, processed_data)
+    return src.pipeline_build.predict_category_multi(models, processed_data)
 
 
 

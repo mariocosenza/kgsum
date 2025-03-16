@@ -17,6 +17,12 @@ from sklearn.model_selection import (
     LeaveOneOut,
 )
 from sklearn.naive_bayes import MultinomialNB
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, Dense
+from tensorflow.keras.utils import to_categorical
 
 # Suppress invalid cast warnings (if benign)
 np.seterr(invalid='ignore')
@@ -24,15 +30,48 @@ np.seterr(invalid='ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# -------------------------------
+# Custom F1 Metric for Keras
+# -------------------------------
+class F1Score(tf.keras.metrics.Metric):
+    def __init__(self, name='f1_score', **kwargs):
+        super(F1Score, self).__init__(name=name, **kwargs)
+        self.true_positives = self.add_weight(name='tp', initializer='zeros')
+        self.false_positives = self.add_weight(name='fp', initializer='zeros')
+        self.false_negatives = self.add_weight(name='fn', initializer='zeros')
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        # If multi-class, assume y_true is one-hot and y_pred are probabilities.
+        if y_pred.shape[-1] > 1:
+            y_pred = tf.argmax(y_pred, axis=1)
+            y_true = tf.argmax(y_true, axis=1)
+        y_pred = tf.cast(tf.round(y_pred), tf.float32)
+        y_true = tf.cast(y_true, tf.float32)
+        tp = tf.reduce_sum(y_true * y_pred)
+        fp = tf.reduce_sum((1 - y_true) * y_pred)
+        fn = tf.reduce_sum(y_true * (1 - y_pred))
+        self.true_positives.assign_add(tp)
+        self.false_positives.assign_add(fp)
+        self.false_negatives.assign_add(fn)
+
+    def result(self):
+        precision = self.true_positives / (self.true_positives + self.false_positives + tf.keras.backend.epsilon())
+        recall = self.true_positives / (self.true_positives + self.false_negatives + tf.keras.backend.epsilon())
+        return 2 * ((precision * recall) / (precision + recall + tf.keras.backend.epsilon()))
+
+    def reset_states(self):
+        self.true_positives.assign(0)
+        self.false_positives.assign(0)
+        self.false_negatives.assign(0)
+
 
 class ClassifierType(Enum):
     SVM = auto()
     NAIVE_BAYES = auto()
-
+    CNN = auto()  # Added CNN option
 
 def majority_vote(predictions: list[Any]) -> Any | None:
     return None if not predictions else Counter(predictions).most_common(1)[0][0]
-
 
 def _predict_category_for_instance(
     models: dict[str, KnowledgeGraphClassifier],
@@ -56,7 +95,6 @@ def _predict_category_for_instance(
             logger.error(f"Prediction error for '{feature}': {err}")
     return majority_vote(votes)
 
-
 def predict_category_multi(
     models: dict[str, KnowledgeGraphClassifier],
     instance: dict[str, Any] | pd.DataFrame
@@ -64,7 +102,6 @@ def predict_category_multi(
     if isinstance(instance, pd.DataFrame):
         return instance.apply(lambda row: _predict_category_for_instance(models, row.to_dict()), axis=1).tolist()
     return _predict_category_for_instance(models, instance)
-
 
 def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFrame:
     if isinstance(labels, str):
@@ -75,7 +112,9 @@ def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFr
         result = result[result[label] != '']
     return result
 
-
+# -------------------------------
+# Train Multiple Models
+# -------------------------------
 def train_multiple_models(
     training_data: pd.DataFrame,
     feature_columns: list[str],
@@ -103,12 +142,18 @@ def train_multiple_models(
         training_results[feature] = result
     return models, training_results
 
-
+# -------------------------------
+# KnowledgeGraphClassifier Class
+# -------------------------------
 class KnowledgeGraphClassifier:
     def __init__(self, classifier_type: ClassifierType = ClassifierType.SVM):
         self.classifier_type = classifier_type
+        # For SVM and Naive Bayes, use TF-IDF vectorizer
         self.vectorizer = TfidfVectorizer(max_features=10000, lowercase=True, ngram_range=(1, 2))
-        self.model: GridSearchCV | None = None
+        self.model: GridSearchCV | Sequential | None = None
+        # Attributes used for the CNN branch
+        self.tokenizer: Tokenizer | None = None
+        self.max_length: int | None = None
 
     @staticmethod
     def _prepare_features(frame: pd.DataFrame, feature_labels: str | list[str]) -> pd.Series:
@@ -122,23 +167,31 @@ class KnowledgeGraphClassifier:
     def _get_param_grid(self) -> dict[str, list[Any]]:
         if self.classifier_type == ClassifierType.SVM:
             return {
-                "C": [0,5, 1.0, 1,5, 2,0],
+                "C": [0.5, 1.0, 1.5, 2.0],
                 "kernel": ["linear", "rbf", "poly"],
                 "gamma": ["scale", "auto", 0.01],
-                "degree": [2, 3, 4, 5],
+                "degree": [2, 3, 5],
                 "coef0": [0.0, 0.1],
                 "tol": [1e-3, 1e-4],
                 "class_weight": ["balanced", None],
                 "decision_function_shape": ["ovr", "ovo"],
             }
-        return {
-            "alpha": [0.01, 0.1, 1.0, 10.0],
-            "fit_prior": [True, False],
-            "class_prior": [None, [0.3, 0.7], [0.5, 0.5]],
-        }
+        elif self.classifier_type == ClassifierType.NAIVE_BAYES:
+            # Note: We'll remove "class_prior" if the number of classes != 2 later.
+            return {
+                "alpha": [0.01, 0.1, 1.0, 10.0],
+                "fit_prior": [True, False],
+                "class_prior": [None, [0.3, 0.7], [0.5, 0.5]],
+            }
+        return {}
 
     def _get_base_estimator(self):
-        return svm.SVC(probability=True) if self.classifier_type == ClassifierType.SVM else MultinomialNB()
+        if self.classifier_type == ClassifierType.SVM:
+            return svm.SVC(probability=True)
+        elif self.classifier_type == ClassifierType.NAIVE_BAYES:
+            return MultinomialNB()
+        elif self.classifier_type == ClassifierType.CNN:
+            return None
 
     def _get_cv_strategy(self, data_y: pd.Series, cv_folds: int) -> object:
         min_count = data_y.value_counts().min()
@@ -162,9 +215,14 @@ class KnowledgeGraphClassifier:
 
     def _vectorize(self, data: Any, feature_labels: str | list[str] | None) -> Any:
         processed = self._process_input(data, feature_labels)
-        if isinstance(processed, str):
-            processed = [processed]
-        return self.vectorizer.transform(processed)
+        if self.classifier_type == ClassifierType.CNN:
+            texts = [processed] if isinstance(processed, str) else processed
+            sequences = self.tokenizer.texts_to_sequences(texts)
+            return pad_sequences(sequences, maxlen=self.max_length)
+        else:
+            if isinstance(processed, str):
+                processed = [processed]
+            return self.vectorizer.transform(processed)
 
     def train(
         self,
@@ -181,32 +239,75 @@ class KnowledgeGraphClassifier:
         if data_y.nunique() < 2:
             raise ValueError(f"Only one unique class: {data_y.unique()}")
 
-        cv_strategy = self._get_cv_strategy(data_y, cv_folds)
-        grid = GridSearchCV(
-            estimator=self._get_base_estimator(),
-            param_grid=self._get_param_grid(),
-            cv=cv_strategy,
-            scoring='f1_weighted',
-            return_train_score=True,
-            verbose=1,
-            n_jobs=-1,
-            error_score=np.nan,
-        )
-        x_vectorized = self.vectorizer.fit_transform(data_x)
-        grid.fit(x_vectorized, data_y)
-        self.model = grid
-        cv_scores = cross_val_score(grid.best_estimator_, x_vectorized, data_y, cv=cv_strategy, scoring='f1_weighted')
-        mean_f1 = np.mean(cv_scores)
-        logger.info(f"Training completed. Mean CV F1 Score: {mean_f1:.4f}")
-        return {
-            'best_params': grid.best_params_,
-            'best_score': grid.best_score_,
-            'cv_scores': cv_scores,
-            'cv_mean': mean_f1,
-            'cv_std': np.std(cv_scores),
-            'feature_labels': feature_labels,
-            'classifier_type': self.classifier_type,
-        }
+        if self.classifier_type == ClassifierType.CNN:
+            self.tokenizer = Tokenizer(num_words=10000)
+            self.tokenizer.fit_on_texts(data_x)
+            sequences = self.tokenizer.texts_to_sequences(data_x)
+            self.max_length = max(len(seq) for seq in sequences)
+            x_data = pad_sequences(sequences, maxlen=self.max_length)
+
+            num_classes = data_y.nunique()
+            if num_classes > 2:
+                labels_encoded = data_y.factorize()[0]
+                y_data = to_categorical(labels_encoded, num_classes=num_classes)
+            else:
+                unique = list(data_y.unique())
+                mapping = {unique[0]: 0, unique[1]: 1}
+                y_data = data_y.map(mapping).values
+
+            model = Sequential()
+            model.add(Embedding(input_dim=10000, output_dim=128))
+            model.add(Conv1D(filters=64, kernel_size=5, activation='relu'))
+            model.add(GlobalMaxPooling1D())
+            model.add(Dense(64, activation='relu'))
+            if num_classes > 2:
+                model.add(Dense(num_classes, activation='softmax'))
+                loss = 'categorical_crossentropy'
+            else:
+                model.add(Dense(1, activation='sigmoid'))
+                loss = 'binary_crossentropy'
+            model.compile(loss=loss, optimizer='adam', metrics=[F1Score(), 'accuracy'])
+            history = model.fit(x_data, y_data, epochs=5, batch_size=32, verbose=1)
+            self.model = model
+            logger.info("CNN training completed.")
+            return {
+                'history': history.history,
+                'epochs': 5,
+                'num_classes': num_classes,
+                'max_length': self.max_length,
+            }
+        else:
+            param_grid = self._get_param_grid()
+            if self.classifier_type == ClassifierType.NAIVE_BAYES:
+                # Remove class_prior if number of classes is not 2.
+                if data_y.nunique() != 2 and 'class_prior' in param_grid:
+                    del param_grid['class_prior']
+            cv_strategy = self._get_cv_strategy(data_y, cv_folds)
+            grid = GridSearchCV(
+                estimator=self._get_base_estimator(),
+                param_grid=param_grid,
+                cv=cv_strategy,
+                scoring='f1_weighted',
+                return_train_score=True,
+                verbose=1,
+                n_jobs=-1,
+                error_score=np.nan,
+            )
+            x_vectorized = self.vectorizer.fit_transform(data_x)
+            grid.fit(x_vectorized, data_y)
+            self.model = grid
+            cv_scores = cross_val_score(grid.best_estimator_, x_vectorized, data_y, cv=cv_strategy, scoring='f1_weighted')
+            mean_f1 = np.mean(cv_scores)
+            logger.info(f"Training completed. Mean CV F1 Score: {mean_f1:.4f}")
+            return {
+                'best_params': grid.best_params_,
+                'best_score': grid.best_score_,
+                'cv_scores': cv_scores,
+                'cv_mean': mean_f1,
+                'cv_std': np.std(cv_scores),
+                'feature_labels': feature_labels,
+                'classifier_type': self.classifier_type.name,
+            }
 
     def predict(
         self,
@@ -216,7 +317,14 @@ class KnowledgeGraphClassifier:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
         x_vectorized = self._vectorize(data, feature_labels)
-        return self.model.predict(x_vectorized)
+        if self.classifier_type == ClassifierType.CNN:
+            preds = self.model.predict(x_vectorized)
+            if preds.shape[-1] > 1:
+                return np.argmax(preds, axis=1)
+            else:
+                return (preds > 0.5).astype(int).flatten()
+        else:
+            return self.model.predict(x_vectorized)
 
     def predict_proba(
         self,
@@ -226,7 +334,10 @@ class KnowledgeGraphClassifier:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
         x_vectorized = self._vectorize(data, feature_labels)
-        return self.model.predict_proba(x_vectorized)
+        if self.classifier_type == ClassifierType.CNN:
+            return self.model.predict(x_vectorized)
+        else:
+            return self.model.predict_proba(x_vectorized)
 
     def save(self, filepath: str | None = None):
         if self.model is None:
@@ -253,18 +364,17 @@ class KnowledgeGraphClassifier:
         instance.vectorizer = data['vectorizer']
         return instance
 
-
 def save_multiple_models(
     models: dict[str, KnowledgeGraphClassifier],
     training_results: dict[str, Any],
-    filepath: str | None = None) -> None:
+    filepath: str | None = None
+) -> None:
     if filepath is None:
         os.makedirs('../data/trained', exist_ok=True)
         filepath = '../data/trained/multiple_models.pkl'
     with open(filepath, 'wb') as f:
         pickle.dump({'models': models, 'training_results': training_results}, f)
     logger.info(f"Multiple models saved to {filepath}")
-
 
 def load_multiple_models(filepath: str | None = None) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     if filepath is None:
