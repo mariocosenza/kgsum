@@ -114,11 +114,15 @@ def predict_category_from_lod_svg(limit=500):
         try:
             int(elem.getAttribute('id'))
         except Exception as e:
-            logger.warning('Skipping non it id')
+            logger.warning('Skipping non int id')
             continue
 
         first_circle = elem.getElementsByTagName('circle')[0]
         col = str(first_circle.getElementsByTagName('title')[0].firstChild.nodeValue)
+        for id_col in df.columns:
+            if col in df[id_col]['title']:
+                col = id_col
+                break
 
         if hit + miss > limit:
             break
