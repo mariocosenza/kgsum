@@ -1,5 +1,4 @@
 import os
-import asyncio
 import psutil
 import functools
 from http.client import responses
@@ -12,7 +11,6 @@ from service.file_upload_service import allowed_file, UPLOAD_FOLDER
 from service.generate_profile_service import (
     generate_profile_service,
     generate_profile_service_store,
-    generate_local_profile
 )
 
 app = Flask(__name__)
@@ -51,7 +49,7 @@ async def sparql_profile():
     if 'store' in request.args:
         store = request.args.get('store')
         if store:
-            result = await generate_profile_service_store(data['endpoint'], sparql=True)
+            result = generate_profile_service_store(data['endpoint'], sparql=True)
         else:
             result = await generate_profile_service(data['endpoint'], sparql=True)
         return {"profile": result}
@@ -79,11 +77,11 @@ async def rdf_profile():
         if 'store' in request.args:
             store = request.args['store'].lower()
             if store in ('true', '1', 'yes'):
-                result = await generate_profile_service_store(filepath, sparql=False)
+                result = generate_profile_service_store(filepath, sparql=False)
             else:
-                result = generate_local_profile(filepath)
+                result = await generate_profile_service(filepath, sparql=False)
         else:
-            result = generate_local_profile(filepath)
+            result = await generate_profile_service(filepath, sparql=False)
 
         if result is None:
             return {"error": "Profile generation failed unexpectedly."}
