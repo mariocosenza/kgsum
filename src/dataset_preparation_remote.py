@@ -241,14 +241,18 @@ async def async_select_remote_property_names(endpoint, limit=1000, timeout=300):
     processed = set()
     offset = 0
     async with aiohttp.ClientSession() as session:
-        query = f"""
-            SELECT DISTINCT ?property
-            WHERE {{
-                ?subject ?property ?object .
-                FILTER isIRI(?property)
-            }}
-            LIMIT {limit}
-            """
+        query =  """
+        SELECT ?property (COUNT(?s) AS ?usageCount)
+        WHERE {{
+            ?s ?property ?o .
+  
+            # Optional: Filter out rdf:type if you want to exclude it
+            # FILTER (?property != rdf:type)
+         }}
+        GROUP BY ?property
+        ORDER BY DESC(?usageCount)
+        LIMIT 1000
+        """
         try:
             result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
@@ -283,14 +287,14 @@ async def async_select_remote_class_name(endpoint, limit=1000, timeout=300):
     local_names = []
     offset = 0
     async with aiohttp.ClientSession() as session:
-        query = f"""
-            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            SELECT DISTINCT ?classUri
-            WHERE {{
-                ?s rdf:type ?classUri .
-            }}
-            ORDER BY ?classUri
-            LIMIT {limit}
+        query = """
+            SELECT ?class (COUNT(?instance) AS ?instanceCount)
+            WHERE {
+                ?instance a ?class .
+            }
+            GROUP BY ?class
+            ORDER BY DESC(?instanceCount)
+            LIMIT 1000
             """
         try:
             result_text = await _fetch_query(session, endpoint, query, timeout)
@@ -609,4 +613,3 @@ if __name__ == '__main__':
         asyncio.run(main_void())
     else:
         asyncio.run(main_normal())
-# asyncio.run(process_endpoint_full_inplace('https://www.foodie-cloud.org/sparql'))

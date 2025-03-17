@@ -1,21 +1,16 @@
 import logging
 import os
 import uuid
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
-from os import listdir
-
 import pandas as pd
 import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
-
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from os import listdir
 from src.util import match_file_lod, CATEGORIES
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation")
-
-# Initialize the rdflib graph with Oxigraph store.
-#rdflib.Graph(store="Oxigraph")
 
 FORMATS = {
     'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'
@@ -31,13 +26,13 @@ Q_LOCAL_VOCABULARIES = prepareQuery("""
     } LIMIT 1000
 """)
 Q_LOCAL_CLASS = prepareQuery("""
-        SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
-        WHERE {
+    SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
+    WHERE {
         ?instance a ?classUri .
-        }
-        GROUP BY ?classUri
-        ORDER BY DESC(?instanceCount)
-        LIMIT 1000
+    }
+    GROUP BY ?classUri
+    ORDER BY DESC(?instanceCount)
+    LIMIT 1000
 """)
 Q_LOCAL_LABEL = prepareQuery("""
     SELECT DISTINCT ?type
@@ -62,29 +57,35 @@ Q_LOCAL_TLD = prepareQuery("""
     } LIMIT 1000
 """)
 Q_LOCAL_PROPERTY = prepareQuery("""
-        SELECT ?property (COUNT(?s) AS ?usageCount)
-        WHERE {{
-            ?s ?property ?o .
-  
-            # Optional: Filter out rdf:type if you want to exclude it
-            # FILTER (?property != rdf:type)
-         }}
-        GROUP BY ?property
-        ORDER BY DESC(?usageCount)
-        LIMIT 1000
+    SELECT ?property (COUNT(?s) AS ?usageCount)
+    WHERE {{
+        ?s ?property ?o .
+        # Optional: Filter out rdf:type if you want to exclude it
+        # FILTER (?property != rdf:type)
+    }}
+    GROUP BY ?property
+    ORDER BY DESC(?usageCount)
+    LIMIT 1000
 """, initNs={"rdf": rdflib.RDF})
 Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
-    SELECT DISTINCT ?property
-    WHERE {
-        ?subject ?property ?object .
-        FILTER isIRI(?property)
-    } LIMIT 1000
+    SELECT ?property (COUNT(?s) AS ?usageCount)
+    WHERE {{
+        ?s ?property ?o .
+        # Optional: Filter out rdf:type if you want to exclude it
+        # FILTER (?property != rdf:type)
+    }}
+    GROUP BY ?property
+    ORDER BY DESC(?usageCount)
+    LIMIT 1000
 """)
 Q_LOCAL_CLASS_NAME = prepareQuery("""
-    SELECT DISTINCT ?classUri
+    SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
     WHERE {
-        ?s rdf:type ?classUri .
-    } LIMIT 1000
+        ?instance a ?classUri .
+    }
+    GROUP BY ?classUri
+    ORDER BY DESC(?instanceCount)
+    LIMIT 1000
 """, initNs={"rdf": rdflib.RDF})
 
 Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
