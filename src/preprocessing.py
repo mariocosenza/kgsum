@@ -5,18 +5,9 @@ from typing import Dict, List, Tuple, Any, Union
 
 import pandas as pd
 import spacy
-from spacy.language import Language
-from spacy_langdetect import LanguageDetector
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-# Create a spaCy language detector factory
-@Language.factory("language_detector")
-def get_lang_detector(nlp, name):
-    return LanguageDetector()
-
 
 # Load the main spaCy pipeline (for language detection)
 nlp = spacy.load("en_core_web_sm")
