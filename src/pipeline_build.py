@@ -30,40 +30,6 @@ np.seterr(invalid='ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# -------------------------------
-# Custom F1 Metric for Keras
-# -------------------------------
-class F1Score(tf.keras.metrics.Metric):
-    def __init__(self, name='f1_score', **kwargs):
-        super(F1Score, self).__init__(name=name, **kwargs)
-        self.true_positives = self.add_weight(name='tp', initializer='zeros')
-        self.false_positives = self.add_weight(name='fp', initializer='zeros')
-        self.false_negatives = self.add_weight(name='fn', initializer='zeros')
-
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        # If multi-class, assume y_true is one-hot and y_pred are probabilities.
-        if y_pred.shape[-1] > 1:
-            y_pred = tf.argmax(y_pred, axis=1)
-            y_true = tf.argmax(y_true, axis=1)
-        y_pred = tf.cast(tf.round(y_pred), tf.float32)
-        y_true = tf.cast(y_true, tf.float32)
-        tp = tf.reduce_sum(y_true * y_pred)
-        fp = tf.reduce_sum((1 - y_true) * y_pred)
-        fn = tf.reduce_sum(y_true * (1 - y_pred))
-        self.true_positives.assign_add(tp)
-        self.false_positives.assign_add(fp)
-        self.false_negatives.assign_add(fn)
-
-    def result(self):
-        precision = self.true_positives / (self.true_positives + self.false_positives + tf.keras.backend.epsilon())
-        recall = self.true_positives / (self.true_positives + self.false_negatives + tf.keras.backend.epsilon())
-        return 2 * ((precision * recall) / (precision + recall + tf.keras.backend.epsilon()))
-
-    def reset_states(self):
-        self.true_positives.assign(0)
-        self.false_positives.assign(0)
-        self.false_negatives.assign(0)
-
 
 class ClassifierType(Enum):
     SVM = auto()
@@ -266,7 +232,7 @@ class KnowledgeGraphClassifier:
             else:
                 model.add(Dense(1, activation='sigmoid'))
                 loss = 'binary_crossentropy'
-            model.compile(loss=loss, optimizer='adam', metrics=[F1Score(), 'accuracy'])
+            model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
             history = model.fit(x_data, y_data, epochs=5, batch_size=32, verbose=1)
             self.model = model
             logger.info("CNN training completed.")
