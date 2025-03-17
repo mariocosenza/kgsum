@@ -7,10 +7,12 @@ from pandas.core.interchange.dataframe_protocol import DataFrame
 from src.dataset_preparation import process_file_full_inplace
 from src.dataset_preparation_remote import process_endpoint_full_inplace
 from src.dataset_extraction.vocabulary_extraction import IS_URI
-from src.predict_category import predict_category_multi
+from src.predict_category import CategoryPredictor
+from src.preprocessing import process_all_from_input
 
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
 
+PREDICTOR : CategoryPredictor = CategoryPredictor.get_predictor()
 
 async def _fetch_query(query, timeout=300):
     async with aiohttp.ClientSession() as session:
@@ -18,11 +20,11 @@ async def _fetch_query(query, timeout=300):
             return await response.text()
 
 
-def generate_profile(endpoint=None, file=None) -> dict:
+async def generate_profile(endpoint=None, file=None) -> dict:
     if file is not None:
-        processed_data = process_file_full_inplace(file)
+        processed_data = process_all_from_input(process_file_full_inplace(file))
     elif endpoint is not None:
-        processed_data = process_endpoint_full_inplace(endpoint)
+        processed_data = process_all_from_input(await process_endpoint_full_inplace(endpoint))
     else:
         return {
             'error': 'Upload a file or input a valid SPARQL endpoint'
@@ -30,9 +32,21 @@ def generate_profile(endpoint=None, file=None) -> dict:
 
     return {
             'profile': create_profile(processed_data),
-            'category':  predict_category_multi(processed_data)
+            'category': PREDICTOR.predict_category(processed_data)
     }
 
+async def generate_and_store_profile(endpoint=None, file=None):
+    row = await generate_profile(endpoint=endpoint, file=file)
+    await store_profile(profile=row['profile'], category=row['category'])
+    return row['profile']
+
+async def generate_profile_from_store():
+    dataset = pd.read_json('../data/processed/combined.json')
+    for row in dataset.iterrows():
+        await store_profile(profile=create_profile(data=row), category=row['category'])
+
+def create_profile(data: dict | tuple) -> pd.DataFrame:
+    return DataFrame()
 
 
 async def store_profile(profile: pd.DataFrame, category: str):
@@ -97,18 +111,7 @@ async def store_profile(profile: pd.DataFrame, category: str):
     except:
         pass
 
-async def generate_and_store_profile(endpoint=None, file=None):
-    row = generate_profile(endpoint=endpoint, file=file)
-    await store_profile(profile=row['profile'], category=row['category'])
-    return row['profile']
 
-async def generate_profile_from_store():
-    dataset = pd.read_json('../data/processed/combined.json')
-    for row in dataset.iterrows():
-        await store_profile(profile=create_profile(data=row), category=row['category'])
-
-def create_profile(data: dict | tuple) -> pd.DataFrame:
-    return DataFrame()
 
 if __name__ == '__main__':
     asyncio.run(generate_profile_from_store())

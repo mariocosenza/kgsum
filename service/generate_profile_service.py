@@ -1,29 +1,30 @@
+import logging
 import os
+from src.profile.generate_profile import generate_profile, generate_and_store_profile
 
-from src.predict_category import predict_category_remote, predict_category_local
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-
-async def generate_profile_service(endpoint: str, sparql: bool = False) -> object:
+async def generate_profile_service(endpoint: str, sparql: bool = False) -> dict:
     if sparql:
-        result = await predict_category_remote(endpoint)
+        result = await generate_profile(endpoint=endpoint)
         return result
     else:
         try:
-            result = predict_category_local(endpoint)
+            result = await generate_profile(file=endpoint)
             os.remove(path= endpoint)
             return result
         except Exception as e:
-            print(e)
-    return ''
-
-def generate_local_profile(path):
-    try:
-        result = predict_category_local(path)
-        os.remove(path=path)
-        return result
-    except Exception as e:
-        print(e)
-    return ''
+            raise ValueError(f'Cannot process the given Knowledge Graph {e}')
 
 def generate_profile_service_store(endpoint: str, sparql = False):
-    return
+    if sparql:
+        result = generate_and_store_profile(endpoint=endpoint)
+        return result
+    else:
+        try:
+            result = generate_and_store_profile(file=endpoint)
+            os.remove(path=endpoint)
+            return result
+        except Exception as e:
+            raise ValueError(f'Cannot process the given Knowledge Graph {e}')
