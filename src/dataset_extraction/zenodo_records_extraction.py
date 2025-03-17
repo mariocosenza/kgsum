@@ -6,7 +6,7 @@ import pandas as pd
 import requests
 from google import genai
 
-from src.util import LOD_CATEGORY
+from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def get_zenodo_records(g_client):
                 f"Only respond with the category and no other words. "
                 f"Be precise and use your reasoning. "
                 f"Use the same category format. "
-                f"Categories: {LOD_CATEGORY}. "
+                f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
                 f"Description: {description}"
             )
         )

@@ -13,13 +13,10 @@ CATEGORIES = {
     'cross_domain', 'geography', 'government', 'life_sciences',
     'linguistics', 'media', 'publications', 'social_networking', 'user_generated'
 }
-LOD_CATEGORY = {
+LOD_CATEGORY_NO_MULTIPLE_DOMAIN = {
     'geography', 'government', 'life_sciences',
     'linguistics', 'media', 'publications', 'social_networking'
 }
-
-
-
 
 def is_endpoint_working(endpoint) -> bool:
     query_string = """
