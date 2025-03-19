@@ -51,23 +51,49 @@ def predict_category_from_lod_description(limit=500) -> pd.DataFrame:
 
         if df[col]['domain'] != '' and df[col]['domain'] not in 'cross_domain' and df[col][
             'domain'] not in 'user_generated':
-            try:
-                result = client.models.generate_content(
-                    model="gemini-2.0-flash-thinking-exp-01-21",
-                    contents=(
-                        f"Given the following description and keywords, find a category given this data. "
-                        f"Only respond with the category and no other words. "
-                        f"Be precise and use your reasoning. "
-                        f"Use the same category format. "
-                        f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-                        f"Description: {df[col]['description']}"
-                        f"Keywords: {df[col]['keywords']}. "
+            max_retries = 3
+            retry_count = 0
+            retry_wait = 60  
+            result = None
+
+            while retry_count <= max_retries:
+                try:
+                    result = client.models.generate_content(
+                        model="gemini-2.0-flash-thinking-exp-01-21",
+                        contents=(
+                            f"Given the following description and keywords, find a category given this data. "
+                            f"Only respond with the category and no other words. "
+                            f"Be precise and use your reasoning. "
+                            f"Use the same category format. "
+                            f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+                            f"Description: {df[col]['description']}"
+                            f"Keywords: {df[col]['keywords']}. "
+                        )
                     )
-                )
-            except Exception as e:
-                result = ''
-                calls_in_minute += 2
-                logger.warning(e)
+                    break
+                except Exception as e:
+                    error_str = str(e)
+                    logger.warning(f"Error with ID {col}: {error_str}")
+                    calls_in_minute += 1
+
+                    if "429" in error_str:
+                        retry_count += 1
+                        if retry_count <= max_retries:
+                            logger.info(
+                                f"Rate limit hit. Waiting {retry_wait} seconds before retry {retry_count}/{max_retries}")
+                            time.sleep(retry_wait)
+                            retry_wait *= 2
+                        else:
+                            logger.warning(f"Max retries reached for ID {col}. Skipping.")
+                    else:
+                        # For non-429 errors, don't retry
+                        logger.warning(f"Non-rate limit error. Skipping ID {col}.")
+                        break
+
+            # Skip this item if we couldn't get a result after retries
+            if result is None:
+                logger.warning(f"Skipping item {col} due to API errors")
+                continue
 
             result_dict = {
                 'lod_category': df[col]['domain'],
@@ -85,9 +111,11 @@ def predict_category_from_lod_description(limit=500) -> pd.DataFrame:
                 miss += 1
 
             if miss >= 1:
-                logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / miss}%')
+                logger.info(
+                    f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')  # Fixed percentage calculation
 
             calls_in_minute += 1
+
     df = pd.DataFrame(records)
 
     logger.info(f'Category hit: {hit}')
@@ -136,25 +164,50 @@ def predict_category_from_lod_svg(limit=500):
             minute_start = time.time()
             calls_in_minute = 0
 
-        if df[col]['domain'] not in 'cross_domain' and df[col][
-            'domain'] not in 'user_generated':
-            try:
-                result = client.models.generate_content(
-                    model="gemini-2.0-flash-thinking-exp-01-21",
-                    contents=(
-                        f"Given the following description and keywords, find a category given this data. "
-                        f"Only respond with the category and no other words. "
-                        f"Be precise and use your reasoning. "
-                        f"Use the same category format. "
-                        f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-                        f"Description: {df[col]['description']}"
-                        f"Keywords: {df[col]['keywords']}. "
+        if df[col]['domain'] not in 'cross_domain' and df[col]['domain'] not in 'user_generated':
+            max_retries = 3
+            retry_count = 0
+            retry_wait = 60
+            result = None
+
+            while retry_count <= max_retries:
+                try:
+                    result = client.models.generate_content(
+                        model="gemini-2.0-flash-thinking-exp-01-21",
+                        contents=(
+                            f"Given the following description and keywords, find a category given this data. "
+                            f"Only respond with the category and no other words. "
+                            f"Be precise and use your reasoning. "
+                            f"Use the same category format. "
+                            f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+                            f"Description: {df[col]['description']}"
+                            f"Keywords: {df[col]['keywords']}. "
+                        )
                     )
-                )
-            except Exception as e:
-                result = ''
-                calls_in_minute += 2
-                logger.warning(e)
+                    break
+                except Exception as e:
+                    error_str = str(e)
+                    logger.warning(f"Error with ID {col}: {error_str}")
+                    calls_in_minute += 1
+
+                    if "429" in error_str:
+                        retry_count += 1
+                        if retry_count <= max_retries:
+                            logger.info(
+                                f"Rate limit hit. Waiting {retry_wait} seconds before retry {retry_count}/{max_retries}")
+                            time.sleep(retry_wait)
+                            retry_wait *= 2
+                        else:
+                            logger.warning(f"Max retries reached for ID {col}. Skipping.")
+                    else:
+                        # For non-429 errors, don't retry
+                        logger.warning(f"Non-rate limit error. Skipping ID {col}.")
+                        break
+
+            # Skip this item if we couldn't get a result after retries
+            if result is None:
+                logger.warning(f"Skipping item {col} due to API errors")
+                continue
 
             lod_category = CATEGORIES_COLOR.get(first_circle.getAttribute('fill').lower())
             result_dict = {
@@ -173,7 +226,7 @@ def predict_category_from_lod_svg(limit=500):
                 miss += 1
 
             if miss >= 1:
-                logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / miss}%')
+                logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')
 
             calls_in_minute += 1
     df = pd.DataFrame(records)
