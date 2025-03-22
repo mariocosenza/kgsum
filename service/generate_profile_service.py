@@ -1,6 +1,6 @@
 import logging
 import os
-from src.profile.generate_profile import generate_profile, generate_and_store_profile
+from src.generate_profile import generate_profile, generate_and_store_profile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

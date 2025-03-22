@@ -5,9 +5,16 @@ from typing import Dict, List, Tuple, Any, Union
 
 import pandas as pd
 import spacy
+from spacy import Language
+from spacy_langdetect import LanguageDetector
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Create a spaCy language detector factory
+@Language.factory("language_detector")
+def get_lang_detector(nlp, name):
+    return LanguageDetector()
 
 # Load the main spaCy pipeline (for language detection)
 nlp = spacy.load("en_core_web_sm")
@@ -160,6 +167,7 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
         logger.info("Processing row %d/%d started.", i, total_rows)
         # Process text-based features
         lab_text, lcn_text, lnp_text = process_row(row, i, total_rows)
+        title = process_text(row.get("title", []))
         # Retrieve URI fields directly from the row
         curi = row.get("curi", [])
         puri = row.get("puri", [])
@@ -169,6 +177,7 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
         combined_rows.append({
             "id": row.get("id", ""),
             "category": row.get("category", ""),
+            "title": title,
             "lab": lab_text,
             "lcn": lcn_text,
             "lpn": lnp_text,

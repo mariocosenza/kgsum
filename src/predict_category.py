@@ -20,7 +20,7 @@ class CategoryPredictor:
     def get_predictor():
         combined_df = pd.read_json('../data/processed/combined.json')
         feature_columns = ["lab", "lcn", "lpn", "sbj", "dsc"]
-
+        classifier = ClassifierType.CNN
         try:
            models, training_results  = load_multiple_models('../data/trained/multiple_models.pkl')
         except Exception as _:
@@ -28,13 +28,14 @@ class CategoryPredictor:
                 combined_df,
                 feature_columns,
                 target_label="category",
-                classifier_type=ClassifierType.SVM
+                classifier_type=classifier
             )
             save_multiple_models(models, training_results)
 
         logger.info("Global models trained. Training results:")
         for feature, metrics in training_results.items():
-            logger.info(f"Feature: {feature}, CV Mean: {metrics['cv_mean']:.3f}, Best Params: {metrics['best_params']}")
+            if classifier != ClassifierType.CNN:
+                logger.info(f"Feature: {feature} CV Mean: {metrics['cv_mean']:.3f}, Best Params: {metrics['best_params']}")
 
         return CategoryPredictor(models, training_results)
 
