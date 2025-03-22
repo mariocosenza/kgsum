@@ -4,7 +4,7 @@ import aiohttp
 import pandas as pd
 from pandas.core.interchange.dataframe_protocol import DataFrame
 
-from src.dataset_preparation import process_file_full_inplace
+from src.dataset_preparation import process_file_full_inplace, logger
 from src.dataset_preparation_remote import process_endpoint_full_inplace
 from src.dataset_extraction.vocabulary_extraction import IS_URI
 from src.predict_category import CategoryPredictor
@@ -42,14 +42,15 @@ async def generate_and_store_profile(endpoint=None, file=None):
 
 async def generate_profile_from_store():
     dataset = pd.read_json('../data/processed/combined.json')
-    for row in dataset.iterrows():
-        await store_profile(profile=create_profile(data=row), category=row['category'])
+    for col in dataset.columns():
+        await store_profile(profile=create_profile(data=dataset[col]), category=str(dataset[col]['category']))
 
-def create_profile(data: dict | tuple) -> pd.DataFrame:
-    return DataFrame()
+def create_profile(data: dict | pd.DataFrame) -> dict:
+    if isinstance(data, pd.DataFrame):
+        data = data.to_dict('records')
+    return data
 
-
-async def store_profile(profile: pd.DataFrame, category: str):
+async def store_profile(profile: dict, category: str):
     iri = profile['id']
     try:
         await _fetch_query(f"""
@@ -64,7 +65,7 @@ async def store_profile(profile: pd.DataFrame, category: str):
         INSERT DATA {{
         {iri} rdf:type dcat:dataset .
         {iri} dcterms:title "{profile['title']}" .
-        {iri} dcterms:language "{'language'}" .
+        {iri} dcterms:language "{profile['language']}" .
         {iri} dcterms:description "{profile['dsc']}" .
         {iri} dcterms:creator "{profile['creator']}" .
         {iri} dcterms:license "{profile['license']}" .
@@ -98,20 +99,14 @@ async def store_profile(profile: pd.DataFrame, category: str):
                      {keywords}
                  }}
                 """)
-    except:
-        pass
-
-    try:
         await _fetch_query(f"""
-                 PREFIX dcterms: <http://purl.org/dc/terms/>
-                 INSERT DATA {{
-                     {subjects}
-                 }}
-                 """)
+                PREFIX dcterms: <http://purl.org/dc/terms/>
+                INSERT DATA {{
+                    {subjects}
+                }}
+                """)
     except:
-        pass
-
-
+        logger.warning('Cannot insert vocabulary data or subject data')
 
 if __name__ == '__main__':
     asyncio.run(generate_profile_from_store())

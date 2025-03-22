@@ -51,7 +51,7 @@ def get_zenodo_records(g_client):
 
         # Generate the category using Gemini
         result = g_client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.0-flash-thinking-exp-01-21",
             contents=(
                 f"Given the following description, find a category from this list. "
                 f"Only respond with the category and no other words. "

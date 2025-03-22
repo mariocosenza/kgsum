@@ -145,7 +145,7 @@ def _process_row(row_column: set) -> list[str] | None:
                 sparql.setQuery(f"""
                         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                         SELECT ?o WHERE {{
-                        <{curi}> rdfs:comment ?o
+                            <{curi}> rdfs:comment ?o
                         FILTER(langMatches(lang(?o), "en"))
                         }} LIMIT 5
                         """)
@@ -183,7 +183,7 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
 
 
 def find_local_curi_puri_comments_combined(uri_list: list) -> list:
-    comments = _process_row(uri_list)
+    comments = _process_row(set(uri_list))
     return list(comments) if comments else []
 
 

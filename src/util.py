@@ -21,9 +21,10 @@ LOD_CATEGORY_NO_MULTIPLE_DOMAIN = {
 def is_endpoint_working(endpoint) -> bool:
     query_string = """
       SELECT ?s ?p ?o
-   WHERE {
-      ?s ?p ?o
-   } LIMIT 1"""
+      WHERE {
+        ?s ?p ?o
+      } LIMIT 1
+    """
     sparql = SPARQLWrapper(endpoint)
     sparql.setQuery(query_string)
     sparql.setTimeout(120)

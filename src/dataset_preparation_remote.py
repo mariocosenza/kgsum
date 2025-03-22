@@ -107,7 +107,7 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300):
                 root = eT.fromstring(result_text)
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
-            except:
+            except Exception as e:
                 logger.debug(f"[LAB] No label bindings found at offset {offset}.")
 
             try:
@@ -235,7 +235,7 @@ async def async_select_remote_property(endpoint, timeout=300):
     return properties
 
 
-async def async_select_remote_property_names(endpoint, limit=1000, timeout=300):
+async def async_select_remote_property_names(endpoint, timeout=300):
     logger.info(f"[PNAME] Starting property name query for endpoint: {endpoint}")
     local_property_names = []
     processed = set()
@@ -282,7 +282,7 @@ async def async_select_remote_property_names(endpoint, limit=1000, timeout=300):
     return local_property_names
 
 
-async def async_select_remote_class_name(endpoint, limit=1000, timeout=300):
+async def async_select_remote_class_name(endpoint, timeout=300):
     logger.info(f"[CNAME] Starting class name query for endpoint: {endpoint}")
     local_names = []
     offset = 0

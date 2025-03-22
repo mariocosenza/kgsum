@@ -75,9 +75,18 @@ def process_text(text: str) -> str:
     try:
         doc = nlp(text)
         lang = doc._.language.get("language", "en")
+
         chosen_nlp = pipeline_dict.get(lang, fallback_pipeline)
         docs = list(chosen_nlp.pipe([text]))
         return docs[0].text if docs else ""
+    except Exception as e:
+        logger.error(f"Error processing text: {e}")
+        return text
+
+def find_language(text: str) -> str:
+    try:
+        doc = nlp(text)
+        return doc._.language.get("language", "en")
     except Exception as e:
         logger.error(f"Error processing text: {e}")
         return text
@@ -169,7 +178,8 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
             "tlds": tld,
             'sparql': sparql,
             'creator': row.get("creator", ""),
-            'license': row.get("license", "")
+            'license': row.get("license", ""),
+            'language': find_language(lab_text[:1000])
         })
         logger.info("Processing row %d/%d completed.", i, total_rows)
     combined_df = pd.DataFrame(combined_rows)

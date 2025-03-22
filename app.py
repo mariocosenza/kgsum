@@ -1,10 +1,9 @@
-import os
-import psutil
 import functools
-from http.client import responses
+import os
 
-from flask import Flask, request, flash, jsonify
+import psutil
 from flasgger import Swagger
+from flask import Flask, request, flash, jsonify
 from werkzeug.utils import secure_filename
 
 from service.file_upload_service import allowed_file, UPLOAD_FOLDER
@@ -18,6 +17,7 @@ swagger = Swagger(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 active_requests = 0
+
 
 def check_system_load(func):
     @functools.wraps(func)
@@ -40,7 +40,9 @@ def check_system_load(func):
             return await func(*args, **kwargs)
         finally:
             active_requests -= 1
+
     return wrapper
+
 
 @app.route('/api/v1/sparql/profile', methods=['POST'])
 @check_system_load
@@ -56,6 +58,7 @@ async def sparql_profile():
     # Fallback in case no 'store' param is provided
     result = await generate_profile_service(data['endpoint'], sparql=True)
     return {"profile": result}
+
 
 @app.route('/api/v1/dump/profile', methods=['POST'])
 @check_system_load
@@ -90,13 +93,16 @@ async def rdf_profile():
 
     return {"error": "Error Uploading File"}
 
+
 @app.route('/api/v1/search')
 def search():
     return ''
 
+
 @app.route('/api/v1/info')
 def info_from_db():
     return ''
+
 
 if __name__ == '__main__':
     app.run()

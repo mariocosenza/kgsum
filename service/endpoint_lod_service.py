@@ -7,7 +7,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("endpoint_lod")
 
 
-
 def download_dataset(): #expected number of triples 167001612763
     df = pd.read_csv('../data/raw/sparql_full_download.csv')
     for index, row in df.iterrows():

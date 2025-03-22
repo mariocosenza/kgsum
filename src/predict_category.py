@@ -23,7 +23,7 @@ class CategoryPredictor:
 
         try:
            models, training_results  = load_multiple_models('../data/trained/multiple_models.pkl')
-        except Exception as e:
+        except Exception as _:
             models, training_results = src.pipeline_build.train_multiple_models(
                 combined_df,
                 feature_columns,
