@@ -94,16 +94,16 @@ def process_text(text: str) -> str:
         chosen_nlp = pipeline_dict.get(lang, fallback_pipeline)
         docs = list(chosen_nlp.pipe([text]))
         return docs[0].text if docs else ""
-    except Exception as e:
-        logger.error(f"Error processing text: {e}")
+    except Exception as exc:
+        logger.error(f"Error processing text: {exc}")
         return text
 
 def find_language(text: str) -> str:
     try:
         doc = nlp(text)
         return doc._.language.get("language", "en")
-    except Exception as e:
-        logger.error(f"Error processing text: {e}")
+    except Exception as exc:
+        logger.error(f"Error processing text: {exc}")
         return text
 
 
@@ -124,15 +124,15 @@ def merge_dataset() -> pd.DataFrame:
         if "local_feature_set" in file:
             try:
                 local_frames.append(pd.read_json(f"{RAW_DIR}/local/{file}"))
-            except Exception as e:
-                logger.error(f"Error reading file {file}: {e}")
+            except Exception as exc:
+                logger.error(f"Error reading file {file}: {exc}")
     remote_frames = []
     for file in listdir(f"{RAW_DIR}/remote"):
         if "remote_feature_set" in file:
             try:
                 remote_frames.append(pd.read_json(f"{RAW_DIR}/remote/{file}"))
-            except Exception as e:
-                logger.error(f"Error reading file {file}: {e}")
+            except Exception as exc:
+                logger.error(f"Error reading file {file}: {exc}")
     df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
     df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
     merged_df = pd.concat([df_local, df_remote], ignore_index=True)
@@ -146,15 +146,15 @@ def merge_void_dataset() -> pd.DataFrame:
         if "local_void_feature_set" in file:
             try:
                 local_frames.append(pd.read_json(f"{RAW_DIR}/local/{file}"))
-            except Exception as e:
-                logger.error(f"Error reading void file {file}: {e}")
+            except Exception as exc:
+                logger.error(f"Error reading void file {file}: {exc}")
     remote_frames = []
     for file in listdir(f"{RAW_DIR}/remote"):
         if "remote_void_feature_set" in file:
             try:
                 remote_frames.append(pd.read_json(f"{RAW_DIR}/remote/{file}"))
-            except Exception as e:
-                logger.error(f"Error reading void file {file}: {e}")
+            except Exception as exc:
+                logger.error(f"Error reading void file {file}: {exc}")
     df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
     df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
     merged_df = pd.concat([df_local, df_remote], ignore_index=True)

@@ -141,7 +141,7 @@ def predict_category_from_lod_svg(limit=500):
     for elem in doc.getElementsByTagName('g'):
         try:
             int(elem.getAttribute('id'))
-        except Exception as e:
+        except Exception as _:
             logger.warning('Skipping non int id')
             continue
 

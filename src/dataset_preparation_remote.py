@@ -108,7 +108,7 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300):
                 ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
                 bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
             except Exception as e:
-                logger.debug(f"[LAB] No label bindings found at offset {offset}.")
+                logger.debug(f"[LAB] No label bindings found at offset {offset}. Exception: {e}")
 
             try:
                 if not bindings:

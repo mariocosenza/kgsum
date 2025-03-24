@@ -2,13 +2,19 @@ from __future__ import annotations
 import os
 import pickle
 import logging
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, Dense
+from tensorflow.keras.utils import to_categorical
 from collections import Counter
 from enum import Enum, auto
 from typing import Any, Tuple
-
-import numpy as np
-import pandas as pd
 from sklearn import svm
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import (
     GridSearchCV,
@@ -16,13 +22,7 @@ from sklearn.model_selection import (
     cross_val_score,
     LeaveOneOut,
 )
-from sklearn.naive_bayes import MultinomialNB
-import tensorflow as tf
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, Dense
-from tensorflow.keras.utils import to_categorical
+
 
 # Suppress invalid cast warnings (if benign)
 np.seterr(invalid='ignore')
@@ -159,6 +159,7 @@ class KnowledgeGraphClassifier:
         elif self.classifier_type == ClassifierType.CNN:
             return None
 
+    @staticmethod
     def _get_cv_strategy(self, data_y: pd.Series, cv_folds: int) -> object:
         min_count = data_y.value_counts().min()
         if min_count < cv_folds:

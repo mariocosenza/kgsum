@@ -171,8 +171,8 @@ def select_local_tld(parsed_graph):
                 tld = url.split('/')[2].split('.')[-1]
                 if 1 < len(tld) <= 10:
                     tlds.add(tld)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(f'Unable to find tld {exc}')
     return tlds
 
 
@@ -260,7 +260,7 @@ def _guess_format_and_parse(path):
     for f in FORMATS:
         try:
             return g.parse(path, format=f)
-        except Exception:
+        except Exception as _:
             pass
     raise Exception('Format not supported')
 
