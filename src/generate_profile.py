@@ -92,6 +92,7 @@ async def store_profile(profile: dict, category: str):
     for sparql in _to_list(profile.get('sparql')):
         if IS_URI.match(sparql):
             triples.append(f'{iri_formatted} dcterms:endpointURL <{sparql}>')
+    triples.append(f'{iri_formatted} dcterms:identifier "{raw_id}"')
 
     # Add category as a theme.
     triples.append(f'{iri_formatted} dcat:theme "{category}"')
