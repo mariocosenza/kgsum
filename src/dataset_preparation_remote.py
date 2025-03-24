@@ -590,7 +590,7 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
     data_void = await process_endpoint_void(row)
 
     return {
-        'id': title,
+        'id': endpoint,
         'title': title,
         'sbj': data_void[0],
         'dsc': data_void[1],

@@ -318,8 +318,6 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         if not title or title == '':
             if sparql is not None:
                 title = sparql
-            else:
-                title = uuid.uuid4()
 
 
         return {

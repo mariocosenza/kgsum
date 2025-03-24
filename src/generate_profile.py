@@ -14,7 +14,7 @@ LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
 
 PREDICTOR : CategoryPredictor = CategoryPredictor.get_predictor()
 
-async def _fetch_query(query, timeout=300):
+async def _update_query(query, timeout=300):
     async with aiohttp.ClientSession() as session:
         async with session.post(LOCAL_ENDPOINT + '/statements', data={'update': query}, timeout=timeout) as response:
             return await response.text()
@@ -114,7 +114,7 @@ async def store_profile(profile: dict, category: str):
         """.strip()
 
     try:
-        await _fetch_query(query_main)
+        await _update_query(query_main)
     except Exception as error:
         logger.warning(f"Cannot insert data with iri: {iri}. Error: {error}")
         return
@@ -138,7 +138,7 @@ async def store_profile(profile: dict, category: str):
                 {keyword_triples}
             }}
             """.strip()
-            await _fetch_query(query_vocab)
+            await _update_query(query_vocab)
 
         # Build subject triples.
         subject_triples = ""
@@ -152,7 +152,7 @@ async def store_profile(profile: dict, category: str):
             {subject_triples}
             }}
             """.strip()
-            await _fetch_query(query_subject)
+            await _update_query(query_subject)
 
     except Exception as error:
         logger.warning(f"Cannot insert vocabulary or subject data. Error: {error}")
