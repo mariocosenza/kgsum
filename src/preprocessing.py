@@ -42,9 +42,17 @@ try:
     pipeline_dict["fr"] = spacy.load("fr_core_news_sm")
 except Exception as e:
     logger.error("Error loading French pipeline: %s", e)
+try:
+    pipeline_dict["ru"] = spacy.load("ru_core_news_sm")
+except Exception as e:
+    logger.error("Error loading Russian pipeline: %s", e)
+try:
+    pipeline_dict["zh"] = spacy.load("zh_core_web_sm")
+except Exception as e:
+    logger.error("Error loading Chinese pipeline: %s", e)
 
 try:
-    fallback_pipeline = spacy.load("xx_ent_wiki_sm")
+    fallback_pipeline = spacy.load("xx_sent_ud_sm")
 except Exception as e:
     logger.error("Error loading multilingual pipeline: %s", e)
     fallback_pipeline = pipeline_dict.get("en")
@@ -105,6 +113,9 @@ def normalize_text_list(text_list) -> str:
     if isinstance(text_list, str):
         return text_list
     return " ".join(str(word) for word in text_list if word is not None)
+
+def process_normalize_text(text_list: list[str]) -> list[str]:
+    return [process_text(str(word)) for word in text_list if word is not None]
 
 
 def merge_dataset() -> pd.DataFrame:
@@ -264,7 +275,9 @@ def process_all_from_input(input_data: Union[pd.DataFrame, Dict[str, Any]]) -> D
 def process_lov_data_row(row, index: int, total: int) -> dict:
     logger.info("Processing lov row %d/%d started.", index, total)
     tags = row.get("tags", [])
-    comments  = process_text(normalize_text_list(row.get("comments", [])))
+    comments = row.get("comments", None)
+    if comments:
+        comments  = process_normalize_text(row["comments"])
     logger.info("Processing lov row %d/%d completed.", index, total)
     return {"tags": tags, "comments": comments}
 

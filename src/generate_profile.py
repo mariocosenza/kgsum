@@ -1,6 +1,7 @@
 import asyncio
 import os
 import aiohttp
+import urllib.parse
 import pandas as pd
 
 from src.dataset_preparation import process_file_full_inplace, logger
@@ -18,10 +19,7 @@ async def _fetch_query(query, timeout=300):
         async with session.post(LOCAL_ENDPOINT + '/statements', data={'update': query}, timeout=timeout) as response:
             return await response.text()
 
-
-
-
-async def generate_profile(endpoint=None, file=None) -> dict:
+async def generate_profile(endpoint: None | str = None, file: None | str = None) -> dict:
     if file is not None:
         processed_data = process_all_from_input(process_file_full_inplace(file))
     elif endpoint is not None:
@@ -39,7 +37,7 @@ async def generate_profile(endpoint=None, file=None) -> dict:
 async def generate_and_store_profile(endpoint=None, file=None):
     row = await generate_profile(endpoint=endpoint, file=file)
     await store_profile(profile=row['profile'], category=row['category'])
-    return row['profile']
+    return row
 
 async def generate_profile_from_store():
     dataset = pd.read_json('../data/processed/combined.json')
@@ -52,13 +50,11 @@ def create_profile(data: dict | pd.DataFrame | pd.Series) -> dict:
         data = data.to_dict('records')
     return data
 
-
-import urllib.parse
-
-import urllib.parse
-
-import urllib.parse
-
+def _to_list(val):
+    """Ensure property value is returned as a list."""
+    if val is None:
+        return []
+    return val if isinstance(val, list) else [val]
 
 async def store_profile(profile: dict, category: str):
     raw_id = profile.get('id')
@@ -78,26 +74,22 @@ async def store_profile(profile: dict, category: str):
     # Wrap the final IRI in angle brackets for SPARQL syntax.
     iri_formatted = f"<{iri}>"
 
-    def to_list(val):
-        """Ensure property value is returned as a list."""
-        if val is None:
-            return []
-        return val if isinstance(val, list) else [val]
+
 
     # Build main triples with proper literal quoting.
     triples = [f"{iri_formatted} rdf:type dcat:dataset"]
 
-    for title in to_list(profile.get('title')):
+    for title in _to_list(profile.get('title')):
         triples.append(f'{iri_formatted} dcterms:title "{title}"')
-    for language in to_list(profile.get('language')):
+    for language in _to_list(profile.get('language')):
         triples.append(f'{iri_formatted} dcterms:language "{language}"')
-    for dsc in to_list(profile.get('dsc')):
+    for dsc in _to_list(profile.get('dsc')):
         triples.append(f'{iri_formatted} dcterms:description "{dsc}"')
-    for creator in to_list(profile.get('creator')):
+    for creator in _to_list(profile.get('creator')):
         triples.append(f'{iri_formatted} dcterms:creator "{creator}"')
-    for lic in to_list(profile.get('license')):
+    for lic in _to_list(profile.get('license')):
         triples.append(f'{iri_formatted} dcterms:license "{lic}"')
-    for sparql in to_list(profile.get('sparql')):
+    for sparql in _to_list(profile.get('sparql')):
         if IS_URI.match(sparql):
             triples.append(f'{iri_formatted} dcterms:endpointURL <{sparql}>')
 
@@ -128,12 +120,12 @@ async def store_profile(profile: dict, category: str):
 
     try:
         vocab_triples = ""
-        for voc in to_list(profile.get('voc')):
+        for voc in _to_list(profile.get('voc')):
             if IS_URI.match(voc):
                 vocab_triples += f"{iri_formatted} void:vocabulary <{voc}> .\n"
 
         keyword_triples = ""
-        for tag in to_list(profile.get('tags')):
+        for tag in _to_list(profile.get('tags')):
             keyword_triples += f'{iri_formatted} dcat:keyword "{tag}" .\n'
 
         if vocab_triples or keyword_triples:
@@ -149,7 +141,7 @@ async def store_profile(profile: dict, category: str):
 
         # Build subject triples.
         subject_triples = ""
-        for subj in to_list(profile.get('sbj')):
+        for subj in _to_list(profile.get('sbj')):
             if IS_URI.match(subj):
                 subject_triples += f'{iri_formatted} dcterms:subject <{subj}> .\n'
         if subject_triples:

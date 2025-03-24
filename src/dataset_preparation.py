@@ -313,7 +313,7 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         tld = select_local_tld(result)
         sparql = select_local_endpoint(result)
         creator = select_local_creator(result)
-        license = select_local_license(result)
+        licenses = select_local_license(result)
 
         if not title or title == '':
             if sparql is not None:
@@ -336,7 +336,7 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
             'sparql': [sparql],
             'tlds': [tld],
             'creator': [creator],
-            'license': [license]
+            'license': [licenses]
         }
 
     except Exception as e:
