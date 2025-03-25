@@ -23,8 +23,9 @@ _last_zenodo_call = 0
 
 
 def zenodo_get(*args, **kwargs):
-    global _last_zenodo_call, ZENODO_RATE_LIMIT, response
+    global _last_zenodo_call, ZENODO_RATE_LIMIT
     max_retries = 5
+    response = None  # Ensure 'response' is defined
     for attempt in range(max_retries):
         now = time.time()
         wait = max(0.0, (1.0 / ZENODO_RATE_LIMIT) - (now - _last_zenodo_call))
@@ -40,24 +41,27 @@ def zenodo_get(*args, **kwargs):
             except ValueError:
                 wait_time = 60.0
             logger.warning(
-                f"Received 429 Too Many Requests. Retrying after {wait_time} seconds (attempt {attempt + 1}/{max_retries})...")
+                f"Received 429 Too Many Requests. Retrying after {wait_time} seconds (attempt {attempt+1}/{max_retries})..."
+            )
             time.sleep(wait_time)
         else:
-            # Check for X-RateLimit-Limit header and update rate limit if present.
             rate_limit_header = response.headers.get("X-RateLimit-Limit")
             if rate_limit_header is not None:
                 try:
                     new_limit = float(rate_limit_header)
                     if new_limit > 0 and new_limit != ZENODO_RATE_LIMIT:
                         logger.info(
-                            f"X-RateLimit-Limit header indicates a new rate limit: {new_limit} calls per second.")
+                            f"X-RateLimit-Limit header indicates a new rate limit: {new_limit} calls per second."
+                        )
                         ZENODO_RATE_LIMIT = new_limit
                 except Exception as ex:
                     logger.warning(f"Unable to parse X-RateLimit-Limit header: {ex}")
             return response
 
-    # If we reach here, all retries have failed.
-    response.raise_for_status()
+    if response is not None:
+        response.raise_for_status()
+    else:
+        raise Exception("Zenodo API call failed after maximum retries.")
 
 
 def safe_generate_content(g_client, description, max_retries=5, initial_wait=60):
@@ -194,32 +198,46 @@ def get_zenodo_records(g_client, use_ollama=False):
 
 def download_file_for_record(record_detail, download_folder):
     files = record_detail.get("files", [])
-    min_size = 15 * 1024  # 15 KB
-    max_size = 2 * 1024 * 1024 * 1024  # 2 GB
-    candidate_file = None
+    # Updated size limits: minimum 10KB and maximum 3GB
+    min_size = 10 * 1024  # 10 KB
+    max_size = 3 * 1024 * 1024 * 1024  # 3 GB
 
-    # Search for an .nt file first
+    # Gather all candidate files with allowed extensions and within size limits.
+    candidate_files = []
     for file in files:
         file_name = file.get("key")
-        if file_name and file_name.lower().endswith(".nt"):
+        if file_name and (file_name.lower().endswith(".nt") or file_name.lower().endswith(".ttl")):
             file_size = file.get("size", 0)
             if min_size <= file_size <= max_size:
-                candidate_file = file
-                break
+                candidate_files.append(file)
 
-    # If no qualifying .nt file, search for a .ttl file
-    if candidate_file is None:
-        for file in files:
-            file_name = file.get("key")
-            if file_name and file_name.lower().endswith(".ttl"):
-                file_size = file.get("size", 0)
-                if min_size <= file_size <= max_size:
-                    candidate_file = file
-                    break
-
-    if candidate_file is None:
+    if not candidate_files:
         logger.info("No qualifying file found for this record.")
         return None
+
+    # Prefer .nt files first, then .ttl
+    candidate_file = None
+    for file in candidate_files:
+        if file.get("key").lower().endswith(".nt"):
+            candidate_file = file
+            break
+    if candidate_file is None:
+        candidate_file = candidate_files[0]
+
+    # If the selected candidate is named README, attempt to find an alternative.
+    base_name, ext = os.path.splitext(candidate_file.get("key"))
+    if base_name.lower() == "readme":
+        logger.info("Candidate file is README. Searching for an alternative file...")
+        alternative = None
+        for file in candidate_files:
+            bname, _ = os.path.splitext(file.get("key"))
+            if bname.lower() != "readme":
+                alternative = file
+                break
+        if alternative:
+            candidate_file = alternative
+        else:
+            logger.info("No alternative file found. Using README file.")
 
     file_name = candidate_file.get("key")
     record_id = record_detail.get("id")
@@ -288,8 +306,8 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
 
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../../data/downloads"
-    output_csv_path = "../../data/raw/zenodo_with_files.csv"
+    download_folder = "../data/downloads"
+    output_csv_path = "../data/raw/zenodo_with_files.csv"
     use_ollama = False
     # Uncomment the next line to download files as well:
     # df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
