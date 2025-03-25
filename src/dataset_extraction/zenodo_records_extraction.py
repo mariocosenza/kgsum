@@ -16,6 +16,49 @@ LOD_CATEGORY_NO_MULTIPLE_DOMAIN = {
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Rate limit configuration for Zenodo API calls.
+# Initially set to 1.0 call per second (using float for compatibility).
+ZENODO_RATE_LIMIT = 1.0  # calls per second
+_last_zenodo_call = 0
+
+
+def zenodo_get(*args, **kwargs):
+    global _last_zenodo_call, ZENODO_RATE_LIMIT, response
+    max_retries = 5
+    for attempt in range(max_retries):
+        now = time.time()
+        wait = max(0.0, (1.0 / ZENODO_RATE_LIMIT) - (now - _last_zenodo_call))
+        if wait:
+            time.sleep(wait)
+        response = requests.get(*args, **kwargs)
+        _last_zenodo_call = time.time()
+
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After")
+            try:
+                wait_time = float(retry_after) if retry_after is not None else 60.0
+            except ValueError:
+                wait_time = 60.0
+            logger.warning(
+                f"Received 429 Too Many Requests. Retrying after {wait_time} seconds (attempt {attempt + 1}/{max_retries})...")
+            time.sleep(wait_time)
+        else:
+            # Check for X-RateLimit-Limit header and update rate limit if present.
+            rate_limit_header = response.headers.get("X-RateLimit-Limit")
+            if rate_limit_header is not None:
+                try:
+                    new_limit = float(rate_limit_header)
+                    if new_limit > 0 and new_limit != ZENODO_RATE_LIMIT:
+                        logger.info(
+                            f"X-RateLimit-Limit header indicates a new rate limit: {new_limit} calls per second.")
+                        ZENODO_RATE_LIMIT = new_limit
+                except Exception as ex:
+                    logger.warning(f"Unable to parse X-RateLimit-Limit header: {ex}")
+            return response
+
+    # If we reach here, all retries have failed.
+    response.raise_for_status()
+
 
 def safe_generate_content(g_client, description, max_retries=5, initial_wait=60):
     retries = 0
@@ -35,7 +78,6 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
             )
             # Normalize the result to a string.
             if isinstance(result, dict):
-                # Check common keys for the response text.
                 output = result.get("text", "").strip() or result.get("response", "").strip()
             elif isinstance(result, str):
                 output = result.strip()
@@ -55,7 +97,7 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
 def safe_generate_content_ollama(description):
     prompt = (
         f"Given the following description, find a category from this list. "
-        f"Only respond with the category and no other words. "
+        f"Only respond with the category and no other words. Do not add any other words for any reason. "
         f"Be precise and use your reasoning. "
         f"Use the same category format. "
         f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
@@ -84,7 +126,8 @@ def get_zenodo_records(g_client, use_ollama=False):
         ("sort", "newest")
     ]
 
-    response = requests.get(url, params=params, timeout=600)
+    # Use zenodo_get instead of requests.get to enforce rate limiting.
+    response = zenodo_get(url, params=params, timeout=600)
     response.raise_for_status()
     data = response.json()
 
@@ -191,7 +234,8 @@ def download_file_for_record(record_detail, download_folder):
     download_url = f"https://zenodo.org/record/{record_id}/files/{file_name}?download=1"
     logger.info(f"Downloading file {file_name} from {download_url}")
 
-    response = requests.get(download_url, stream=True)
+    # Use zenodo_get to enforce rate limiting on the file download as well.
+    response = zenodo_get(download_url, stream=True)
     response.raise_for_status()
 
     os.makedirs(download_folder, exist_ok=True)
@@ -207,29 +251,46 @@ def download_file_for_record(record_detail, download_folder):
 def process_zenodo_records_with_download(g_client, download_folder, output_csv_path, use_ollama=False):
     df = get_zenodo_records(g_client, use_ollama=use_ollama)
     file_names = []
+    file_indices = []
+    current_index = 1000  # starting index
 
     for index, row in df.iterrows():
         record_link = row["record_link"]
         try:
-            detail_response = requests.get(record_link, timeout=600)
+            # Use zenodo_get for record detail API call.
+            detail_response = zenodo_get(record_link, timeout=600)
             detail_response.raise_for_status()
             record_detail = detail_response.json()
-            file_name = download_file_for_record(record_detail, download_folder)
-            if file_name is None:
-                file_name = ""
+            downloaded_file_name = download_file_for_record(record_detail, download_folder)
+            if downloaded_file_name:
+                # Get the file extension and create a new name based on the progressive index.
+                _, ext = os.path.splitext(downloaded_file_name)
+                new_file_name = f"{current_index}{ext}"
+                original_path = os.path.join(download_folder, downloaded_file_name)
+                new_path = os.path.join(download_folder, new_file_name)
+                os.rename(original_path, new_path)
+                file_names.append(new_file_name)
+                file_indices.append(current_index)
+                current_index += 1
+            else:
+                file_names.append("")
+                file_indices.append("")
         except Exception as e:
             logger.error(f"Failed to process record '{row['title']}': {e}")
-            file_name = ""
-        file_names.append(file_name)
+            file_names.append("")
+            file_indices.append("")
 
     df["file_name"] = file_names
+    df["file_index"] = file_indices
     df.to_csv(output_csv_path, index=False)
     return df
 
 
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../data/downloads"
-    output_csv_path = "../data/raw/zenodo_with_files.csv"
-    use_ollama = True
-    df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
+    download_folder = "../../data/downloads"
+    output_csv_path = "../../data/raw/zenodo_with_files.csv"
+    use_ollama = False
+    # Uncomment the next line to download files as well:
+    # df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
+    get_zenodo_records(client, use_ollama=use_ollama).to_csv(output_csv_path, index=False)
