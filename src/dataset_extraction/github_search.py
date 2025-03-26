@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import time
@@ -5,9 +6,39 @@ from urllib.parse import quote
 
 import pandas as pd
 import requests
+from google import genai
+
+from util import LOD_CATEGORY_NO_USER_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def safe_generate_content(g_client, description, max_retries=5, initial_wait=60):
+    retries = 0
+    wait_time = initial_wait
+    while retries < max_retries:
+        try:
+            result = g_client.models.generate_content(
+                model="gemini-2.0-flash-thinking-exp-01-21",
+                contents=(
+                    f"Given the following README file, find a category from the given list. "
+                    f"Only respond with the category and no other words. "
+                    f"Be precise and use your reasoning. "
+                    f"Use the same format for the categories as instructed. "
+                    f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
+                    f"Description: {description}"
+                )
+            )
+            return result.text.strip()
+        except Exception as e:
+            logger.warning(
+                f"Gemini server overloaded (attempt {retries + 1}/{max_retries}). Retrying in {wait_time} seconds..."
+            )
+            time.sleep(wait_time)
+            retries += 1
+            wait_time *= 2  # Exponential backoff
+    raise Exception("Max retries exceeded for generate_content (Gemini)")
 
 
 def get_with_rate_limit(url, headers):
@@ -103,7 +134,7 @@ def search_github_files(file_extensions, token, max_pages=10):
     return all_results
 
 
-def save_to_csv(results, output_file="../data/raw/github_unique_repos_with_ttl_nt.csv"):
+def save_to_csv(results, output_file="../../data/raw/github/github_unique_repos_with_ttl_nt.csv"):
     if not results:
         logger.info("No results to save.")
         return
@@ -111,6 +142,44 @@ def save_to_csv(results, output_file="../data/raw/github_unique_repos_with_ttl_n
     df.sort_values("repository", inplace=True)
     df.to_csv(output_file, index=False)
     logger.info(f"Saved {len(results)} unique repositories (sorted by title) to {output_file}")
+    return df
+
+def download_and_predict(g_client, download_folder, output_file="../../data/raw/github/github_unique_repos_with_ttl_nt.csv"):
+    id_int = 2000
+    token = os.environ.get("GITHUB_TOKEN")
+    df = pd.read_csv("../../data/raw/github/github_unique_repos_with_ttl_nt.csv")
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    os.makedirs(download_folder, exist_ok=True)
+    for index, row in df.iterrows():
+        repo = row['repository']
+        try:
+            resp = get_with_rate_limit(f'https://raw.githubusercontent.com/{repo}/main/README.md', headers)
+            if resp.status_code == 200:
+                if id_int == 3000:
+                    res = input('Change your IP to continue with free api or confirm current key (True to change IP):')
+                    if bool(res):
+                        g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY_2"))
+                row['category'] = safe_generate_content(g_client, description=resp.text[:100000]).strip()
+                logger.info(f'Category predicted for {repo}: {row['category']}')
+                id_int += 1
+                file_name = str(row['file_url'])
+                file_name = file_name.replace('https://github.com/', '').replace('/blob', '')
+                rdf_dump_resp = get_with_rate_limit(f'https://raw.githubusercontent.com/{file_name}', headers)
+                if rdf_dump_resp.status_code == 200:
+                    os.makedirs(download_folder + f'/{row['category']}', exist_ok=True)
+                    file_path = os.path.join(download_folder + f'/{row['category']}', f'{id_int}-{hashlib.sha256(repo.encode()).hexdigest()}.rdf')
+                    with open(file_path, "wb") as f:
+                        for chunk in rdf_dump_resp.iter_content(chunk_size=8192):
+                            f.write(chunk)
+        except Exception as e:
+            logger.error(f'An error occurred while processing repository {repo}. Check the final output! Error: {e}')
+
+    df.sort_values("repository", inplace=True)
+    df.to_csv(output_file, index=False)
 
 
 def main():
@@ -127,4 +196,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    download_folder = "../../data/raw/github"
+    #main()
+    download_and_predict(client, download_folder)
+

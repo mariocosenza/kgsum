@@ -18,6 +18,12 @@ LOD_CATEGORY_NO_MULTIPLE_DOMAIN = {
     'linguistics', 'media', 'publications', 'social_networking'
 }
 
+LOD_CATEGORY_NO_USER_DOMAIN = {
+    'geography', 'government', 'life_sciences', 'cross_domain',
+    'linguistics', 'media', 'publications', 'social_networking'
+}
+
+
 def is_endpoint_working(endpoint) -> bool:
     query_string = """
       SELECT ?s ?p ?o

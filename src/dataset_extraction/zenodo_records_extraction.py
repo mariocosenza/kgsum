@@ -7,11 +7,7 @@ import pandas as pd
 import requests
 from google import genai
 
-# Define allowed categories
-LOD_CATEGORY_NO_MULTIPLE_DOMAIN = {
-    'geography', 'government', 'life_sciences', 'cross_domain',
-    'linguistics', 'media', 'publications', 'social_networking'
-}
+from util import LOD_CATEGORY_NO_USER_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,7 +72,7 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
                     f"Only respond with the category and no other words. "
                     f"Be precise and use your reasoning. "
                     f"Use the same category format. "
-                    f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+                    f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
                     f"Description: {description}"
                 )
             )
@@ -104,7 +100,7 @@ def safe_generate_content_ollama(description):
         f"Only respond with the category and no other words. Do not add any other words for any reason. "
         f"Be precise and use your reasoning. "
         f"Use the same category format. "
-        f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+        f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
         f"Description: {description}"
     )
 
@@ -306,8 +302,8 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
 
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../data/downloads"
-    output_csv_path = "../data/raw/zenodo_with_files.csv"
+    download_folder = "../../data/raw/zenodo"
+    output_csv_path = "../../data/raw/zenodo_with_files.csv"
     use_ollama = False
     # Uncomment the next line to download files as well:
     # df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
