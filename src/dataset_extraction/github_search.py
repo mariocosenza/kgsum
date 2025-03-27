@@ -4,6 +4,7 @@ import os
 import time
 from urllib.parse import quote
 
+import ollama
 import pandas as pd
 import requests
 from google import genai
@@ -39,6 +40,26 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
             retries += 1
             wait_time *= 2  # Exponential backoff
     raise Exception("Max retries exceeded for generate_content (Gemini)")
+
+def safe_generate_content_ollama(description):
+    prompt = (
+        f"Given the following description, find a category from this list. "
+        f"Only respond with the category and no other words. Do not add any other words for any reason. "
+        f"Be precise and use your reasoning. "
+        f"Use the same category format. "
+        f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
+        f"Description: {description}"
+    )
+
+    try:
+        response = ollama.generate(model="gemma3:12b", prompt=prompt)
+        output = response['response'].strip()
+        logger.info(f'Categories: {output}')
+    except Exception as e:
+        logger.error("Error calling Ollama model: %s", e)
+        return ""
+
+    return output
 
 
 def get_with_rate_limit(url, headers):
@@ -134,7 +155,7 @@ def search_github_files(file_extensions, token, max_pages=10):
     return all_results
 
 
-def save_to_csv(results, output_file="../../data/raw/github/github_unique_repos_with_ttl_nt.csv"):
+def save_to_csv(results, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv"):
     if not results:
         logger.info("No results to save.")
         return
@@ -144,7 +165,7 @@ def save_to_csv(results, output_file="../../data/raw/github/github_unique_repos_
     logger.info(f"Saved {len(results)} unique repositories (sorted by title) to {output_file}")
     return df
 
-def download_and_predict(g_client, download_folder, output_file="../../data/raw/github/github_unique_repos_with_ttl_nt.csv"):
+def download_and_predict(g_client, download_folder, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv", use_ollama=False):
     id_int = 2000
     token = os.environ.get("GITHUB_TOKEN")
     df = pd.read_csv("../../data/raw/github/github_unique_repos_with_ttl_nt.csv")
@@ -159,11 +180,14 @@ def download_and_predict(g_client, download_folder, output_file="../../data/raw/
         try:
             resp = get_with_rate_limit(f'https://raw.githubusercontent.com/{repo}/main/README.md', headers)
             if resp.status_code == 200:
-                if id_int == 3000:
+                if id_int == 3000 and not use_ollama:
                     res = input('Change your IP to continue with free api or confirm current key (True to change IP):')
                     if bool(res):
                         g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY_2"))
-                row['category'] = safe_generate_content(g_client, description=resp.text[:100000]).strip()
+                if use_ollama:
+                    row['category'] = safe_generate_content_ollama(description=resp.text[:100000]).strip()
+                else:
+                    row['category'] = safe_generate_content(g_client, description=resp.text[:100000]).strip()
                 logger.info(f'Category predicted for {repo}: {row['category']}')
                 id_int += 1
                 file_name = str(row['file_url'])
@@ -197,7 +221,7 @@ def main():
 
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../../data/raw/github"
+    download_folder = "../../data/raw/rdf_dump"
     #main()
     download_and_predict(client, download_folder)
 

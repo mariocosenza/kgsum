@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import time
@@ -268,9 +269,11 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
     file_indices = []
     current_index = 1000  # starting index
 
+
     for index, row in df.iterrows():
         record_link = row["record_link"]
         try:
+            download_folder = f'{download_folder}/{df['category']}'
             # Use zenodo_get for record detail API call.
             detail_response = zenodo_get(record_link, timeout=600)
             detail_response.raise_for_status()
@@ -279,7 +282,7 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
             if downloaded_file_name:
                 # Get the file extension and create a new name based on the progressive index.
                 _, ext = os.path.splitext(downloaded_file_name)
-                new_file_name = f"{current_index}{ext}"
+                new_file_name = f"{current_index}-{hashlib.sha256(record_detail.encode()).hexdigest()}{ext}"
                 original_path = os.path.join(download_folder, downloaded_file_name)
                 new_path = os.path.join(download_folder, new_file_name)
                 os.rename(original_path, new_path)
@@ -302,7 +305,7 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
 
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../../data/raw/zenodo"
+    download_folder = "../../data/raw/rdf_dump"
     output_csv_path = "../../data/raw/zenodo_with_files.csv"
     use_ollama = False
     # Uncomment the next line to download files as well:
