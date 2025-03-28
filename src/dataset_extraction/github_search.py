@@ -168,7 +168,7 @@ def save_to_csv(results, output_file="../../data/raw/github_unique_repos_with_tt
 def download_and_predict(g_client, download_folder, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv", use_ollama=False):
     id_int = 2000
     token = os.environ.get("GITHUB_TOKEN")
-    df = pd.read_csv("../../data/raw/github/github_unique_repos_with_ttl_nt.csv")
+    df = pd.read_csv("../../data/raw/github_unique_repos_with_ttl_nt.csv")
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {token}",

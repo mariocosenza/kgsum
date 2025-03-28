@@ -17,10 +17,9 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor():
+    def get_predictor(classifier = ClassifierType.CNN):
         combined_df = pd.read_json('../data/processed/combined.json')
         feature_columns = ["lab", "lcn", "lpn", "sbj", "dsc"]
-        classifier = ClassifierType.CNN
         try:
            models, training_results  = load_multiple_models('../data/trained/multiple_models.pkl')
         except Exception as _:

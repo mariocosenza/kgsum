@@ -1,3 +1,5 @@
+import hashlib
+
 import pandas as pd
 import requests
 import logging
@@ -14,7 +16,7 @@ def download_dataset(): #expected number of triples 167001612763
             logger.info("Downloading " + row['download_url'] + f' Number: {index}')
             response = requests.get(row['download_url'], timeout=600)
             if response.status_code == 200 and response.headers['Content-Type'] and response.headers['Content-Type'] != 'text/html':
-                open(f'../data/raw/rdf_dump/{row['category']}/{index}.rdf', 'x').write(response.text)
+                open(f'../data/raw/rdf_dump/{row['category']}/{index}-{hashlib.sha256(row['id'].encode()).hexdigest()}.rdf', 'x').write(response.text)
 
 def extract_sparql_or_full_download_list():
     frame = pd.read_json('../data/raw/lod-data.json', orient='columns')

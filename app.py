@@ -6,6 +6,7 @@ from flasgger import Swagger
 from flask import Flask, request, flash, jsonify
 from werkzeug.utils import secure_filename
 
+from predict_category import CategoryPredictor
 from service.file_upload_service import allowed_file, UPLOAD_FOLDER
 from service.generate_profile_service import (
     generate_profile_service,
@@ -15,6 +16,7 @@ from service.generate_profile_service import (
 app = Flask(__name__)
 swagger = Swagger(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+PREDICTOR : CategoryPredictor = CategoryPredictor.get_predictor()
 
 active_requests = 0
 

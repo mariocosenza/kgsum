@@ -80,3 +80,10 @@ def rename_new_file(offset):
                 if file_num > offset:
                     os.rename(path,
                               f'../data/raw/rdf_dump/{category}/{file_num}-{hashlib.sha256(lod_frame['id'][file_num].encode()).hexdigest()}.rdf')
+
+
+def merge_zenodo_sparql():
+    return
+
+def merge_github_sparql():
+    return

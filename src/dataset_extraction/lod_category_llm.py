@@ -3,10 +3,11 @@ import os
 import time
 from xml.dom import minidom
 
+import ollama
 import pandas as pd
 from google import genai
 
-from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN
+from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN, LOD_CATEGORY_NO_USER_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,7 +25,29 @@ CATEGORIES_COLOR: dict[str, str] = {
 }
 
 
-def predict_category_from_lod_description(limit=500) -> pd.DataFrame:
+def safe_generate_content_ollama(description, keywords):
+    prompt = (
+        f"Given the following description and keywords, find a category given this data. "
+        f"Only respond with the category and no other words. "
+        f"Be precise and use your reasoning. "
+        f"Use the same category format. "
+        f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+        f"Description: {description}"
+        f"Keywords: {keywords}. "
+    )
+
+    try:
+        response = ollama.generate(model="gemma3:12b", prompt=prompt)
+        output = response['response'].strip()
+        logger.info(f'Categories: {output}')
+    except Exception as e:
+        logger.error(f"Error calling Ollama model: {e}")
+        return ""
+
+    return output
+
+
+def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.DataFrame:
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     df = pd.read_json('../../data/raw/lod-data.json')
     hit = 0
@@ -41,26 +64,27 @@ def predict_category_from_lod_description(limit=500) -> pd.DataFrame:
         if hit + miss > limit:
             break
         logger.info(f'Processing id: {col}')
-        # Enforce rate limiting: max 10 calls per minute
-        if calls_in_minute >= 10:
-            elapsed = time.time() - minute_start
-            if elapsed < 60:
-                time.sleep(60 - elapsed)
-            minute_start = time.time()
-            calls_in_minute = 0
 
         if df[col]['domain'] != '' and df[col]['domain'] not in 'cross_domain' and df[col][
             'domain'] not in 'user_generated':
-            max_retries = 3
-            retry_count = 0
-            retry_wait = 60  
-            result = None
+            if not use_ollama:
+                max_retries = 3
+                retry_count = 0
+                retry_wait = 60
+                result = None
 
-            while retry_count <= max_retries:
-                try:
-                    result = client.models.generate_content(
-                        model="gemini-2.0-flash-thinking-exp-01-21",
-                        contents=(
+                if calls_in_minute >= 10:
+                    elapsed = time.time() - minute_start
+                    if elapsed < 60:
+                        time.sleep(60 - elapsed)
+                    minute_start = time.time()
+                    calls_in_minute = 0
+
+                while retry_count <= max_retries:
+                    try:
+                        result = client.models.generate_content(
+                            model="gemini-2.0-flash-thinking-exp-01-21",
+                            contents=(
                             f"Given the following description and keywords, find a category given this data. "
                             f"Only respond with the category and no other words. "
                             f"Be precise and use your reasoning. "
@@ -68,53 +92,55 @@ def predict_category_from_lod_description(limit=500) -> pd.DataFrame:
                             f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
                             f"Description: {df[col]['description']}"
                             f"Keywords: {df[col]['keywords']}. "
+                            )
                         )
-                    )
-                    break
-                except Exception as e:
-                    error_str = str(e)
-                    logger.warning(f"Error with ID {col}: {error_str}")
-                    calls_in_minute += 1
-
-                    if "429" in error_str:
-                        retry_count += 1
-                        if retry_count <= max_retries:
-                            logger.info(
-                                f"Rate limit hit. Waiting {retry_wait} seconds before retry {retry_count}/{max_retries}")
-                            time.sleep(retry_wait)
-                            retry_wait *= 2
-                        else:
-                            logger.warning(f"Max retries reached for ID {col}. Skipping.")
-                    else:
-                        # For non-429 errors, don't retry
-                        logger.warning(f"Non-rate limit error. Skipping ID {col}.")
                         break
+                    except Exception as e:
+                        error_str = str(e)
+                        logger.warning(f"Error with ID {col}: {error_str}")
+                        calls_in_minute += 1
 
-            # Skip this item if we couldn't get a result after retries
-            if result is None:
-                logger.warning(f"Skipping item {col} due to API errors")
-                continue
+                        if "429" in error_str:
+                            retry_count += 1
+                            if retry_count <= max_retries:
+                                logger.info(
+                                    f"Rate limit hit. Waiting {retry_wait} seconds before retry {retry_count}/{max_retries}")
+                                time.sleep(retry_wait)
+                                retry_wait *= 2
+                            else:
+                                logger.warning(f"Max retries reached for ID {col}. Skipping.")
+                        else:
+                            # For non-429 errors, don't retry
+                            logger.warning(f"Non-rate limit error. Skipping ID {col}.")
+                            break
 
-            result_dict = {
-                'lod_category': df[col]['domain'],
-                'predicted_category': result.text.strip(),
-                'id': col
-            }
+                    # Skip this item if we couldn't get a result after retries
+                    if result is None:
+                        logger.warning(f"Skipping item {col} due to API errors")
+                        continue
+                else:
+                    result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords'])
 
-            logger.info(f'Processed: {result_dict}')
+                result_dict = {
+                    'lod_category': df[col]['domain'],
+                    'predicted_category': result.text.strip(),
+                    'id': col
+                 }
 
-            records.append(result_dict)
+                logger.info(f'Processed: {result_dict}')
 
-            if result.text.strip() in df[col]['domain']:
-                hit += 1
-            elif df[col]['domain'] not in '':
-                miss += 1
+                records.append(result_dict)
 
-            if miss >= 1:
-                logger.info(
-                    f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')  # Fixed percentage calculation
+                if result.text.strip() in df[col]['domain']:
+                    hit += 1
+                elif df[col]['domain'] not in '':
+                    miss += 1
 
-            calls_in_minute += 1
+                if miss >= 1:
+                    logger.info(
+                        f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')  # Fixed percentage calculation
+
+                calls_in_minute += 1
 
     df = pd.DataFrame(records)
 
@@ -123,7 +149,7 @@ def predict_category_from_lod_description(limit=500) -> pd.DataFrame:
     return df
 
 
-def predict_category_from_lod_svg(limit=500):
+def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
     doc = minidom.parse('../../data/raw/lod-cloud.svg')
 
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -156,77 +182,81 @@ def predict_category_from_lod_svg(limit=500):
             break
 
         logger.info(f'Processing id: {col}')
-        # Enforce rate limiting: max 10 calls per minute
-        if calls_in_minute >= 10:
-            elapsed = time.time() - minute_start
-            if elapsed < 60:
-                time.sleep(60 - elapsed)
-            minute_start = time.time()
-            calls_in_minute = 0
+
 
         if df[col]['domain'] not in 'cross_domain' and df[col]['domain'] not in 'user_generated':
-            max_retries = 3
-            retry_count = 0
-            retry_wait = 60
-            result = None
+            if not use_ollama:
+                # Enforce rate limiting: max 10 calls per minute
+                if calls_in_minute >= 10:
+                    elapsed = time.time() - minute_start
+                    if elapsed < 60:
+                        time.sleep(60 - elapsed)
+                    minute_start = time.time()
+                    calls_in_minute = 0
 
-            while retry_count <= max_retries:
-                try:
-                    result = client.models.generate_content(
-                        model="gemini-2.0-flash-thinking-exp-01-21",
-                        contents=(
-                            f"Given the following description and keywords, find a category given this data. "
-                            f"Only respond with the category and no other words. "
-                            f"Be precise and use your reasoning. "
-                            f"Use the same category format. "
-                            f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-                            f"Description: {df[col]['description']}"
-                            f"Keywords: {df[col]['keywords']}. "
+
+                max_retries = 3
+                retry_count = 0
+                retry_wait = 60
+                result = None
+
+                while retry_count <= max_retries:
+                    try:
+                        result = client.models.generate_content(
+                            model="gemini-2.0-flash-thinking-exp-01-21",
+                            contents=(
+                                f"Given the following description and keywords, find a category given this data. "
+                                f"Only respond with the category and no other words. "
+                                f"Be precise and use your reasoning. "
+                                f"Use the same category format. "
+                                f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+                                f"Description: {df[col]['description']}"
+                                f"Keywords: {df[col]['keywords']}. "
+                            )
                         )
-                    )
-                    break
-                except Exception as e:
-                    error_str = str(e)
-                    logger.warning(f"Error with ID {col}: {error_str}")
-                    calls_in_minute += 1
-
-                    if "429" in error_str:
-                        retry_count += 1
-                        if retry_count <= max_retries:
-                            logger.info(
-                                f"Rate limit hit. Waiting {retry_wait} seconds before retry {retry_count}/{max_retries}")
-                            time.sleep(retry_wait)
-                            retry_wait *= 2
-                        else:
-                            logger.warning(f"Max retries reached for ID {col}. Skipping.")
-                    else:
-                        # For non-429 errors, don't retry
-                        logger.warning(f"Non-rate limit error. Skipping ID {col}.")
                         break
+                    except Exception as e:
+                        error_str = str(e)
+                        logger.warning(f"Error with ID {col}: {error_str}")
+                        calls_in_minute += 1
 
-            # Skip this item if we couldn't get a result after retries
-            if result is None:
-                logger.warning(f"Skipping item {col} due to API errors")
-                continue
+                        if "429" in error_str:
+                            retry_count += 1
+                            if retry_count <= max_retries:
+                                logger.info(
+                                    f"Rate limit hit. Waiting {retry_wait} seconds before retry {retry_count}/{max_retries}")
+                                time.sleep(retry_wait)
+                                retry_wait *= 2
+                            else:
+                                logger.warning(f"Max retries reached for ID {col}. Skipping.")
+                        else:
+                            # For non-429 errors, don't retry
+                            logger.warning(f"Non-rate limit error. Skipping ID {col}.")
+                            break
 
-            lod_category = CATEGORIES_COLOR.get(first_circle.getAttribute('fill').lower())
-            result_dict = {
-                'lod_category': lod_category,
-                'predicted_category': result.text.strip(),
-                'id': col
-            }
+                    # Skip this item if we couldn't get a result after retries
+                    if result is None:
+                        logger.warning(f"Skipping item {col} due to API errors")
+                        continue
+                else:
+                    result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords'])
+                lod_category = CATEGORIES_COLOR.get(first_circle.getAttribute('fill').lower())
+                result_dict = {
+                    'lod_category': lod_category,
+                    'predicted_category': result.text.strip(),
+                    'id': col
+                }
 
-            logger.info(f'Processed: {result_dict}')
+                logger.info(f'Processed: {result_dict}')
 
-            records.append(result_dict)
+                records.append(result_dict)
 
-            if result.text.strip() in lod_category:
-                hit += 1
-            else:
-                miss += 1
-
-            if miss >= 1:
-                logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')
+                if result.text.strip() in lod_category:
+                    hit += 1
+                else:
+                    miss += 1
+                if miss >= 1:
+                    logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')
 
             calls_in_minute += 1
     df = pd.DataFrame(records)
