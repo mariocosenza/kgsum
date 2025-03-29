@@ -65,7 +65,7 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
             break
         logger.info(f'Processing id: {col}')
 
-        if df[col]['domain'] != '' and df[col]['domain'] not in 'cross_domain' and df[col][
+        if df[col]['domain'] not in '' and df[col]['domain'] not in 'cross_domain' and df[col][
             'domain'] not in 'user_generated':
             if not use_ollama:
                 max_retries = 3
@@ -118,29 +118,31 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                     if result is None:
                         logger.warning(f"Skipping item {col} due to API errors")
                         continue
-                else:
-                    result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords'])
+                    else:
+                        result = result.text.strip()
+            else:
+                result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords']).strip()
 
-                result_dict = {
-                    'lod_category': df[col]['domain'],
-                    'predicted_category': result.text.strip(),
-                    'id': col
-                 }
+            result_dict = {
+                'lod_category': df[col]['domain'],
+                'predicted_category': result,
+                'id': col
+            }
 
-                logger.info(f'Processed: {result_dict}')
+            logger.info(f'Processed: {result_dict}')
 
-                records.append(result_dict)
+            records.append(result_dict)
 
-                if result.text.strip() in df[col]['domain']:
-                    hit += 1
-                elif df[col]['domain'] not in '':
-                    miss += 1
+            if result in df[col]['domain']:
+                 hit += 1
+            elif df[col]['domain'] not in '':
+                miss += 1
 
-                if miss >= 1:
-                    logger.info(
-                        f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')  # Fixed percentage calculation
+            if miss >= 1:
+                logger.info(
+                    f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')  # Fixed percentage calculation
 
-                calls_in_minute += 1
+            calls_in_minute += 1
 
     df = pd.DataFrame(records)
 
@@ -238,25 +240,30 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                     if result is None:
                         logger.warning(f"Skipping item {col} due to API errors")
                         continue
-                else:
-                    result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords'])
-                lod_category = CATEGORIES_COLOR.get(first_circle.getAttribute('fill').lower())
-                result_dict = {
-                    'lod_category': lod_category,
-                    'predicted_category': result.text.strip(),
-                    'id': col
-                }
+                    else:
+                        result =  result.text.strip()
+            else:
+                result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords']).strip()
 
-                logger.info(f'Processed: {result_dict}')
+            lod_category = CATEGORIES_COLOR.get(first_circle.getAttribute('fill').lower())
 
-                records.append(result_dict)
+            result_dict = {
+                'lod_category': df[col]['domain'],
+                'predicted_category': result,
+                'id': col
+            }
 
-                if result.text.strip() in lod_category:
-                    hit += 1
-                else:
-                    miss += 1
-                if miss >= 1:
-                    logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')
+
+            logger.info(f'Processed: {result_dict}')
+
+            records.append(result_dict)
+
+            if result in lod_category:
+                hit += 1
+            else:
+                miss += 1
+            if miss >= 1:
+                logger.info(f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')
 
             calls_in_minute += 1
     df = pd.DataFrame(records)
@@ -267,5 +274,5 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
-    # predict_category_from_lod_description().to_csv('../../data/raw/lod-gemini.csv')
+    #predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
+    predict_category_from_lod_description(use_ollama=True).to_csv('../../data/raw/lod-gemini.csv')

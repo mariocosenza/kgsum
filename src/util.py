@@ -6,7 +6,7 @@ import pandas as pd
 from SPARQLWrapper import SPARQLWrapper
 
 # Precompile the regex used to extract the file number
-FILE_NUM_REGEX = re.compile(r'(\d+).*\.rdf$')
+FILE_NUM_REGEX = re.compile(r'(\d+).*\.((?:rdf)|(?:nt)|(?:ttl)|(?:nq))$', re.IGNORECASE)
 FILE_STRING_REGEX = re.compile(r'-(.*)\.')
 
 CATEGORIES = {
@@ -82,8 +82,54 @@ def rename_new_file(offset):
                               f'../data/raw/rdf_dump/{category}/{file_num}-{hashlib.sha256(lod_frame['id'][file_num].encode()).hexdigest()}.rdf')
 
 
-def merge_zenodo_sparql():
-    return
+def merge_csv_files(csv1_path, csv2_path, output_csv_path):
+
+    df1 = pd.read_csv(csv1_path)
+    df2 = pd.read_csv(csv2_path)
+
+    # Transform CSV2:
+    # Use 'record_link' as 'id' (ignoring 'title' and 'description') and keep 'category'.
+    df2_transformed = df2.rename(columns={'record_link': 'id'})[['id', 'category']].copy()
+    # Add missing columns with empty strings.
+    df2_transformed["download_url"] = ""
+    df2_transformed["sparql_url"] = ""
+    # Reorder columns to match CSV1.
+    df2_transformed = df2_transformed[['id', 'category', 'download_url', 'sparql_url']]
+
+    # Merge the two dataframes vertically.
+    merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
+
+    # Write the merged DataFrame to CSV including the index column.
+    merged_df.to_csv(output_csv_path, index=True)
+
+    return merged_df
+
+def merge_zenodo_sparql(csv1_path='../data/raw/sparql_full_download.csv', csv2_path='../data/raw/zenodo.csv'):
+    df1 = pd.read_csv(csv1_path, index_col=0)
+
+    # Read CSV2 normally
+    df2 = pd.read_csv(csv2_path)
+
+    # Transform CSV2:
+    # Rename 'record_link' to 'id' and keep only the 'id' and 'category' columns.
+    df2_transformed = df2.rename(columns={'record_link': 'id'})[['id', 'category']].copy()
+    # Add missing columns with empty strings.
+    df2_transformed["download_url"] = ""
+    df2_transformed["sparql_url"] = ""
+    # Reorder columns to match CSV1: id, category, download_url, sparql_url.
+    df2_transformed = df2_transformed[['id', 'category', 'download_url', 'sparql_url']]
+
+    # Merge the two DataFrames (resetting index so there's only one index column)
+    merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
+
+    # Write the merged DataFrame to CSV with one index column
+    merged_df.to_csv(csv1_path, index=True)
+
+    return merged_df
 
 def merge_github_sparql():
     return
+
+
+if __name__ == '__main__':
+    merge_zenodo_sparql()

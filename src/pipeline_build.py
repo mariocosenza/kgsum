@@ -115,7 +115,7 @@ class KnowledgeGraphClassifier:
     def __init__(self, classifier_type: ClassifierType = ClassifierType.SVM):
         self.classifier_type = classifier_type
         # For SVM and Naive Bayes, use TF-IDF vectorizer
-        self.vectorizer = TfidfVectorizer(max_features=10000, lowercase=True, ngram_range=(1, 2))
+        self.vectorizer = TfidfVectorizer(max_features=100000, lowercase=True, ngram_range=(1, 2))
         self.model: GridSearchCV | Sequential | None = None
         # Attributes used for the CNN branch
         self.tokenizer: Tokenizer | None = None
@@ -207,7 +207,7 @@ class KnowledgeGraphClassifier:
             raise ValueError(f"Only one unique class: {data_y.unique()}")
 
         if self.classifier_type == ClassifierType.CNN:
-            self.tokenizer = Tokenizer(num_words=10000)
+            self.tokenizer = Tokenizer(num_words=100000)
             self.tokenizer.fit_on_texts(data_x)
             sequences = self.tokenizer.texts_to_sequences(data_x)
             self.max_length = max(len(seq) for seq in sequences)

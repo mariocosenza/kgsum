@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import re
 import time
 
 import ollama
@@ -8,21 +9,43 @@ import pandas as pd
 import requests
 from google import genai
 
-from util import LOD_CATEGORY_NO_USER_DOMAIN
+from src.util import LOD_CATEGORY_NO_USER_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Rate limit configuration for Zenodo API calls.
-# Initially set to 1.0 call per second (using float for compatibility).
 ZENODO_RATE_LIMIT = 1.0  # calls per second
 _last_zenodo_call = 0
+
+
+def sanitize_folder_name(name: str) -> str:
+    # Remove illegal characters: < > : " / \ | ? *
+    name = re.sub(r'[<>:"/\\|?*]', '', name).strip()
+    # If name is excessively long, trim it (e.g., to 50 characters)
+    if len(name) > 50:
+        name = name[:50].strip()
+    # If the resulting name is empty, return a default value.
+    return name or "unknown"
+
+
+def extract_category(text: str) -> str:
+    # Look for text='some_category' or text="some_category"
+    match = re.search(r"text=['\"]([^'\"]+)['\"]", text)
+    if match:
+        candidate = match.group(1).strip()
+        if candidate:
+            return candidate
+    # Fallback: if the output starts with "candidates=" or is excessively long, use "unknown"
+    if text.startswith("candidates=") or len(text) > 50:
+        return "unknown"
+    return text.strip()
 
 
 def zenodo_get(*args, **kwargs):
     global _last_zenodo_call, ZENODO_RATE_LIMIT
     max_retries = 5
-    response = None  # Ensure 'response' is defined
+    response = None
     for attempt in range(max_retries):
         now = time.time()
         wait = max(0.0, (1.0 / ZENODO_RATE_LIMIT) - (now - _last_zenodo_call))
@@ -38,7 +61,7 @@ def zenodo_get(*args, **kwargs):
             except ValueError:
                 wait_time = 60.0
             logger.warning(
-                f"Received 429 Too Many Requests. Retrying after {wait_time} seconds (attempt {attempt+1}/{max_retries})..."
+                f"Received 429 Too Many Requests. Retrying after {wait_time} seconds (attempt {attempt + 1}/{max_retries})..."
             )
             time.sleep(wait_time)
         else:
@@ -73,18 +96,20 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
                     f"Only respond with the category and no other words. "
                     f"Be precise and use your reasoning. "
                     f"Use the same category format. "
+                    f"If the predicted category is publication, try if other categories are more appropriate and use one of them instead. "
                     f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
                     f"Description: {description}"
                 )
             )
-            # Normalize the result to a string.
             if isinstance(result, dict):
                 output = result.get("text", "").strip() or result.get("response", "").strip()
             elif isinstance(result, str):
                 output = result.strip()
             else:
                 output = str(result).strip()
-            return output
+            predicted = extract_category(output)
+            logger.info(f"Predicted category (Gemini): {predicted}")
+            return predicted
         except Exception as e:
             logger.warning(
                 f"Gemini server overloaded (attempt {retries + 1}/{max_retries}). Retrying in {wait_time} seconds..."
@@ -101,19 +126,22 @@ def safe_generate_content_ollama(description):
         f"Only respond with the category and no other words. Do not add any other words for any reason. "
         f"Be precise and use your reasoning. "
         f"Use the same category format. "
+        f"If the predicted category is publication, try if other categories are more appropriate and use one of them instead. "
         f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
         f"Description: {description}"
     )
 
     try:
-        response = ollama.generate(model="gemma3:12b", prompt=prompt)
+        # Added a 2-minute (120 seconds) timeout parameter
+        response = ollama.generate(model="gemma3:12b", prompt=prompt, timeout=120)
         output = response['response'].strip()
-        logger.info(f'Categories: {output}')
+        logger.info(f"Raw output from Ollama: {output}")
+        predicted = extract_category(output)
+        logger.info(f"Predicted category (Ollama): {predicted}")
+        return predicted
     except Exception as e:
         logger.error("Error calling Ollama model: %s", e)
         return ""
-
-    return output
 
 
 def get_zenodo_records(g_client, use_ollama=False):
@@ -127,7 +155,6 @@ def get_zenodo_records(g_client, use_ollama=False):
         ("sort", "newest")
     ]
 
-    # Use zenodo_get instead of requests.get to enforce rate limiting.
     response = zenodo_get(url, params=params, timeout=600)
     response.raise_for_status()
     data = response.json()
@@ -153,7 +180,7 @@ def get_zenodo_records(g_client, use_ollama=False):
 
         if title in category_cache:
             category = category_cache[title]
-            logger.info(f"Using cached category for repository: {title}")
+            logger.info(f"Using cached category for repository: {title} - {category}")
         else:
             if use_ollama:
                 try:
@@ -163,7 +190,6 @@ def get_zenodo_records(g_client, use_ollama=False):
                     logger.error(f"Failed to generate content for record '{title}' using Ollama: {e}")
                     category = "unknown"
             else:
-                # Enforce rate limiting for Gemini: max 10 calls per minute
                 if calls_in_minute >= 10:
                     elapsed = time.time() - minute_start
                     if elapsed < 60:
@@ -199,7 +225,6 @@ def download_file_for_record(record_detail, download_folder):
     min_size = 10 * 1024  # 10 KB
     max_size = 3 * 1024 * 1024 * 1024  # 3 GB
 
-    # Gather all candidate files with allowed extensions and within size limits.
     candidate_files = []
     for file in files:
         file_name = file.get("key")
@@ -212,7 +237,6 @@ def download_file_for_record(record_detail, download_folder):
         logger.info("No qualifying file found for this record.")
         return None
 
-    # Prefer .nt files first, then .ttl
     candidate_file = None
     for file in candidate_files:
         if file.get("key").lower().endswith(".nt"):
@@ -221,7 +245,7 @@ def download_file_for_record(record_detail, download_folder):
     if candidate_file is None:
         candidate_file = candidate_files[0]
 
-    # If the selected candidate is named README, attempt to find an alternative.
+    # If the selected candidate is named README, try to find an alternative.
     base_name, ext = os.path.splitext(candidate_file.get("key"))
     if base_name.lower() == "readme":
         logger.info("Candidate file is README. Searching for an alternative file...")
@@ -249,7 +273,6 @@ def download_file_for_record(record_detail, download_folder):
     download_url = f"https://zenodo.org/record/{record_id}/files/{file_name}?download=1"
     logger.info(f"Downloading file {file_name} from {download_url}")
 
-    # Use zenodo_get to enforce rate limiting on the file download as well.
     response = zenodo_get(download_url, stream=True)
     response.raise_for_status()
 
@@ -269,33 +292,36 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
     file_indices = []
     current_index = 1000  # starting index
 
-
-    for index, row in df.iterrows():
+    for idx, row in df.iterrows():
         record_link = row["record_link"]
         try:
-            download_folder = f'{download_folder}/{df['category']}'
-            # Use zenodo_get for record detail API call.
+            # Extract and sanitize the category to use for the folder name.
+            category = sanitize_folder_name(str(row["category"]))
+            record_folder = os.path.join(download_folder, category)
+
+            # Retrieve record details.
             detail_response = zenodo_get(record_link, timeout=600)
             detail_response.raise_for_status()
             record_detail = detail_response.json()
-            downloaded_file_name = download_file_for_record(record_detail, download_folder)
+
+            downloaded_file_name = download_file_for_record(record_detail, record_folder)
             if downloaded_file_name:
-                # Get the file extension and create a new name based on the progressive index.
+                # Create a new file name based on the progressive index.
                 _, ext = os.path.splitext(downloaded_file_name)
-                new_file_name = f"{current_index}-{hashlib.sha256(record_detail.encode()).hexdigest()}{ext}"
-                original_path = os.path.join(download_folder, downloaded_file_name)
-                new_path = os.path.join(download_folder, new_file_name)
+                new_file_name = f"{current_index}-{hashlib.sha256(record_link.encode()).hexdigest()}.rdf"
+                original_path = os.path.join(record_folder, downloaded_file_name)
+                new_path = os.path.join(record_folder, new_file_name)
                 os.rename(original_path, new_path)
                 file_names.append(new_file_name)
                 file_indices.append(current_index)
                 current_index += 1
             else:
                 file_names.append("")
-                file_indices.append("")
+                file_indices.append(None)
         except Exception as e:
             logger.error(f"Failed to process record '{row['title']}': {e}")
             file_names.append("")
-            file_indices.append("")
+            file_indices.append(None)
 
     df["file_name"] = file_names
     df["file_index"] = file_indices
@@ -308,6 +334,6 @@ if __name__ == "__main__":
     download_folder = "../../data/raw/rdf_dump"
     output_csv_path = "../../data/raw/zenodo_with_files.csv"
     use_ollama = False
-    # Uncomment the next line to download files as well:
-    # df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
-    get_zenodo_records(client, use_ollama=use_ollama).to_csv(output_csv_path, index=False)
+    df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
+    # Alternatively:
+    # get_zenodo_records(client, use_ollama=use_ollama).to_csv(output_csv_path, index=False)

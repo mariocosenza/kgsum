@@ -4,16 +4,14 @@ import pandas as pd
 import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from multiprocessing import Pool
 from os import listdir
 from src.util import match_file_lod, CATEGORIES
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation")
 
-FORMATS = {
-    'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'
-}
+FORMATS = {'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'}
 
 # Precompile SPARQL queries
 Q_LOCAL_VOCABULARIES = prepareQuery("""
@@ -24,6 +22,7 @@ Q_LOCAL_VOCABULARIES = prepareQuery("""
         FILTER (!STRSTARTS(STR(STRBEFORE(STR(?predicate), "#")), "http://www.w3.org/"))
     } LIMIT 1000
 """)
+
 Q_LOCAL_CLASS = prepareQuery("""
     SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
     WHERE {
@@ -33,6 +32,7 @@ Q_LOCAL_CLASS = prepareQuery("""
     ORDER BY DESC(?instanceCount)
     LIMIT 1000
 """)
+
 Q_LOCAL_LABEL = prepareQuery("""
     SELECT DISTINCT ?type
     WHERE {
@@ -55,6 +55,7 @@ Q_LOCAL_TLD = prepareQuery("""
         FILTER(isIRI(?o))
     } LIMIT 1000
 """)
+
 Q_LOCAL_PROPERTY = prepareQuery("""
     SELECT ?property (COUNT(?s) AS ?usageCount)
     WHERE {{
@@ -66,6 +67,7 @@ Q_LOCAL_PROPERTY = prepareQuery("""
     ORDER BY DESC(?usageCount)
     LIMIT 1000
 """, initNs={"rdf": rdflib.RDF})
+
 Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
     SELECT ?property (COUNT(?s) AS ?usageCount)
     WHERE {{
@@ -77,6 +79,7 @@ Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
     ORDER BY DESC(?usageCount)
     LIMIT 1000
 """)
+
 Q_LOCAL_CLASS_NAME = prepareQuery("""
     SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
     WHERE {
@@ -129,7 +132,7 @@ Q_LOCAL_DCTERMS_LICENSE = prepareQuery(
     } LIMIT 1
 """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
-
+# Helper functions to run SPARQL queries on parsed RDF graphs
 def select_local_vocabularies(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
     vocabularies = set()
@@ -147,18 +150,15 @@ def select_local_vocabularies(parsed_graph):
                 vocabularies.add(vocabulary_uri)
     return vocabularies
 
-
 def select_local_class(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_CLASS)
     return [str(row.classUri) for row in qres]
-
 
 def select_local_label(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_LABEL_EN)
     if len(qres) < 2:
         qres = parsed_graph.query(Q_LOCAL_LABEL)
     return {str(row.type) for row in qres}
-
 
 def select_local_tld(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_TLD)
@@ -173,7 +173,6 @@ def select_local_tld(parsed_graph):
             except Exception as exc:
                 logger.warning(f'Unable to find tld {exc}')
     return tlds
-
 
 def select_local_property(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_PROPERTY)
@@ -190,7 +189,6 @@ def select_local_creator(parsed_graph):
 def select_local_license(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_LICENSE)
     return {str(row.license) for row in qres}
-
 
 def select_local_property_names(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_PROPERTY_NAMES, initNs={"rdf": rdflib.RDF})
@@ -211,7 +209,6 @@ def select_local_property_names(parsed_graph):
             processed_local_names.add(local_name)
     return local_property_names
 
-
 def select_local_class_name(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_CLASS_NAME)
     local_names = set()
@@ -228,31 +225,27 @@ def select_local_class_name(parsed_graph):
         local_names.add(local_name)
     return local_names
 
-
 def select_local_void_subject(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOID_DESCRIPTION)
     subject = set()
     for row in qres:
         result = parsed_graph.query(f"""
             SELECT ?classUri
-        WHERE {{
-        <{row.s}> dcterms:subject ?classUri .
-        }} LIMIT 100
+            WHERE {{
+                <{row.s}> dcterms:subject ?classUri .
+            }} LIMIT 100
         """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
         for res in result:
             subject.add(res.classUri)
     return {row for row in subject}
 
-
 def select_local_void_description(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
     return {row.desc for row in qres}
 
-
 def select_local_void_title(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
     return {row.desc for row in qres}
-
 
 def _guess_format_and_parse(path):
     g = Graph()
@@ -263,7 +256,7 @@ def _guess_format_and_parse(path):
             pass
     raise Exception('Format not supported')
 
-
+# Processing functions for individual files
 def process_local_dataset_file(category, file, lod_frame, offset, limit):
     path = f'../data/raw/rdf_dump/{category}/{file}'
     file_num = match_file_lod(file, limit, offset, lod_frame)
@@ -291,112 +284,11 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
 
-
-def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] | None:
-    if file_path is None:
-        return None
-    try:
-        logger.info(f"Processing graph id: {file_path}")
-        result = _guess_format_and_parse(file_path)
-
-        # Get all the values
-        title = select_local_void_title(result)
-        subject = select_local_void_subject(result)
-        description = select_local_void_description(result)
-        vocabulary = select_local_vocabularies(result)
-        class_val = select_local_class(result)
-        property_val = select_local_property(result)
-        cname = select_local_class_name(result)
-        pname = select_local_property_names(result)
-        label = select_local_label(result)
-        tld = select_local_tld(result)
-        sparql = select_local_endpoint(result)
-        creator = select_local_creator(result)
-        licenses = select_local_license(result)
-
-        if not title or title == '':
-            if sparql is not None:
-                title = sparql
-
-
-        return {
-            'id': [title],
-            'title': [title],
-            'sbj': [subject],
-            'dsc': [description],
-            'voc': [vocabulary],
-            'curi': [class_val],
-            'puri': [property_val],
-            'lcn': [cname],
-            'lpn': [pname],
-            'lab': [label],
-            'sparql': [sparql],
-            'tlds': [tld],
-            'creator': [creator],
-            'license': [licenses]
-        }
-
-    except Exception as e:
-        logger.warning(f"Error processing file {file_path}: {str(e)}")
-        return None
-
-
-def create_local_dataset(offset=0, limit=10000):
-    lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-    tasks = []
-    for category in CATEGORIES:
-        directory = f'../data/raw/rdf_dump/{category}'
-        for file in listdir(directory):
-            tasks.append((category, file))
-
-    total_tasks = len(tasks)
-    tasks_done = 0
-    results = []
-    n_workers = os.cpu_count()
-
-    with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        task_iter = iter(tasks)
-        future_to_task = {}
-        # Submit initial tasks up to the number of workers
-        for _ in range(n_workers):
-            try:
-                cat, file = next(task_iter)
-                future = executor.submit(process_local_dataset_file, cat, file, lod_frame, offset, limit)
-                future_to_task[future] = (cat, file)
-            except StopIteration:
-                break
-
-        # Process futures as they complete and schedule new tasks
-        while future_to_task:
-            done, _ = wait(future_to_task.keys(), return_when=FIRST_COMPLETED)
-            for future in done:
-                try:
-                    result = future.result()
-                except Exception as e:
-                    logger.warning(f"Task error: {e}")
-                    result = None
-                tasks_done += 1
-                logger.info(f"Progress: {tasks_done}/{total_tasks} tasks completed.")
-                if result is not None:
-                    results.append(result)
-                del future_to_task[future]
-                try:
-                    cat, file = next(task_iter)
-                    new_future = executor.submit(process_local_dataset_file, cat, file, lod_frame, offset, limit)
-                    future_to_task[new_future] = (cat, file)
-                except StopIteration:
-                    continue
-
-    df = pd.DataFrame(results, columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'category'])
-    df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
-
-
 def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
     path = f'../data/raw/rdf_dump/{category}/{file}'
     num = match_file_lod(file, limit, offset, lod_frame)
     if num is None:
         return None
-
     try:
         result = _guess_format_and_parse(path)
         logger.info(f"Processing graph with void id: {lod_frame['id'][num]}")
@@ -412,6 +304,36 @@ def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
 
+# Top-level helper functions for multiprocessing (must be pickleable)
+def process_task(args):
+    cat, file, lod_frame, offset, limit = args
+    return process_local_dataset_file(cat, file, lod_frame, offset, limit)
+
+def process_task_void(args):
+    cat, file, lod_frame, offset, limit = args
+    return process_local_void_dataset_file(cat, file, lod_frame, offset, limit)
+
+# Dataset creation functions using multiprocessing.Pool
+def create_local_dataset(offset=0, limit=10000):
+    lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+    tasks = []
+    for category in CATEGORIES:
+        directory = f'../data/raw/rdf_dump/{category}'
+        for file in listdir(directory):
+            tasks.append((category, file, lod_frame, offset, limit))
+    total_tasks = len(tasks)
+    results = []
+    # Limit the pool to 8 processes
+    with Pool(processes=8, maxtasksperchild=10) as pool:
+        for i, result in enumerate(pool.imap_unordered(process_task, tasks), 1):
+            if result is not None:
+                results.append(result)
+            logger.info(f"Progress: {i}/{total_tasks} tasks completed.")
+    df = pd.DataFrame(
+        results,
+        columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'category']
+    )
+    df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
 
 def create_local_void_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
@@ -419,50 +341,20 @@ def create_local_void_dataset(offset=0, limit=10000):
     for category in CATEGORIES:
         directory = f'../data/raw/rdf_dump/{category}'
         for file in listdir(directory):
-            tasks.append((category, file))
-
+            tasks.append((category, file, lod_frame, offset, limit))
     total_tasks = len(tasks)
-    tasks_done = 0
     results = []
-    n_workers = os.cpu_count()
-
-    with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        task_iter = iter(tasks)
-        future_to_task = {}
-        for _ in range(n_workers):
-            try:
-                cat, file = next(task_iter)
-                future = executor.submit(process_local_void_dataset_file, cat, file, lod_frame, offset, limit)
-                future_to_task[future] = (cat, file)
-            except StopIteration:
-                break
-
-        while future_to_task:
-            done, _ = wait(future_to_task.keys(), return_when=FIRST_COMPLETED)
-            for future in done:
-                try:
-                    result = future.result()
-                except Exception as e:
-                    logger.warning(f"(Void) Task error: {e}")
-                    result = None
-                tasks_done += 1
-                logger.info(f"(Void) Progress: {tasks_done}/{total_tasks} tasks completed.")
-                if result is not None:
-                    results.append(result)
-                del future_to_task[future]
-                try:
-                    cat, file = next(task_iter)
-                    new_future = executor.submit(process_local_void_dataset_file, cat, file, lod_frame, offset, limit)
-                    future_to_task[new_future] = (cat, file)
-                except StopIteration:
-                    continue
-
+    # Limit the pool to 8 processes here as well
+    with Pool(processes=8, maxtasksperchild=10) as pool:
+        for i, result in enumerate(pool.imap_unordered(process_task_void, tasks), 1):
+            if result is not None:
+                results.append(result)
+            logger.info(f"(Void) Progress: {i}/{total_tasks} tasks completed.")
     df = pd.DataFrame(results, columns=['id', 'title', 'sbj', 'dsc', 'category'])
     df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
 
 if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()
-    create_local_dataset(offset=0, limit=200)
-# To process the void dataset, call:
-# create_local_void_dataset(offset=0, limit=200)
+    create_local_dataset(offset=187, limit=2000)
+    create_local_void_dataset(offset=187, limit=2000)

@@ -101,11 +101,16 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
 def find_voc_local(data_frame: pd.DataFrame):
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
+    count = 0
     response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
     for index, row in data_frame.iterrows():
         all_tags = set()
         all_vocs = []
         for voc in set(row['voc']):
+            if count == 10000:
+                time.sleep(60)
+                count = 0
+            count += 1
             logger.info(f'Processing voc {voc}')
             if IS_URI.match(voc):
                 try:
@@ -192,8 +197,13 @@ def find_voc_local_combined(voc_list: list) -> list:
     sparql.setReturnFormat(JSON)
     all_tags = set()
     voc_list = set(voc_list)
+    count = 0
     for voc in voc_list:
         logger.info(f'Processing voc {voc}')
+        if count == 1000:
+            time.sleep(60)
+            count = 0
+        count += 1
         try:
             sparql.setQuery(f"""
             PREFIX dcat: <http://www.w3.org/ns/dcat#>
