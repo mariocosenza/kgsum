@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 from google import genai
 
-from util import LOD_CATEGORY_NO_USER_DOMAIN
+from src.util import LOD_CATEGORY_NO_USER_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -165,42 +165,58 @@ def save_to_csv(results, output_file="../../data/raw/github_unique_repos_with_tt
     logger.info(f"Saved {len(results)} unique repositories (sorted by title) to {output_file}")
     return df
 
-def download_and_predict(g_client, download_folder, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv", use_ollama=False):
+
+def download_and_predict(g_client, download_folder, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv",
+                         use_ollama=False):
     id_int = 2000
     token = os.environ.get("GITHUB_TOKEN")
     df = pd.read_csv("../../data/raw/github_unique_repos_with_ttl_nt.csv")
+
+    # Ensure the 'category' column exists
+    if 'category' not in df.columns:
+        df['category'] = ""
+
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {token}",
         "X-GitHub-Api-Version": "2022-11-28"
     }
     os.makedirs(download_folder, exist_ok=True)
+
     for index, row in df.iterrows():
         repo = row['repository']
         try:
             resp = get_with_rate_limit(f'https://raw.githubusercontent.com/{repo}/main/README.md', headers)
             if resp.status_code == 200:
                 if id_int == 3000 and not use_ollama:
-                    res = input('Change your IP to continue with free api or confirm current key (True to change IP):')
+                    res = input('Change your IP to continue with free API or confirm current key (True to change IP):')
                     if bool(res):
                         g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY_2"))
+
+                # Predict the category
                 if use_ollama:
-                    row['category'] = safe_generate_content_ollama(description=resp.text[:100000]).strip()
+                    predicted_category = safe_generate_content_ollama(description=resp.text[:100000]).strip()
                 else:
-                    row['category'] = safe_generate_content(g_client, description=resp.text[:100000]).strip()
-                logger.info(f'Category predicted for {repo}: {row['category']}')
+                    predicted_category = safe_generate_content(g_client, description=resp.text[:100000]).strip()
+
+                # Update the DataFrame with the new category value
+                df.loc[index, 'category'] = predicted_category
+                logger.info(f"Category predicted for {repo}: {predicted_category}")
                 id_int += 1
+
+                # Process file_url for downloading RDF dump
                 file_name = str(row['file_url'])
                 file_name = file_name.replace('https://github.com/', '').replace('/blob', '')
                 rdf_dump_resp = get_with_rate_limit(f'https://raw.githubusercontent.com/{file_name}', headers)
                 if rdf_dump_resp.status_code == 200:
-                    os.makedirs(download_folder + f'/{row['category']}', exist_ok=True)
-                    file_path = os.path.join(download_folder + f'/{row['category']}', f'{id_int}-{hashlib.sha256(repo.encode()).hexdigest()}.rdf')
+                    category_folder = os.path.join(download_folder, predicted_category)
+                    os.makedirs(category_folder, exist_ok=True)
+                    file_path = os.path.join(category_folder, f'{id_int}-{hashlib.sha256(repo.encode()).hexdigest()}.rdf')
                     with open(file_path, "wb") as f:
                         for chunk in rdf_dump_resp.iter_content(chunk_size=8192):
                             f.write(chunk)
         except Exception as e:
-            logger.error(f'An error occurred while processing repository {repo}. Check the final output! Error: {e}')
+            logger.error(f"An error occurred while processing repository {repo}. Check the final output! Error: {e}")
 
     df.sort_values("repository", inplace=True)
     df.to_csv(output_file, index=False)
@@ -222,6 +238,6 @@ def main():
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     download_folder = "../../data/raw/rdf_dump"
-    #main()
+   # main()
     download_and_predict(client, download_folder)
 

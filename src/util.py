@@ -127,9 +127,35 @@ def merge_zenodo_sparql(csv1_path='../data/raw/sparql_full_download.csv', csv2_p
 
     return merged_df
 
-def merge_github_sparql():
-    return
+
+def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
+                        csv2_path='../data/raw/github_unique_repos_with_ttl_nt.csv'):
+    # Read both CSV files
+    df1 = pd.read_csv(csv1_path, index_col=0)
+    df2 = pd.read_csv(csv2_path)
+
+    # Drop rows in df2 where 'category' is NaN
+    df2 = df2.dropna(subset=['category'])
+
+    # Transform df2 to match the format of df1
+    df2_transformed = pd.DataFrame({
+        'id': df2['repository'],
+        'category': df2['category'],
+        'download_url': df2['file_url'],
+        'sparql_url': ""  # leave sparql_url blank
+    })
+
+    # Concatenate the two DataFrames with a fresh index
+    merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
+
+
+    # Save the CSV with the index included (only one index column will be added)
+    merged_df.to_csv(csv1_path, index=True)
+
+    return merged_df
+
+
 
 
 if __name__ == '__main__':
-    merge_zenodo_sparql()
+    merge_github_sparql()

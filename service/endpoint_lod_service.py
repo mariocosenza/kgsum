@@ -36,3 +36,7 @@ def extract_sparql_or_full_download_list():
                 return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], None, frame[i]['sparql'][0]['access_url']]
 
     return_list.to_csv("../data/raw/sparql_full_download.csv", index=True)
+
+
+if __name__ == "__main__":
+    extract_sparql_or_full_download_list()
