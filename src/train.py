@@ -15,6 +15,7 @@ from generate_profile import generate_profile_from_store
 from pipeline_build import ClassifierType
 from predict_category import CategoryPredictor
 from service.endpoint_lod_service import extract_sparql_or_full_download_list, download_dataset
+from util import merge_github_sparql, merge_zenodo_sparql
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ def main():
             return
         else:
             return
+        merge_github_sparql()
     if not os.path.isfile(f'{base_folder}/data/raw/zenodo_with_files.csv'):
         download_folder = f"{base_folder}/data/raw/rdf_dump"
         output_csv_path = f"{base_folder}/data/raw/zenodo_with_files.csv"
@@ -58,6 +60,7 @@ def main():
             return
         else:
             return
+        merge_zenodo_sparql()
 
     user_in = input('Would you like to extract data from dump and sparql endpoint? S | N')
     if user_in.lower() == 's':
