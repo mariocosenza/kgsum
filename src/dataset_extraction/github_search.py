@@ -41,6 +41,7 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
             wait_time *= 2  # Exponential backoff
     raise Exception("Max retries exceeded for generate_content (Gemini)")
 
+
 def safe_generate_content_ollama(description):
     prompt = (
         f"Given the following description, find a category from this list. "
@@ -211,7 +212,8 @@ def download_and_predict(g_client, download_folder, output_file="../../data/raw/
                 if rdf_dump_resp.status_code == 200:
                     category_folder = os.path.join(download_folder, predicted_category)
                     os.makedirs(category_folder, exist_ok=True)
-                    file_path = os.path.join(category_folder, f'{id_int}-{hashlib.sha256(repo.encode()).hexdigest()}.rdf')
+                    file_path = os.path.join(category_folder,
+                                             f'{id_int}-{hashlib.sha256(repo.encode()).hexdigest()}.rdf')
                     with open(file_path, "wb") as f:
                         for chunk in rdf_dump_resp.iter_content(chunk_size=8192):
                             f.write(chunk)
@@ -238,6 +240,5 @@ def main():
 if __name__ == "__main__":
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     download_folder = "../../data/raw/rdf_dump"
-   # main()
+    # main()
     download_and_predict(client, download_folder)
-

@@ -7,7 +7,7 @@ import ollama
 import pandas as pd
 from google import genai
 
-from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN, LOD_CATEGORY_NO_USER_DOMAIN
+from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -85,13 +85,13 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                            f"Given the following description and keywords, find a category given this data. "
-                            f"Only respond with the category and no other words. "
-                            f"Be precise and use your reasoning. "
-                            f"Use the same category format. "
-                            f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-                            f"Description: {df[col]['description']}"
-                            f"Keywords: {df[col]['keywords']}. "
+                                f"Given the following description and keywords, find a category given this data. "
+                                f"Only respond with the category and no other words. "
+                                f"Be precise and use your reasoning. "
+                                f"Use the same category format. "
+                                f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
+                                f"Description: {df[col]['description']}"
+                                f"Keywords: {df[col]['keywords']}. "
                             )
                         )
                         break
@@ -121,7 +121,8 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                     else:
                         result = result.text.strip()
             else:
-                result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords']).strip()
+                result = safe_generate_content_ollama(description=df[col]['description'],
+                                                      keywords=df[col]['keywords']).strip()
 
             result_dict = {
                 'lod_category': df[col]['domain'],
@@ -134,13 +135,13 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
             records.append(result_dict)
 
             if result in df[col]['domain']:
-                 hit += 1
+                hit += 1
             elif df[col]['domain'] not in '':
                 miss += 1
 
             if miss >= 1:
                 logger.info(
-                    f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')  # Fixed percentage calculation
+                    f'Hit: {hit}, Miss: {miss}, Rate: {hit * 100 / (hit + miss)}%')
 
             calls_in_minute += 1
 
@@ -185,7 +186,6 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
 
         logger.info(f'Processing id: {col}')
 
-
         if df[col]['domain'] not in 'cross_domain' and df[col]['domain'] not in 'user_generated':
             if not use_ollama:
                 # Enforce rate limiting: max 10 calls per minute
@@ -195,7 +195,6 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                         time.sleep(60 - elapsed)
                     minute_start = time.time()
                     calls_in_minute = 0
-
 
                 max_retries = 3
                 retry_count = 0
@@ -241,9 +240,10 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                         logger.warning(f"Skipping item {col} due to API errors")
                         continue
                     else:
-                        result =  result.text.strip()
+                        result = result.text.strip()
             else:
-                result = safe_generate_content_ollama(description=df[col]['description'], keywords=df[col]['keywords']).strip()
+                result = safe_generate_content_ollama(description=df[col]['description'],
+                                                      keywords=df[col]['keywords']).strip()
 
             lod_category = CATEGORIES_COLOR.get(first_circle.getAttribute('fill').lower())
 
@@ -252,7 +252,6 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                 'predicted_category': result,
                 'id': col
             }
-
 
             logger.info(f'Processed: {result_dict}')
 
@@ -274,5 +273,5 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
 
 
 if __name__ == '__main__':
-    #predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
+    # predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
     predict_category_from_lod_description(use_ollama=True).to_csv('../../data/raw/lod-gemini.csv')

@@ -23,36 +23,36 @@ async def async_select_remote_vocabularies(endpoint, timeout=300):
     vocabularies = set()
     offset = 0
     async with aiohttp.ClientSession() as session:
-            query = """
+        query = """
             SELECT DISTINCT ?predicate
             WHERE {
                 ?subject ?predicate ?object .
             }
             LIMIT 1000
             """
-            try:
-                result_text = await _fetch_query(session, endpoint, query, timeout)
-                root = eT.fromstring(result_text)
-                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-                bindings = root.findall('.//sparql:binding[@name="predicate"]/sparql:uri', ns)
-                if not bindings:
-                    logger.debug(f"[VOC] No predicate bindings found at offset {offset}.")
-                for binding in bindings:
-                    predicate_uri = binding.text
-                    if predicate_uri:
-                        if "#" in predicate_uri:
-                            vocabulary_uri = predicate_uri.split("#")[0]
-                        elif "/" in predicate_uri:
-                            parts = predicate_uri.split("/")
-                            vocabulary_uri = "/".join(parts[:-1]) if len(parts) > 1 else predicate_uri
-                        else:
-                            vocabulary_uri = predicate_uri
-                        if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
-                            vocabularies.add(vocabulary_uri)
-                offset += 100
-            except Exception as e:
-                logger.warning(f"[VOC] Query execution error: {e}. Endpoint: {endpoint}")
-                return ''
+        try:
+            result_text = await _fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            bindings = root.findall('.//sparql:binding[@name="predicate"]/sparql:uri', ns)
+            if not bindings:
+                logger.debug(f"[VOC] No predicate bindings found at offset {offset}.")
+            for binding in bindings:
+                predicate_uri = binding.text
+                if predicate_uri:
+                    if "#" in predicate_uri:
+                        vocabulary_uri = predicate_uri.split("#")[0]
+                    elif "/" in predicate_uri:
+                        parts = predicate_uri.split("/")
+                        vocabulary_uri = "/".join(parts[:-1]) if len(parts) > 1 else predicate_uri
+                    else:
+                        vocabulary_uri = predicate_uri
+                    if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
+                        vocabularies.add(vocabulary_uri)
+            offset += 100
+        except Exception as e:
+            logger.warning(f"[VOC] Query execution error: {e}. Endpoint: {endpoint}")
+            return ''
     logger.info(f"[VOC] Finished vocabulary query for endpoint: {endpoint} (found {len(vocabularies)} vocabularies)")
     return vocabularies
 
@@ -92,7 +92,7 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300):
     labels = []
     offset = 0
     async with aiohttp.ClientSession() as session:
-            query = f"""
+        query = f"""
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             SELECT ?label
             WHERE {{
@@ -101,19 +101,19 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300):
             }}
             LIMIT {limit} 
             """
-            bindings = []
-            try:
-                result_text = await _fetch_query(session, endpoint, query, timeout)
-                root = eT.fromstring(result_text)
-                ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-                bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
-            except Exception as e:
-                logger.debug(f"[LAB] No label bindings found at offset {offset}. Exception: {e}")
+        bindings = []
+        try:
+            result_text = await _fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
+        except Exception as e:
+            logger.debug(f"[LAB] No label bindings found at offset {offset}. Exception: {e}")
 
-            try:
-                if not bindings:
-                    logger.debug(f"[LAB] No label bindings found at offset {offset} with filter; trying fallback.")
-                    query = f"""
+        try:
+            if not bindings:
+                logger.debug(f"[LAB] No label bindings found at offset {offset} with filter; trying fallback.")
+                query = f"""
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                     SELECT ?label
                     WHERE {{
@@ -121,16 +121,16 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300):
                     }}
                     LIMIT {limit} 
                     """
-                    result_text = await _fetch_query(session, endpoint, query, timeout)
-                    root = eT.fromstring(result_text)
-                    bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
-                if not bindings:
-                    logger.debug(f"[LAB] No label bindings found at offset {offset}.")
-                for binding in bindings:
-                    labels.append(binding.text)
-            except Exception as e:
-                logger.warning(f"[LAB] Query execution error: {e}. Endpoint: {endpoint}")
-                return ''
+                result_text = await _fetch_query(session, endpoint, query, timeout)
+                root = eT.fromstring(result_text)
+                bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
+            if not bindings:
+                logger.debug(f"[LAB] No label bindings found at offset {offset}.")
+            for binding in bindings:
+                labels.append(binding.text)
+        except Exception as e:
+            logger.warning(f"[LAB] Query execution error: {e}. Endpoint: {endpoint}")
+            return ''
     logger.info(f"[LAB] Finished label query for endpoint: {endpoint} (found {len(labels)} labels)")
     return labels
 
@@ -241,7 +241,7 @@ async def async_select_remote_property_names(endpoint, timeout=300):
     processed = set()
     offset = 0
     async with aiohttp.ClientSession() as session:
-        query =  """
+        query = """
         SELECT ?property (COUNT(?s) AS ?usageCount)
         WHERE {{
             ?s ?property ?o .
@@ -535,7 +535,8 @@ async def main_normal():
         logger.info(f"[MAIN] Processed {processed}/{total} endpoints")
     df = pd.DataFrame(
         results,
-        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'category']
+        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license',
+                 'category']
     )
     df.to_json('../data/raw/remote/remote_feature_set_sparqlwrapper.json', orient='records')
     logger.info("[MAIN] Finished asynchronous remote dataset processing (normal mode).")

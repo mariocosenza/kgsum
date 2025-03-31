@@ -83,7 +83,6 @@ def rename_new_file(offset):
 
 
 def merge_csv_files(csv1_path, csv2_path, output_csv_path):
-
     df1 = pd.read_csv(csv1_path)
     df2 = pd.read_csv(csv2_path)
 
@@ -104,7 +103,9 @@ def merge_csv_files(csv1_path, csv2_path, output_csv_path):
 
     return merged_df
 
-def merge_zenodo_sparql(csv1_path='../data/raw/sparql_full_download.csv', csv2_path='../data/raw/zenodo.csv')-> pd.DataFrame:
+
+def merge_zenodo_sparql(csv1_path='../data/raw/sparql_full_download.csv',
+                        csv2_path='../data/raw/zenodo.csv') -> pd.DataFrame:
     df1 = pd.read_csv(csv1_path, index_col=0)
 
     # Read CSV2 normally
@@ -148,13 +149,10 @@ def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
     # Concatenate the two DataFrames with a fresh index
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
-
     # Save the CSV with the index included (only one index column will be added)
     merged_df.to_csv(csv1_path, index=True)
 
     return merged_df.drop_duplicates(subset=['id'])
-
-
 
 
 if __name__ == '__main__':

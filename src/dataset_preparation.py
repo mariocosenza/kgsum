@@ -1,11 +1,12 @@
 import logging
-import os
+from multiprocessing import Pool
+from os import listdir
+
 import pandas as pd
 import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
-from multiprocessing import Pool
-from os import listdir
+
 from src.util import match_file_lod, CATEGORIES
 
 logging.basicConfig(level=logging.INFO)
@@ -132,6 +133,7 @@ Q_LOCAL_DCTERMS_LICENSE = prepareQuery(
     } LIMIT 1
 """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
+
 # Helper functions to run SPARQL queries on parsed RDF graphs
 def select_local_vocabularies(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
@@ -150,15 +152,18 @@ def select_local_vocabularies(parsed_graph):
                 vocabularies.add(vocabulary_uri)
     return vocabularies
 
+
 def select_local_class(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_CLASS)
     return [str(row.classUri) for row in qres]
+
 
 def select_local_label(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_LABEL_EN)
     if len(qres) < 2:
         qres = parsed_graph.query(Q_LOCAL_LABEL)
     return {str(row.type) for row in qres}
+
 
 def select_local_tld(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_TLD)
@@ -174,21 +179,26 @@ def select_local_tld(parsed_graph):
                 logger.warning(f'Unable to find tld {exc}')
     return tlds
 
+
 def select_local_property(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_PROPERTY)
     return {str(row.property) for row in qres}
+
 
 def select_local_endpoint(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOID_SPARQL)
     return {str(row.sparql) for row in qres}
 
+
 def select_local_creator(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_CREATOR)
     return {str(row.creator) for row in qres}
 
+
 def select_local_license(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_LICENSE)
     return {str(row.license) for row in qres}
+
 
 def select_local_property_names(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_PROPERTY_NAMES, initNs={"rdf": rdflib.RDF})
@@ -209,6 +219,7 @@ def select_local_property_names(parsed_graph):
             processed_local_names.add(local_name)
     return local_property_names
 
+
 def select_local_class_name(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_CLASS_NAME)
     local_names = set()
@@ -225,6 +236,7 @@ def select_local_class_name(parsed_graph):
         local_names.add(local_name)
     return local_names
 
+
 def select_local_void_subject(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOID_DESCRIPTION)
     subject = set()
@@ -239,13 +251,16 @@ def select_local_void_subject(parsed_graph):
             subject.add(res.classUri)
     return {row for row in subject}
 
+
 def select_local_void_description(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
     return {row.desc for row in qres}
 
+
 def select_local_void_title(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
     return {row.desc for row in qres}
+
 
 def _guess_format_and_parse(path):
     g = Graph()
@@ -255,6 +270,7 @@ def _guess_format_and_parse(path):
         except Exception as _:
             pass
     raise Exception('Format not supported')
+
 
 # Processing functions for individual files
 def process_local_dataset_file(category, file, lod_frame, offset, limit):
@@ -284,6 +300,7 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
 
+
 def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
     path = f'../data/raw/rdf_dump/{category}/{file}'
     num = match_file_lod(file, limit, offset, lod_frame)
@@ -304,14 +321,17 @@ def process_local_void_dataset_file(category, file, lod_frame, offset, limit):
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
 
+
 # Top-level helper functions for multiprocessing (must be pickleable)
 def process_task(args):
     cat, file, lod_frame, offset, limit = args
     return process_local_dataset_file(cat, file, lod_frame, offset, limit)
 
+
 def process_task_void(args):
     cat, file, lod_frame, offset, limit = args
     return process_local_void_dataset_file(cat, file, lod_frame, offset, limit)
+
 
 # Dataset creation functions using multiprocessing.Pool
 def create_local_dataset(offset=0, limit=10000):
@@ -335,6 +355,7 @@ def create_local_dataset(offset=0, limit=10000):
     )
     df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
 
+
 def create_local_void_dataset(offset=0, limit=10000):
     lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
     tasks = []
@@ -353,8 +374,10 @@ def create_local_void_dataset(offset=0, limit=10000):
     df = pd.DataFrame(results, columns=['id', 'title', 'sbj', 'dsc', 'category'])
     df.to_json(f'../data/raw/local/local_void_feature_set{offset}-{limit}.json', index=False)
 
+
 if __name__ == '__main__':
     import multiprocessing
+
     multiprocessing.freeze_support()
     create_local_dataset(offset=187, limit=2000)
     create_local_void_dataset(offset=187, limit=2000)

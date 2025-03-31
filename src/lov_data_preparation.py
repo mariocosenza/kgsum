@@ -81,7 +81,7 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
             return ''
         if response_lov.status_code == 200:
             try:
-                buckets = json.loads(response_lov.text).get('aggregations', {})\
+                buckets = json.loads(response_lov.text).get('aggregations', {}) \
                     .get('tags', {}).get('buckets', [])
                 key_set = {(item['key'], item['doc_count']) for item in buckets}
                 if key_set:

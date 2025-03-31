@@ -20,8 +20,10 @@ from util import merge_github_sparql, merge_zenodo_sparql
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def main():
-    logger.info('If you like to use Gemini make sure to set the API KEY as env variables GEMINI_API_KEY and GEMINI_API_KEY_2')
+    logger.info(
+        'If you like to use Gemini make sure to set the API KEY as env variables GEMINI_API_KEY and GEMINI_API_KEY_2')
 
     base_folder = '..'
     use_ollama = input('Write S to use OLLAMA')
@@ -87,6 +89,7 @@ def main():
         asyncio.run(generate_profile_from_store())
 
     return
+
 
 if __name__ == '__main__':
     main()

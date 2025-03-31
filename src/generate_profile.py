@@ -1,7 +1,8 @@
 import asyncio
 import os
-import aiohttp
 import urllib.parse
+
+import aiohttp
 import pandas as pd
 
 from app import PREDICTOR
@@ -13,11 +14,11 @@ from src.preprocessing import process_all_from_input
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
 
 
-
 async def _update_query(query, timeout=300):
     async with aiohttp.ClientSession() as session:
         async with session.post(LOCAL_ENDPOINT + '/statements', data={'update': query}, timeout=timeout) as response:
             return await response.text()
+
 
 async def generate_profile(endpoint: None | str = None, file: None | str = None) -> dict:
     if file is not None:
@@ -30,14 +31,16 @@ async def generate_profile(endpoint: None | str = None, file: None | str = None)
         }
 
     return {
-            'profile': create_profile(processed_data),
-            'category': PREDICTOR.predict_category(processed_data)
+        'profile': create_profile(processed_data),
+        'category': PREDICTOR.predict_category(processed_data)
     }
+
 
 async def generate_and_store_profile(endpoint=None, file=None):
     row = await generate_profile(endpoint=endpoint, file=file)
     await store_profile(profile=row['profile'], category=row['category'])
     return row
+
 
 async def generate_profile_from_store():
     dataset = pd.read_json('../data/processed/combined.json')
@@ -45,16 +48,19 @@ async def generate_profile_from_store():
         print(col['id'])
         await store_profile(profile=create_profile(data=col), category=str(col['category']))
 
+
 def create_profile(data: dict | pd.DataFrame | pd.Series) -> dict:
     if isinstance(data, pd.DataFrame):
         data = data.to_dict('records')
     return data
+
 
 def _to_list(val):
     """Ensure property value is returned as a list."""
     if val is None:
         return []
     return val if isinstance(val, list) else [val]
+
 
 async def store_profile(profile: dict, category: str):
     raw_id = profile.get('id')
@@ -73,8 +79,6 @@ async def store_profile(profile: dict, category: str):
 
     # Wrap the final IRI in angle brackets for SPARQL syntax.
     iri_formatted = f"<{iri}>"
-
-
 
     # Build main triples with proper literal quoting.
     triples = [f"{iri_formatted} rdf:type dcat:dataset"]

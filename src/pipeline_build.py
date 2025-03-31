@@ -1,20 +1,15 @@
 from __future__ import annotations
+
+import logging
 import os
 import pickle
-import logging
-import numpy as np
-import pandas as pd
-import tensorflow as tf
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, Dense
-from tensorflow.keras.utils import to_categorical
 from collections import Counter
 from enum import Enum, auto
 from typing import Any, Tuple
+
+import numpy as np
+import pandas as pd
 from sklearn import svm
-from sklearn.naive_bayes import MultinomialNB
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import (
     GridSearchCV,
@@ -22,7 +17,12 @@ from sklearn.model_selection import (
     cross_val_score,
     LeaveOneOut,
 )
-
+from sklearn.naive_bayes import MultinomialNB
+from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, Dense
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.utils import to_categorical
 
 # Suppress invalid cast warnings (if benign)
 np.seterr(invalid='ignore')
@@ -36,12 +36,14 @@ class ClassifierType(Enum):
     NAIVE_BAYES = auto()
     CNN = auto()  # Added CNN option
 
+
 def majority_vote(predictions: list[Any]) -> Any | None:
     return None if not predictions else Counter(predictions).most_common(1)[0][0]
 
+
 def _predict_category_for_instance(
-    models: dict[str, KnowledgeGraphClassifier],
-    instance: dict[str, Any]
+        models: dict[str, KnowledgeGraphClassifier],
+        instance: dict[str, Any]
 ) -> Any | None:
     votes = []
     for feature, model in models.items():
@@ -61,13 +63,15 @@ def _predict_category_for_instance(
             logger.error(f"Prediction error for '{feature}': {err}")
     return majority_vote(votes)
 
+
 def predict_category_multi(
-    models: dict[str, KnowledgeGraphClassifier],
-    instance: dict[str, Any] | pd.DataFrame
+        models: dict[str, KnowledgeGraphClassifier],
+        instance: dict[str, Any] | pd.DataFrame
 ) -> Any | list[Any | None]:
     if isinstance(instance, pd.DataFrame):
         return instance.apply(lambda row: _predict_category_for_instance(models, row.to_dict()), axis=1).tolist()
     return _predict_category_for_instance(models, instance)
+
 
 def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFrame:
     if isinstance(labels, str):
@@ -78,14 +82,15 @@ def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFr
         result = result[result[label] != '']
     return result
 
+
 # -------------------------------
 # Train Multiple Models
 # -------------------------------
 def train_multiple_models(
-    training_data: pd.DataFrame,
-    feature_columns: list[str],
-    target_label: str = 'category',
-    classifier_type: ClassifierType = ClassifierType.SVM
+        training_data: pd.DataFrame,
+        feature_columns: list[str],
+        target_label: str = 'category',
+        classifier_type: ClassifierType = ClassifierType.SVM
 ) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     models: dict[str, KnowledgeGraphClassifier] = {}
     training_results: dict[str, Any] = {}
@@ -95,7 +100,8 @@ def train_multiple_models(
             logger.info(f"Skipping '{feature}': no data available.")
             continue
         if df_feature[target_label].nunique() < 2:
-            logger.info(f"Skipping '{feature}': target label has only one unique class: {df_feature[target_label].unique()}")
+            logger.info(
+                f"Skipping '{feature}': target label has only one unique class: {df_feature[target_label].unique()}")
             continue
         logger.info(f"Training model for '{feature}' with {len(df_feature)} examples.")
         model = KnowledgeGraphClassifier(classifier_type=classifier_type)
@@ -107,6 +113,7 @@ def train_multiple_models(
         models[feature] = model
         training_results[feature] = result
     return models, training_results
+
 
 # -------------------------------
 # KnowledgeGraphClassifier Class
@@ -192,11 +199,11 @@ class KnowledgeGraphClassifier:
             return self.vectorizer.transform(processed)
 
     def train(
-        self,
-        frame: pd.DataFrame,
-        feature_labels: str | list[str],
-        target_label: str = 'category',
-        cv_folds: int = 2,
+            self,
+            frame: pd.DataFrame,
+            feature_labels: str | list[str],
+            target_label: str = 'category',
+            cv_folds: int = 2,
     ) -> dict[str, Any]:
         frame = frame.reset_index(drop=True)
         frame = frame.dropna(subset=[target_label])
@@ -263,7 +270,8 @@ class KnowledgeGraphClassifier:
             x_vectorized = self.vectorizer.fit_transform(data_x)
             grid.fit(x_vectorized, data_y)
             self.model = grid
-            cv_scores = cross_val_score(grid.best_estimator_, x_vectorized, data_y, cv=cv_strategy, scoring='f1_weighted')
+            cv_scores = cross_val_score(grid.best_estimator_, x_vectorized, data_y, cv=cv_strategy,
+                                        scoring='f1_weighted')
             mean_f1 = np.mean(cv_scores)
             logger.info(f"Training completed. Mean CV F1 Score: {mean_f1:.4f}")
             return {
@@ -277,9 +285,9 @@ class KnowledgeGraphClassifier:
             }
 
     def predict(
-        self,
-        data: str | list[str] | pd.Series | pd.DataFrame,
-        feature_labels: str | list[str] | None = None,
+            self,
+            data: str | list[str] | pd.Series | pd.DataFrame,
+            feature_labels: str | list[str] | None = None,
     ) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
@@ -294,9 +302,9 @@ class KnowledgeGraphClassifier:
             return self.model.predict(x_vectorized)
 
     def predict_proba(
-        self,
-        data: str | list[str] | pd.Series | pd.DataFrame,
-        feature_labels: str | list[str] | None = None,
+            self,
+            data: str | list[str] | pd.Series | pd.DataFrame,
+            feature_labels: str | list[str] | None = None,
     ) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
@@ -331,10 +339,11 @@ class KnowledgeGraphClassifier:
         instance.vectorizer = data['vectorizer']
         return instance
 
+
 def save_multiple_models(
-    models: dict[str, KnowledgeGraphClassifier],
-    training_results: dict[str, Any],
-    filepath: str | None = None
+        models: dict[str, KnowledgeGraphClassifier],
+        training_results: dict[str, Any],
+        filepath: str | None = None
 ) -> None:
     if filepath is None:
         os.makedirs('../data/trained', exist_ok=True)
@@ -342,6 +351,7 @@ def save_multiple_models(
     with open(filepath, 'wb') as f:
         pickle.dump({'models': models, 'training_results': training_results}, f)
     logger.info(f"Multiple models saved to {filepath}")
+
 
 def load_multiple_models(filepath: str | None = None) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     if filepath is None:

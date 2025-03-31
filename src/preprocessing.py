@@ -11,10 +11,12 @@ from spacy_langdetect import LanguageDetector
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # Create a spaCy language detector factory
 @Language.factory("language_detector")
 def get_lang_detector(nlp, name):
     return LanguageDetector()
+
 
 # Load the main spaCy pipeline (for language detection)
 nlp = spacy.load("en_core_web_sm")
@@ -98,6 +100,7 @@ def process_text(text: str) -> str:
         logger.error(f"Error processing text: {exc}")
         return text
 
+
 def find_language(text: str) -> str:
     try:
         doc = nlp(text)
@@ -113,6 +116,7 @@ def normalize_text_list(text_list) -> str:
     if isinstance(text_list, str):
         return text_list
     return " ".join(str(word) for word in text_list if word is not None)
+
 
 def process_normalize_text(text_list: list[str]) -> list[str]:
     return [process_text(str(word)) for word in text_list if word is not None]
@@ -244,7 +248,9 @@ def combine_with_void(combined_df: pd.DataFrame, void_df: pd.DataFrame) -> pd.Da
     logger.info("Final combined processing complete.")
     return merged_final
 
-def combine_with_void_and_lov_data(combined_df: pd.DataFrame, void_df: pd.DataFrame, lov_df: pd.DataFrame) -> pd.DataFrame:
+
+def combine_with_void_and_lov_data(combined_df: pd.DataFrame, void_df: pd.DataFrame,
+                                   lov_df: pd.DataFrame) -> pd.DataFrame:
     return combine_with_void(combine_with_void(combined_df, void_df), lov_df)
 
 
@@ -272,14 +278,16 @@ def process_all_from_input(input_data: Union[pd.DataFrame, Dict[str, Any]]) -> D
     logger.info("Full processing completed")
     return merged_df.to_dict(orient='list')
 
+
 def process_lov_data_row(row, index: int, total: int) -> dict:
     logger.info("Processing lov row %d/%d started.", index, total)
     tags = row.get("tags", [])
     comments = row.get("comments", None)
     if comments:
-        comments  = process_normalize_text(row["comments"])
+        comments = process_normalize_text(row["comments"])
     logger.info("Processing lov row %d/%d completed.", index, total)
     return {"tags": tags, "comments": comments}
+
 
 def preprocess_lov_data(input_frame: pd.DataFrame) -> pd.DataFrame:
     total_rows = len(input_frame)
