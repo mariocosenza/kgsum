@@ -21,7 +21,7 @@ class CategoryPredictor:
     @staticmethod
     def get_predictor(classifier=ClassifierType.CNN):
         combined_df = pd.read_json('../data/processed/combined.json')
-        feature_columns = ["lab", "lcn", "lpn", "sbj", "dsc"]
+        feature_columns = ["lab", 'lpn', 'sbj', 'dsc', 'curi', 'puri', 'comments']
         try:
             models, training_results = load_multiple_models('../data/trained/multiple_models.pkl')
         except Exception as _:
@@ -38,5 +38,7 @@ class CategoryPredictor:
             if classifier != ClassifierType.CNN:
                 logger.info(
                     f"Feature: {feature} CV Mean: {metrics['cv_mean']:.3f}, Best Params: {metrics['best_params']}")
+            else:
+                logger.info(f'Feature: {feature}, Best Params:: {metrics}')
 
         return CategoryPredictor(models, training_results)
