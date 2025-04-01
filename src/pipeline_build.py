@@ -127,6 +127,8 @@ class KnowledgeGraphClassifier:
         # Attributes used for the CNN branch
         self.tokenizer: Tokenizer | None = None
         self.max_length: int | None = None
+        # Store vocabulary size for CNN
+        self.vocab_size: int | None = None
 
     @staticmethod
     def _prepare_features(frame: pd.DataFrame, feature_labels: str | list[str]) -> pd.Series:
@@ -167,17 +169,17 @@ class KnowledgeGraphClassifier:
             return None
 
     @staticmethod
-    def _get_cv_strategy(self, data_y: pd.Series, cv_folds: int) -> object:
+    def _get_cv_strategy(data_y: pd.Series, cv_folds: int) -> object:
         min_count = data_y.value_counts().min()
         if min_count < cv_folds:
             if min_count > 1:
                 cv_folds = min_count
                 logger.info(f"Adjusted cv_folds to {cv_folds} due to small class sizes.")
-                return StratifiedKFold(n_splits=cv_folds, random_state=1, shuffle=True)
+                return StratifiedKFold(n_splits=cv_folds, random_state=42, shuffle=True)
             else:
                 logger.info("Using LeaveOneOut due to a class with a single sample.")
                 return LeaveOneOut()
-        return StratifiedKFold(n_splits=cv_folds, random_state=1, shuffle=True)
+        return StratifiedKFold(n_splits=cv_folds, random_state=42, shuffle=True)
 
     def _process_input(self, data: Any, feature_labels: str | list[str] | None) -> Any:
         if feature_labels is not None:
@@ -203,7 +205,7 @@ class KnowledgeGraphClassifier:
             frame: pd.DataFrame,
             feature_labels: str | list[str],
             target_label: str = 'category',
-            cv_folds: int = 2,
+            cv_folds: int = 5,
     ) -> dict[str, Any]:
         frame = frame.reset_index(drop=True)
         frame = frame.dropna(subset=[target_label])
@@ -214,11 +216,16 @@ class KnowledgeGraphClassifier:
             raise ValueError(f"Only one unique class: {data_y.unique()}")
 
         if self.classifier_type == ClassifierType.CNN:
-            self.tokenizer = Tokenizer(num_words=100000)
+            # Initialize tokenizer without limiting num_words to ensure all tokens are captured
+            self.tokenizer = Tokenizer()
             self.tokenizer.fit_on_texts(data_x)
             sequences = self.tokenizer.texts_to_sequences(data_x)
             self.max_length = max(len(seq) for seq in sequences)
             x_data = pad_sequences(sequences, maxlen=self.max_length)
+
+            # Calculate vocabulary size with a buffer margin
+            self.vocab_size = len(self.tokenizer.word_index) + 1  # +1 for the padding token (0)
+            logger.info(f"Vocabulary size: {self.vocab_size}")
 
             num_classes = data_y.nunique()
             if num_classes > 2:
@@ -230,7 +237,8 @@ class KnowledgeGraphClassifier:
                 y_data = data_y.map(mapping).values
 
             model = Sequential()
-            model.add(Embedding(input_dim=10000, output_dim=128))
+            # Use the calculated vocab_size instead of fixed 10000
+            model.add(Embedding(input_dim=self.vocab_size, output_dim=128))
             model.add(Conv1D(filters=64, kernel_size=5, activation='relu'))
             model.add(GlobalMaxPooling1D())
             model.add(Dense(64, activation='relu'))
@@ -241,14 +249,15 @@ class KnowledgeGraphClassifier:
                 model.add(Dense(1, activation='sigmoid'))
                 loss = 'binary_crossentropy'
             model.compile(loss=loss, optimizer='adam', metrics=['accuracy'])
-            history = model.fit(x_data, y_data, epochs=5, batch_size=32, verbose=1)
+            history = model.fit(x_data, y_data, epochs=10, batch_size=32, verbose=1)
             self.model = model
             logger.info("CNN training completed.")
             return {
                 'history': history.history,
-                'epochs': 5,
+                'epochs': 10,
                 'num_classes': num_classes,
                 'max_length': self.max_length,
+                'vocab_size': self.vocab_size,
             }
         else:
             param_grid = self._get_param_grid()
@@ -325,6 +334,9 @@ class KnowledgeGraphClassifier:
                 'model': self.model,
                 'vectorizer': self.vectorizer,
                 'classifier_type': self.classifier_type,
+                'tokenizer': self.tokenizer,
+                'max_length': self.max_length,
+                'vocab_size': self.vocab_size,
             }, f)
 
     @classmethod
@@ -337,6 +349,13 @@ class KnowledgeGraphClassifier:
         instance = cls(classifier_type=data['classifier_type'])
         instance.model = data['model']
         instance.vectorizer = data['vectorizer']
+        # Load CNN-specific attributes if available
+        if 'tokenizer' in data:
+            instance.tokenizer = data['tokenizer']
+        if 'max_length' in data:
+            instance.max_length = data['max_length']
+        if 'vocab_size' in data:
+            instance.vocab_size = data['vocab_size']
         return instance
 
 
