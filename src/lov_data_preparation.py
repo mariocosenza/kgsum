@@ -18,6 +18,9 @@ IS_URI = re.compile(
     r"^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)$")
 LOCAL_ENDPOINT_LOV = os.environ['LOCAL_ENDPOINT_LOV']
 
+# Create a global persistent session to reuse connections
+session = requests.Session()
+
 
 def find_tags_from_json(data_frame: pd.DataFrame):
     response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
@@ -30,7 +33,7 @@ def find_tags_from_json(data_frame: pd.DataFrame):
             logger.info(f'Vocabulary: {voc}')
             try:
                 if voc not in response_cache:
-                    response_lov = requests.get(
+                    response_lov = session.get(
                         f"https://lov.linkeddata.es/dataset/lov/api/v2/vocabulary/info?vocab={voc}",
                         timeout=60
                     )
@@ -43,7 +46,8 @@ def find_tags_from_json(data_frame: pd.DataFrame):
 
             if response_lov.status_code == 200:
                 try:
-                    response_dict = json.loads(response_lov.text)
+                    # Use the built-in json() method for parsing
+                    response_dict = response_lov.json()
                     tags = response_dict.get('tags', [])
                     frame_tags = []
                     for tag in tags:
@@ -71,7 +75,7 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
     clean_uri = match.group(1) if match else uri
     if clean_uri not in cache_dict:
         try:
-            response_lov = requests.get(
+            response_lov = session.get(
                 f"https://lov.linkeddata.es/dataset/lov/api/v2/term/search?q={uri}",
                 timeout=60
             )
@@ -81,7 +85,7 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
             return ''
         if response_lov.status_code == 200:
             try:
-                buckets = json.loads(response_lov.text).get('aggregations', {}) \
+                buckets = response_lov.json().get('aggregations', {}) \
                     .get('tags', {}).get('buckets', [])
                 key_set = {(item['key'], item['doc_count']) for item in buckets}
                 if key_set:
@@ -121,7 +125,6 @@ def find_voc_local(data_frame: pd.DataFrame):
                     }} LIMIT 10
                     """)
                     res = sparql.query().convert()
-                    # Wait a short moment between queries
                     voc_tags = {term['o']['value'] for term in res['results']['bindings']}
                     if voc_tags:
                         all_tags.update(voc_tags)
@@ -157,9 +160,10 @@ def _process_row(row_column: set) -> list[str] | None:
                 res = sparql.query().convert()
                 comments = {term['o']['value'] for term in res['results']['bindings']}
                 all_comments.append(list(comments))
+                time.sleep(0.1)
             except Exception as e:
                 logger.error(f'Error processing uri {curi}: {e}')
-                time.sleep(2)
+                time.sleep(10)
                 continue
     return all_comments if all_comments else None
 
@@ -236,6 +240,8 @@ def main():
     merged_df = merge_dataset()  # merge_dataset() should return a DataFrame
     result_df = find_comments_and_voc_tags(merged_df)
     result_df.to_json('../data/raw/lov_cloud/voc_cmt.json', orient='records')
+    # Close the global session when done
+    session.close()
 
 
 if __name__ == '__main__':
