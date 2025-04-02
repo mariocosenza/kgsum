@@ -19,9 +19,9 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.CNN):
+    def get_predictor(classifier=ClassifierType.NAIVE_BAYES):
         combined_df = pd.read_json('../data/processed/combined.json')
-        feature_columns = ["lab", 'lpn', 'sbj', 'dsc', 'curi', 'puri', 'comments']
+        feature_columns = ["voc", "tlds","tags", "lab", 'lpn', 'sbj', 'dsc', 'curi', 'puri', 'comments']
         try:
             models, training_results = load_multiple_models('../data/trained/multiple_models.pkl')
         except Exception as _:
@@ -35,10 +35,10 @@ class CategoryPredictor:
 
         logger.info("Global models trained. Training results:")
         for feature, metrics in training_results.items():
-            if classifier != ClassifierType.CNN:
+            if classifier != ClassifierType.BERT:
                 logger.info(
-                    f"Feature: {feature} CV Mean: {metrics['cv_mean']:.3f}, Best Params: {metrics['best_params']}")
+                    f"Feature: {feature} CV Mean: {metrics}, Best Params: {metrics}")
             else:
-                logger.info(f'Feature: {feature}, Best Params:: {metrics}')
+                logger.info(f'Feature: {feature}, Best Params: {metrics}')
 
         return CategoryPredictor(models, training_results)
