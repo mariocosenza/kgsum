@@ -19,7 +19,7 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.NAIVE_BAYES):
+    def get_predictor(classifier=ClassifierType.ROBERTA):
         combined_df = pd.read_json('../data/processed/combined.json')
         feature_columns = ["voc", "tlds","tags", "lab", 'lpn', 'sbj', 'dsc', 'curi', 'puri', 'comments']
         try:
@@ -35,10 +35,6 @@ class CategoryPredictor:
 
         logger.info("Global models trained. Training results:")
         for feature, metrics in training_results.items():
-            if classifier != ClassifierType.BERT:
-                logger.info(
-                    f"Feature: {feature} CV Mean: {metrics}, Best Params: {metrics}")
-            else:
-                logger.info(f'Feature: {feature}, Best Params: {metrics}')
+            logger.info(f'Feature: {feature}, Best Params: {metrics}')
 
         return CategoryPredictor(models, training_results)
