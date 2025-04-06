@@ -257,9 +257,6 @@ def remove_empty_list_values(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[str, list[Any]]:
-    """
-    Process input data (as a DataFrame or dict) and merge all features into a final dataset.
-    """
     # Convert dict to DataFrame if needed.
     if isinstance(input_data, dict):
         converted: dict[str, list[Any]] = {}

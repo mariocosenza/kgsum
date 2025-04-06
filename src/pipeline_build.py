@@ -46,41 +46,70 @@ logger = logging.getLogger(__name__)
 class ClassifierType(Enum):
     SVM = auto()
     NAIVE_BAYES = auto()
-    KNN = auto()  # New option for K-Nearest Neighbors
+    KNN = auto()           # New option for K-Nearest Neighbors
     ROBERTA = auto()
 
 
 def majority_vote(predictions: list[Any]) -> Any:
-    print(predictions)
     if not predictions:
+        logger.info("No predictions available for majority vote.")
         return None
-    if isinstance(predictions[0], (tuple, list)) and len(predictions[0]) == 2 and isinstance(predictions[0][1],
-                                                                                             (float, int)):
-        # Weighted votes: multiply the accuracies for each candidate.
-        products = {}
-        for pred, weight in predictions:
-            if pred in products:
-                products[pred] *= weight
-            else:
-                products[pred] = weight
-        return max(products.items(), key=lambda x: x[1])
+
+    # Check if votes are weighted with feature info.
+    if isinstance(predictions[0], (tuple, list)):
+        if len(predictions[0]) == 3 and isinstance(predictions[0][1], (float, int)):
+            candidate_info = {}  # candidate -> {'features': [(feature, f1), ...], 'score': total_score}
+            for pred, f1, feature in predictions:
+                if pred in candidate_info:
+                    candidate_info[pred]['features'].append((feature, f1))
+                    candidate_info[pred]['score'] += f1
+                else:
+                    candidate_info[pred] = {'features': [(feature, f1)], 'score': f1}
+            # Log candidate contributions.
+            for candidate, info in candidate_info.items():
+                features_str = ", ".join(f"{feat} (F1={f1:.2f})" for feat, f1 in info['features'])
+                logger.info("Candidate '%s': features -> %s, total F1 sum = %.4f", candidate, features_str, info['score'])
+            chosen, chosen_info = max(candidate_info.items(), key=lambda x: x[1]['score'])
+            logger.info("Weighted majority vote result: chosen candidate '%s' with total F1 sum %.4f", chosen, chosen_info['score'])
+            return chosen
+        elif len(predictions[0]) == 2 and isinstance(predictions[0][1], (float, int)):
+            # Weighted votes without feature info: use sum.
+            products = {}
+            for pred, f1 in predictions:
+                products[pred] = products.get(pred, 0) + f1
+            chosen, score = max(products.items(), key=lambda x: x[1])
+            logger.info("Weighted majority vote result: label '%s' with total F1 sum %.4f", chosen, score)
+            return chosen
+        else:
+            # Otherwise, fall back to standard majority vote.
+            filtered_predictions = [p for p in predictions if p is not None]
+            if not filtered_predictions:
+                logger.info("No valid predictions available for majority vote.")
+                return None
+            chosen = Counter(filtered_predictions).most_common(1)[0]
+            logger.info("Standard majority vote result: label '%s'", chosen)
+            return chosen
     else:
+        # Standard majority vote if predictions are not tuples.
         filtered_predictions = [p for p in predictions if p is not None]
         if not filtered_predictions:
+            logger.info("No valid predictions available for majority vote.")
             return None
-        return Counter(filtered_predictions).most_common(1)[0]
+        chosen = Counter(filtered_predictions).most_common(1)[0]
+        logger.info("Standard majority vote result: label '%s'", chosen)
+        return chosen
 
 
 def _predict_category_for_instance(
-        models: dict[str, KnowledgeGraphClassifier],
-        instance: dict[str, Any]
+    models: dict[str, KnowledgeGraphClassifier],
+    instance: dict[str, Any]
 ) -> Any | None:
-    votes: list[tuple[Any, float]] = []
+    votes: list[tuple[Any, float, str]] = []
     for feature, model in models.items():
         # Safe lookup: if the feature is absent, skip it.
         value = instance.get(feature, None)
         if value is None:
-            logger.debug(f"Feature '{feature}' not found in instance; skipping.")
+            logger.debug("Feature '%s' not found in instance; skipping.", feature)
             continue
         # Handle string values.
         if isinstance(value, str):
@@ -109,18 +138,19 @@ def _predict_category_for_instance(
             feature_data = [value]
         try:
             pred = model.predict(feature_data)[0]
-            # Use model.accuracy as the weight, defaulting to 0.5 if not available.
-            weight = getattr(model, "accuracy", 0.5)
+            # Use model.accuracy (the F1 score after training) as the weight,
+            # defaulting to 0.5 if not available.
+            f1 = getattr(model, "accuracy", 0.5)
             if pred is not None:
-                votes.append((pred, weight))
+                votes.append((pred, f1, feature))
         except Exception as err:
-            logger.error(f"Prediction error for '{feature}': {err}")
+            logger.error("Prediction error for '%s': %s", feature, err)
     return majority_vote(votes)
 
 
 def predict_category_multi(
-        models: dict[str, KnowledgeGraphClassifier],
-        instance: dict[str, Any] | pd.DataFrame
+    models: dict[str, KnowledgeGraphClassifier],
+    instance: dict[str, Any] | pd.DataFrame
 ) -> Any | list[Any | None]:
     if isinstance(instance, pd.DataFrame):
         # Each row is converted to a dict; missing features are handled gracefully.
@@ -159,10 +189,10 @@ def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float 
 
 
 def train_multiple_models(
-        training_data: pd.DataFrame,
-        feature_columns: list[str],
-        target_label: str = 'category',
-        classifier_type: ClassifierType = ClassifierType.SVM
+    training_data: pd.DataFrame,
+    feature_columns: list[str],
+    target_label: str = 'category',
+    classifier_type: ClassifierType = ClassifierType.SVM
 ) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     models: dict[str, KnowledgeGraphClassifier] = {}
     training_results: dict[str, Any] = {}
@@ -170,25 +200,24 @@ def train_multiple_models(
     for feature in feature_columns:
         df_feature = remove_empty_rows(training_data, [feature, target_label])
         if df_feature.empty:
-            logger.info(f"Skipping '{feature}': no data available.")
+            logger.info("Skipping '%s': no data available.", feature)
             continue
         if df_feature[target_label].nunique() < 2:
-            logger.info(
-                f"Skipping '{feature}': target label has only one unique class: {df_feature[target_label].unique()}")
+            logger.info("Skipping '%s': target label has only one unique class: %s", feature, df_feature[target_label].unique())
             continue
         counts = df_feature[target_label].value_counts()
         if (counts.min() / counts.max()) < 0.75:
-            logger.info(f"Feature '{feature}' is unbalanced. Applying limited oversampling.")
+            logger.info("Feature '%s' is unbalanced. Applying limited oversampling.", feature)
             df_feature = oversample_dataframe(df_feature, target_label, max_factor=2.0)
-        logger.info(f"Training model for '{feature}' with {len(df_feature)} examples.")
+        logger.info("Training model for '%s' with %s examples.", feature, len(df_feature))
         model = KnowledgeGraphClassifier(classifier_type=classifier_type, balance_classes=True)
         try:
             result = model.train(df_feature, feature, target_label=target_label)
         except ValueError as err:
-            logger.info(f"Skipping '{feature}': {err}")
+            logger.info("Skipping '%s': %s", feature, err)
             continue
         except Exception as err:
-            logger.error(f"Unexpected error training model for '{feature}': {err}")
+            logger.error("Unexpected error training model for '%s': %s", feature, err)
             continue
         models[feature] = model
         training_results[feature] = result
@@ -198,7 +227,7 @@ def train_multiple_models(
 
 class KnowledgeGraphClassifier:
     def __init__(
-            self, classifier_type: ClassifierType = ClassifierType.SVM, balance_classes: bool = True
+        self, classifier_type: ClassifierType = ClassifierType.SVM, balance_classes: bool = True
     ) -> None:
         self.classifier_type = classifier_type
         self.balance_classes = balance_classes
@@ -248,18 +277,14 @@ class KnowledgeGraphClassifier:
             if self.balance_classes:
                 return [
                     {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["linear"], "class_weight": ["balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["rbf"], "gamma": ["scale", "auto"],
-                     "class_weight": ["balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["poly"], "degree": [2, 3],
-                     "gamma": ["scale", "auto"], "class_weight": ["balanced"]}
+                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["rbf"], "gamma": ["scale", "auto"], "class_weight": ["balanced"]},
+                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["poly"], "degree": [2, 3], "gamma": ["scale", "auto"], "class_weight": ["balanced"]}
                 ]
             else:
                 return [
                     {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["linear"], "class_weight": [None, "balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["rbf"], "gamma": ["scale", "auto"],
-                     "class_weight": [None, "balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["poly"], "degree": [2, 3],
-                     "gamma": ["scale", "auto"], "class_weight": [None, "balanced"]}
+                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["rbf"], "gamma": ["scale", "auto"], "class_weight": [None, "balanced"]},
+                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["poly"], "degree": [2, 3], "gamma": ["scale", "auto"], "class_weight": [None, "balanced"]}
                 ]
         elif self.classifier_type == ClassifierType.NAIVE_BAYES:
             return {"alpha": [0.001, 0.01, 0.1, 1, 10], "fit_prior": [True, False]}
@@ -311,12 +336,12 @@ class KnowledgeGraphClassifier:
             return self.vectorizer.transform(processed)
 
     def train(
-            self,
-            frame: pd.DataFrame,
-            feature_labels: FeatureLabels,
-            target_label: str = 'category',
-            cv_folds: int = 5,
-            max_length: int = 128
+        self,
+        frame: pd.DataFrame,
+        feature_labels: FeatureLabels,
+        target_label: str = 'category',
+        cv_folds: int = 5,
+        max_length: int = 128
     ) -> dict[str, Any]:
         self.feature_labels = feature_labels
         frame = frame.reset_index(drop=True)
@@ -393,15 +418,14 @@ class KnowledgeGraphClassifier:
             for epoch in range(num_epochs):
                 self.model.train()
                 total_loss = 0.0
-                for batch in tqdm(train_loader, desc=f"Epoch {epoch + 1} Training", leave=False):
+                for batch in tqdm(train_loader, desc=f"Epoch {epoch+1} Training", leave=False):
                     batch_input_ids, batch_attention_mask, batch_labels = [b.to(device) for b in batch]
                     optimizer.zero_grad()
                     if not isinstance(self.model, RobertaForSequenceClassification):
                         raise ValueError("Expected a RobertaForSequenceClassification model, but got a different type.")
                     outputs = self.model(input_ids=batch_input_ids, attention_mask=batch_attention_mask)
                     logits = outputs.logits
-                    loss_fct = torch.nn.CrossEntropyLoss(
-                        weight=class_weights_tensor) if class_weights_tensor is not None else torch.nn.CrossEntropyLoss()
+                    loss_fct = torch.nn.CrossEntropyLoss(weight=class_weights_tensor) if class_weights_tensor is not None else torch.nn.CrossEntropyLoss()
                     loss = loss_fct(logits, batch_labels)
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
@@ -414,12 +438,11 @@ class KnowledgeGraphClassifier:
                 total_val_loss = 0.0
                 all_preds: list[Any] = []
                 all_labels: list[Any] = []
-                for batch in tqdm(val_loader, desc=f"Epoch {epoch + 1} Validation", leave=False):
+                for batch in tqdm(val_loader, desc=f"Epoch {epoch+1} Validation", leave=False):
                     batch_input_ids, batch_attention_mask, batch_labels = [b.to(device) for b in batch]
                     outputs = self.model(input_ids=batch_input_ids, attention_mask=batch_attention_mask)
                     logits = outputs.logits
-                    loss_fct = torch.nn.CrossEntropyLoss(
-                        weight=class_weights_tensor) if class_weights_tensor is not None else torch.nn.CrossEntropyLoss()
+                    loss_fct = torch.nn.CrossEntropyLoss(weight=class_weights_tensor) if class_weights_tensor is not None else torch.nn.CrossEntropyLoss()
                     loss = loss_fct(logits, batch_labels)
                     total_val_loss += loss.detach().item()
                     preds = torch.argmax(logits, dim=1)
@@ -427,8 +450,7 @@ class KnowledgeGraphClassifier:
                     all_labels.extend(batch_labels.cpu().numpy())
                 avg_val_loss = total_val_loss / (len(val_loader) if len(val_loader) > 0 else 1)
                 val_f1 = f1_score(all_labels, all_preds, average='weighted')
-                logger.info(
-                    f"Epoch {epoch + 1} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Val F1: {val_f1:.4f}")
+                logger.info("Epoch %s - Train Loss: %.4f, Val Loss: %.4f, Val F1: %.4f", epoch+1, avg_train_loss, avg_val_loss, val_f1)
 
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss
@@ -457,9 +479,9 @@ class KnowledgeGraphClassifier:
             self.accuracy = final_f1  # Store training F1 score for voting
             conf_mat = confusion_matrix(y_encoded, final_preds)
             legend = "Legend: Rows=True Labels, Columns=Predicted Labels"
-            logger.info(f"Final RoBERTa F1 Score: {final_f1:.4f}")
-            logger.info(f"Final RoBERTa Accuracy Score: {final_acc:.4f}")
-            logger.info(f"Confusion Matrix:\n{conf_mat}\n{legend}")
+            logger.info("Final RoBERTa F1 Score: %.4f", final_f1)
+            logger.info("Final RoBERTa Accuracy Score: %.4f", final_acc)
+            logger.info("Confusion Matrix:\n%s\n%s", conf_mat, legend)
             training_history = {"train_loss": avg_train_loss, "val_loss": best_val_loss}
             return {
                 'history': training_history,
@@ -481,7 +503,7 @@ class KnowledgeGraphClassifier:
                 if x_vectorized.shape[1] == 0:
                     raise ValueError("Vectorization resulted in no features. Check input data.")
             except Exception as e:
-                logger.error(f"Vectorization error: {e}")
+                logger.error("Vectorization error: %s", e)
                 raise ValueError(f"Failed to vectorize text data: {e}")
             y_encoded = data_y.map(self.target_label_mapping).values
             try:
@@ -497,7 +519,7 @@ class KnowledgeGraphClassifier:
                 )
                 grid.fit(x_vectorized, y_encoded)
             except Exception as e:
-                logger.error(f"Grid search error: {e}")
+                logger.error("Grid search error: %s", e)
                 raise ValueError(f"Grid search failed: {e}")
             try:
                 y_pred = grid.predict(x_vectorized)
@@ -506,11 +528,11 @@ class KnowledgeGraphClassifier:
                 self.accuracy = final_f1  # Store training F1 score for voting
                 conf_mat = confusion_matrix(y_encoded, y_pred)
                 legend = "Legend: Rows=True Labels, Columns=Predicted Labels"
-                logger.info(f"Final Model F1 Score: {final_f1:.4f}")
-                logger.info(f"Final Model Accuracy Score: {final_acc:.4f}")
-                logger.info(f"Confusion Matrix:\n{conf_mat}\n{legend}")
+                logger.info("Final Model F1 Score: %.4f", final_f1)
+                logger.info("Final Model Accuracy Score: %.4f", final_acc)
+                logger.info("Confusion Matrix:\n%s\n%s", conf_mat, legend)
             except Exception as e:
-                logger.error(f"Error during final model evaluation: {e}")
+                logger.error("Error during final model evaluation: %s", e)
                 final_f1 = np.nan
                 final_acc = np.nan
                 conf_mat = None
@@ -528,9 +550,9 @@ class KnowledgeGraphClassifier:
             }
 
     def predict(
-            self,
-            data: str | list[str] | pd.Series | pd.DataFrame,
-            feature_labels: FeatureLabels | None = None,
+        self,
+        data: str | list[str] | pd.Series | pd.DataFrame,
+        feature_labels: FeatureLabels | None = None,
     ) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
@@ -561,13 +583,13 @@ class KnowledgeGraphClassifier:
             else:
                 return numerical_preds
         except Exception as e:
-            logger.error(f"Prediction error: {e}")
+            logger.error("Prediction error: %s", e)
             raise ValueError(f"Failed to make predictions: {e}")
 
     def predict_proba(
-            self,
-            data: str | list[str] | pd.Series | pd.DataFrame,
-            feature_labels: FeatureLabels | None = None,
+        self,
+        data: str | list[str] | pd.Series | pd.DataFrame,
+        feature_labels: FeatureLabels | None = None,
     ) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
@@ -590,7 +612,7 @@ class KnowledgeGraphClassifier:
                 else:
                     raise ValueError("The model does not support probability predictions via predict_proba().")
         except Exception as e:
-            logger.error(f"Error in predict_proba: {e}")
+            logger.error("Error in predict_proba: %s", e)
             raise ValueError(f"Failed to get probability estimates: {e}")
 
     def save(self, filepath: str | None = None) -> None:
@@ -618,9 +640,9 @@ class KnowledgeGraphClassifier:
                 data_to_save['model'] = self.model
             with open(filepath, 'wb') as f:
                 pickle.dump(data_to_save, f)
-            logger.info(f"Model saved to {filepath}")
+            logger.info("Model saved to %s", filepath)
         except Exception as e:
-            logger.error(f"Error saving model: {e}")
+            logger.error("Error saving model: %s", e)
             raise ValueError(f"Failed to save model: {e}")
 
     @classmethod
@@ -649,14 +671,14 @@ class KnowledgeGraphClassifier:
                 instance.model = data.get('model')
             return instance
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.error("Error loading model: %s", e)
             raise ValueError(f"Failed to load model from {filepath}: {e}")
 
 
 def save_multiple_models(
-        models: dict[str, KnowledgeGraphClassifier],
-        training_results: dict[str, Any],
-        filepath: str | None = None
+    models: dict[str, KnowledgeGraphClassifier],
+    training_results: dict[str, Any],
+    filepath: str | None = None
 ) -> None:
     if filepath is None:
         os.makedirs('../data/trained', exist_ok=True)
@@ -664,9 +686,9 @@ def save_multiple_models(
     try:
         with open(filepath, 'wb') as f:
             pickle.dump({'models': models, 'training_results': training_results}, f)
-        logger.info(f"Multiple models saved to {filepath}")
+        logger.info("Multiple models saved to %s", filepath)
     except Exception as e:
-        logger.error(f"Error saving multiple models: {e}")
+        logger.error("Error saving multiple models: %s", e)
         raise ValueError(f"Failed to save multiple models: {e}")
 
 
@@ -676,8 +698,8 @@ def load_multiple_models(filepath: str | None = None) -> Tuple[dict[str, Knowled
     try:
         with open(filepath, 'rb') as f:
             data = pickle.load(f)
-        logger.info(f"Multiple models loaded from {filepath}")
+        logger.info("Multiple models loaded from %s", filepath)
         return data['models'], data['training_results']
     except Exception as e:
-        logger.error(f"Error loading multiple models: {e}")
+        logger.error("Error loading multiple models: %s", e)
         raise ValueError(f"Failed to load multiple models from {filepath}: {e}")
