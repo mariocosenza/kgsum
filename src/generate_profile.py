@@ -4,6 +4,7 @@ import urllib.parse
 
 import aiohttp
 import pandas as pd
+from flask import jsonify
 
 from predict_category import CategoryPredictor
 from src.dataset_preparation import process_file_full_inplace, logger
@@ -30,10 +31,10 @@ async def generate_profile(endpoint: None | str = None, file: None | str = None)
             'error': 'Upload a file or input a valid SPARQL endpoint'
         }
 
-    return {
-        #'profile': create_profile(processed_data),
-        'category': PREDICTOR.predict_category(processed_data)
-    }
+    profile = create_profile(processed_data)
+    profile['category'] = PREDICTOR.predict_category(processed_data)
+
+    return profile
 
 
 async def generate_and_store_profile(endpoint=None, file=None):

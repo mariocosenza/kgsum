@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 class ClassifierType(Enum):
     SVM = auto()
     NAIVE_BAYES = auto()
-    KNN = auto()           # New option for K-Nearest Neighbors
+    KNN = auto()
     ROBERTA = auto()
 
 
@@ -138,8 +138,6 @@ def _predict_category_for_instance(
             feature_data = [value]
         try:
             pred = model.predict(feature_data)[0]
-            # Use model.accuracy (the F1 score after training) as the weight,
-            # defaulting to 0.5 if not available.
             f1 = getattr(model, "accuracy", 0.5)
             if pred is not None:
                 votes.append((pred, f1, feature))
@@ -153,7 +151,6 @@ def predict_category_multi(
     instance: dict[str, Any] | pd.DataFrame
 ) -> Any | list[Any | None]:
     if isinstance(instance, pd.DataFrame):
-        # Each row is converted to a dict; missing features are handled gracefully.
         return instance.apply(
             lambda row: _predict_category_for_instance(models, row.to_dict()), axis=1
         ).tolist()
@@ -236,7 +233,7 @@ class KnowledgeGraphClassifier:
             tokenizer=self.custom_tokenizer,
             lowercase=False,  # For multilingual text, do not force lowercasing
             stop_words=None,  # Do not use language-specific stop words
-            max_features=10000,
+            max_features=20000,
             ngram_range=(1, 3),
             min_df=1,
             max_df=0.9,

@@ -52,10 +52,10 @@ async def sparql_profile():
             result = generate_profile_service_store(data['endpoint'], sparql=True)
         else:
             result = await generate_profile_service(data['endpoint'], sparql=True)
-        return {"profile": result}
+        return jsonify(result)
     # Fallback in case no 'store' param is provided
     result = await generate_profile_service(data['endpoint'], sparql=True)
-    return {"profile": result}
+    return jsonify(result)
 
 
 @app.route('/api/v1/dump/profile', methods=['POST'])
@@ -87,7 +87,7 @@ async def rdf_profile():
         if result is None:
             return {"error": "Profile generation failed unexpectedly."}
 
-        return {"profile": result}
+        return jsonify(result)
 
     return {"error": "Error Uploading File"}
 
