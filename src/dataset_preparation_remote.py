@@ -87,49 +87,88 @@ async def async_select_remote_class(endpoint, timeout=300):
     return classes
 
 
-async def async_select_remote_label(endpoint, limit=1000, timeout=300):
+async def async_select_remote_label(endpoint, limit=1000, timeout=300, en = True):
     logger.info(f"[LAB] Starting label query for endpoint: {endpoint}")
     labels = []
     offset = 0
     async with aiohttp.ClientSession() as session:
-        query = f"""
+        query = """
+            PREFIX skosxl:<http://www.w3.org/2008/05/skos-xl#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            SELECT ?label
-            WHERE {{
-                ?item rdfs:label ?label .
-                FILTER(langMatches(lang(?label), "en"))
-            }}
-            LIMIT {limit} 
+            PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+            PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+            PREFIX awol: <http://bblfish.net/work/atom-owl/2006-06-06/#>
+            PREFIX wdrs: <http://www.w3.org/2007/05/powder-s#>
+            PREFIX schema: <http://schema.org/>
+            SELECT DISTINCT ?o
+            WHERE {
+                {?class rdfs:label ?o}
+                UNION
+                {?s foaf:name ?o}
+                UNION
+                {?s skos:prefLabel ?o}
+                UNION
+                {?s rdfs:comment ?o}
+                UNION
+                {?s awol:label ?o}
+                UNION
+                {?s skos:note ?o}
+                UNION
+                {?s wdrs:text ?o}
+                UNION
+                {?s skosxl:prefLabel ?o}
+                UNION
+                {?s skosxl:literalForm ?o}
+                UNION
+                {?s schema:name ?o}
+            """
+        if en:
+            query += """
+                {FILTER(langMatches(lang(?o), "en"))}
+                } LIMIT 1000
+            """
+        else:
+            query += """
+                } LIMIT 1000
             """
         bindings = []
         try:
             result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
+            bindings = root.findall('.//sparql:binding[@name="o"]/sparql:literal', ns)
         except Exception as e:
             logger.debug(f"[LAB] No label bindings found at offset {offset}. Exception: {e}")
 
         try:
             if not bindings:
                 logger.debug(f"[LAB] No label bindings found at offset {offset} with filter; trying fallback.")
-                query = f"""
+                query = """
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                    SELECT ?label
-                    WHERE {{
-                        ?item rdfs:label ?label .
-                    }}
-                    LIMIT {limit} 
-                    """
+                    SELECT DISTINCT ?o
+                    WHERE {
+                        ?class rdfs:label ?o
+                """
+                if en:
+                    query += """
+                               {FILTER(langMatches(lang(?o), "en"))}
+                               } LIMIT 1000
+                           """
+                else:
+                    query += """
+                               } LIMIT 1000
+                           """
                 result_text = await _fetch_query(session, endpoint, query, timeout)
                 root = eT.fromstring(result_text)
-                bindings = root.findall('.//sparql:binding[@name="label"]/sparql:literal', ns)
+                bindings = root.findall('.//sparql:binding[@name="o"]/sparql:literal', ns)
             if not bindings:
                 logger.debug(f"[LAB] No label bindings found at offset {offset}.")
             for binding in bindings:
                 labels.append(binding.text)
         except Exception as e:
             logger.warning(f"[LAB] Query execution error: {e}. Endpoint: {endpoint}")
+            if en:
+                return await async_select_remote_label(endpoint=endpoint, en=False)
             return ''
     logger.info(f"[LAB] Finished label query for endpoint: {endpoint} (found {len(labels)} labels)")
     return labels
@@ -212,7 +251,7 @@ async def async_select_remote_property(endpoint, timeout=300):
             ?s ?property ?o .
   
             # Optional: Filter out rdf:type if you want to exclude it
-            # FILTER (?property != rdf:type)
+            FILTER (?property != rdf:type)
          }}
         GROUP BY ?property
         ORDER BY DESC(?usageCount)
@@ -247,7 +286,7 @@ async def async_select_remote_property_names(endpoint, timeout=300):
             ?s ?property ?o .
   
             # Optional: Filter out rdf:type if you want to exclude it
-            # FILTER (?property != rdf:type)
+            FILTER (?property != rdf:type)
          }}
         GROUP BY ?property
         ORDER BY DESC(?usageCount)
@@ -354,7 +393,7 @@ async def async_select_void_description(endpoint, timeout=300, void_file=False):
     query = """
           PREFIX dcterms: <http://purl.org/dc/terms/> 
           SELECT ?desc WHERE {
-              ?s dcterms:description ?desc .
+                ?s dcterms:description ?desc .
           } LIMIT 1
     """
     async with aiohttp.ClientSession() as session:

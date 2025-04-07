@@ -35,19 +35,67 @@ Q_LOCAL_CLASS = prepareQuery("""
 """)
 
 Q_LOCAL_LABEL = prepareQuery("""
-    SELECT DISTINCT ?type
+    SELECT DISTINCT ?o
     WHERE {
-        ?class rdfs:label ?type .
+        {?class rdfs:label ?o}
+        UNION
+        {?s foaf:name ?o}
+        UNION
+        {?s skos:prefLabel ?o}
+        UNION
+        {?s rdfs:comment ?o}
+        UNION
+        {?s awol:label ?o}
+        UNION
+        {?s skos:note ?o}
+        UNION
+        {?s wdrs:text ?o}
+        UNION
+        {?s skosxl:prefLabel ?o}
+        UNION
+        {?s skosxl:literalForm ?o}
+        UNION
+        {?s schema:name ?o}
     } LIMIT 1000
-""", initNs={"rdfs": 'http://www.w3.org/2000/01/rdf-schema#'})
+""", initNs={"schema": 'http://schema.org',
+             "skos": 'http://www.w3.org/2004/02/skos/core#',
+             "rdfs": 'http://www.w3.org/2000/01/rdf-schema#',
+             "foaf" : 'http://xmlns.com/foaf/0.1/',
+             "awol": 'http://bblfish.net/work/atom-owl/2006-06-06/#',
+             "wdrs": 'http://www.w3.org/2007/05/powder-s#',
+             "skosxl": 'http://www.w3.org/2008/05/skos-xl#'})
 
 Q_LOCAL_LABEL_EN = prepareQuery("""
-    SELECT DISTINCT ?type
+    SELECT DISTINCT ?o
     WHERE {
-         ?item rdfs:label ?type .
-         FILTER(langMatches(lang(?type), "en"))
+        {?class rdfs:label ?o}
+        UNION
+        {?s foaf:name ?o}
+        UNION
+        {?s skos:prefLabel ?o}
+        UNION
+        {?s rdfs:comment ?o}
+        UNION
+        {?s awol:label ?o}
+        UNION
+        {?s skos:note ?o}
+        UNION
+        {?s wdrs:text ?o}
+        UNION
+        {?s skosxl:prefLabel ?o}
+        UNION
+        {?s skosxl:literalForm ?o}
+        UNION
+        {?s schema:name ?o}
+        FILTER(langMatches(lang(?o), "en"))
     } LIMIT 1000
-""", initNs={"rdfs": 'http://www.w3.org/2000/01/rdf-schema#'})
+""", initNs={"schema": 'http://schema.org',
+             "skos": 'http://www.w3.org/2004/02/skos/core#',
+             "rdfs": 'http://www.w3.org/2000/01/rdf-schema#',
+             "foaf" : 'http://xmlns.com/foaf/0.1/',
+             "awol": 'http://bblfish.net/work/atom-owl/2006-06-06/#',
+             "wdrs": 'http://www.w3.org/2007/05/powder-s#',
+             "skosxl": 'http://www.w3.org/2008/05/skos-xl#'})
 
 Q_LOCAL_TLD = prepareQuery("""
     SELECT DISTINCT ?o
@@ -62,7 +110,7 @@ Q_LOCAL_PROPERTY = prepareQuery("""
     WHERE {{
         ?s ?property ?o .
         # Optional: Filter out rdf:type if you want to exclude it
-        # FILTER (?property != rdf:type)
+        FILTER (?property != rdf:type)
     }}
     GROUP BY ?property
     ORDER BY DESC(?usageCount)
@@ -74,7 +122,7 @@ Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
     WHERE {{
         ?s ?property ?o .
         # Optional: Filter out rdf:type if you want to exclude it
-        # FILTER (?property != rdf:type)
+        FILTER (?property != rdf:type)
     }}
     GROUP BY ?property
     ORDER BY DESC(?usageCount)
@@ -94,16 +142,18 @@ Q_LOCAL_CLASS_NAME = prepareQuery("""
 Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
     SELECT DISTINCT ?s
     WHERE {
-        ?s rdf:type void:Dataset .
+        ?s rdf:type void:Dataset . #dcat
     } LIMIT 100
 """, initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
 
 Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery(
     """
     SELECT ?desc WHERE {
-            ?s dcterms:description ?desc .
-    } LIMIT 1
-    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
+            {?s dcterms:description ?desc}
+            UNION
+            {?s schema:description ?desc}
+    } LIMIT 100
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/', "schema": 'http://schema.org/'})
 
 Q_LOCAL_DCTERMS_TITLE = prepareQuery(
     """
@@ -129,10 +179,11 @@ Q_LOCAL_DCTERMS_CREATOR = prepareQuery(
 Q_LOCAL_DCTERMS_LICENSE = prepareQuery(
     """
     SELECT ?desc WHERE {
-            ?s dcterms:license ?license .
+            ?s dcterms:license ?license . 
     } LIMIT 1
 """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
+#owl same as schema: same as
 
 # Helper functions to run SPARQL queries on parsed RDF graphs
 def select_local_vocabularies(parsed_graph):
@@ -162,7 +213,7 @@ def select_local_label(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_LABEL_EN)
     if len(qres) < 2:
         qres = parsed_graph.query(Q_LOCAL_LABEL)
-    return {str(row.type) for row in qres}
+    return {str(row.o) for row in qres}
 
 
 def select_local_tld(parsed_graph):
