@@ -5,7 +5,6 @@ import os
 import pickle
 import re
 import warnings
-from collections import Counter
 from enum import Enum, auto
 from typing import Any, Tuple, NewType, TypeAlias, Self
 
@@ -16,7 +15,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, make_scorer
+from collections import Counter
+
 
 from transformers import (
     RobertaForSequenceClassification,
@@ -50,7 +51,14 @@ class ClassifierType(Enum):
     ROBERTA = auto()
 
 
+
+
+
 def majority_vote(predictions: list[Any]) -> Any:
+    # If predictions is actually a string, treat it as a single prediction.
+    if isinstance(predictions, str):
+        return predictions
+
     if not predictions:
         logger.info("No predictions available for majority vote.")
         return None
@@ -81,23 +89,22 @@ def majority_vote(predictions: list[Any]) -> Any:
             logger.info("Weighted majority vote result: label '%s' with total F1 sum %.4f", chosen, score)
             return chosen
         else:
-            # Otherwise, fall back to standard majority vote.
             filtered_predictions = [p for p in predictions if p is not None]
             if not filtered_predictions:
                 logger.info("No valid predictions available for majority vote.")
                 return None
-            chosen = Counter(filtered_predictions).most_common(1)[0]
+            chosen = Counter(filtered_predictions).most_common(1)[0][0]
             logger.info("Standard majority vote result: label '%s'", chosen)
             return chosen
     else:
-        # Standard majority vote if predictions are not tuples.
         filtered_predictions = [p for p in predictions if p is not None]
         if not filtered_predictions:
             logger.info("No valid predictions available for majority vote.")
             return None
-        chosen = Counter(filtered_predictions).most_common(1)[0]
+        chosen = Counter(filtered_predictions).most_common(1)[0][0]
         logger.info("Standard majority vote result: label '%s'", chosen)
         return chosen
+
 
 
 def _predict_category_for_instance(
@@ -167,11 +174,7 @@ def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFr
     return result
 
 
-def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 2.0) -> pd.DataFrame:
-    """
-    Oversample minority classes, but limit oversampling so that each class
-    is at most max_factor times its original count.
-    """
+def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.2) -> pd.DataFrame:
     counts = df[target_label].value_counts()
     max_count = counts.max()
     groups = []
@@ -228,12 +231,11 @@ class KnowledgeGraphClassifier:
     ) -> None:
         self.classifier_type = classifier_type
         self.balance_classes = balance_classes
-        # Create TF-IDF vectorizer without token_pattern to avoid warnings.
         self.vectorizer = TfidfVectorizer(
             tokenizer=self.custom_tokenizer,
-            lowercase=False,  # For multilingual text, do not force lowercasing
-            stop_words=None,  # Do not use language-specific stop words
-            max_features=20000,
+            lowercase=True,
+            stop_words=None,
+            max_features=1000000,
             ngram_range=(1, 3),
             min_df=1,
             max_df=0.9,
@@ -273,25 +275,34 @@ class KnowledgeGraphClassifier:
         if self.classifier_type == ClassifierType.SVM:
             if self.balance_classes:
                 return [
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["linear"], "class_weight": ["balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["rbf"], "gamma": ["scale", "auto"], "class_weight": ["balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["poly"], "degree": [2, 3], "gamma": ["scale", "auto"], "class_weight": ["balanced"]}
+                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["linear"], "class_weight": ["balanced"]},
+                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["rbf"], "gamma": ["scale", 0.01, 0.1],
+                     "class_weight": ["balanced"]},
+                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["poly"], "degree": [2], "gamma": ["scale", 0.01],
+                     "class_weight": ["balanced"]}
                 ]
             else:
                 return [
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["linear"], "class_weight": [None, "balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["rbf"], "gamma": ["scale", "auto"], "class_weight": [None, "balanced"]},
-                    {"C": [0.001, 0.01, 0.1, 1, 10, 100], "kernel": ["poly"], "degree": [2, 3], "gamma": ["scale", "auto"], "class_weight": [None, "balanced"]}
+                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["linear"], "class_weight": [None, "balanced"]},
+                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["rbf"], "gamma": ["scale", 0.01, 0.1],
+                     "class_weight": [None, "balanced"]},
+                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["poly"], "degree": [2], "gamma": ["scale", 0.01],
+                     "class_weight": [None, "balanced"]}
                 ]
         elif self.classifier_type == ClassifierType.NAIVE_BAYES:
-            return {"alpha": [0.001, 0.01, 0.1, 1, 10], "fit_prior": [True, False]}
+            return {"alpha": [0.5, 1, 2, 5, 10], "fit_prior": [True, False]}
         elif self.classifier_type == ClassifierType.KNN:
-            return {"n_neighbors": [3, 5, 7, 9, 11], "weights": ["uniform", "distance"]}
+            return {
+                "n_neighbors": [11, 15, 21, 25, 31],
+                "weights": ["uniform", "distance"],
+                "metric": ["euclidean", "manhattan"],
+                "leaf_size": [20, 30, 40]
+            }
         return {}
 
     def _get_base_estimator(self):
         if self.classifier_type == ClassifierType.SVM:
-            return svm.SVC(probability=True, random_state=42)
+            return svm.SVC(probability=True, random_state=67)
         elif self.classifier_type == ClassifierType.NAIVE_BAYES:
             return MultinomialNB()
         elif self.classifier_type == ClassifierType.KNN:
@@ -300,7 +311,7 @@ class KnowledgeGraphClassifier:
             raise ValueError(f"Base estimator not defined for classifier type: {self.classifier_type}")
 
     def _get_cv_strategy(self, data_y: pd.Series, cv_folds: int) -> StratifiedKFold:
-        return StratifiedKFold(n_splits=5, random_state=42, shuffle=True)
+        return StratifiedKFold(n_splits=2, random_state=67, shuffle=True)
 
     def _process_input(self, data: Any, feature_labels: FeatureLabels | None) -> Any:
         if feature_labels is None:
@@ -338,7 +349,7 @@ class KnowledgeGraphClassifier:
         feature_labels: FeatureLabels,
         target_label: str = 'category',
         cv_folds: int = 5,
-        max_length: int = 128
+        max_length: int = 512
     ) -> dict[str, Any]:
         self.feature_labels = feature_labels
         frame = frame.reset_index(drop=True)
@@ -503,12 +514,15 @@ class KnowledgeGraphClassifier:
                 logger.error("Vectorization error: %s", e)
                 raise ValueError(f"Failed to vectorize text data: {e}")
             y_encoded = data_y.map(self.target_label_mapping).values
+
+            # Use a custom scorer with zero_division set to 0 to avoid scoring errors.
+            scorer = make_scorer(f1_score, average='weighted', zero_division=0)
             try:
                 grid = GridSearchCV(
                     estimator=self._get_base_estimator(),
                     param_grid=param_grid,
                     cv=cv_strategy,
-                    scoring='f1_weighted',
+                    scoring=scorer,
                     return_train_score=True,
                     verbose=1,
                     n_jobs=-1,

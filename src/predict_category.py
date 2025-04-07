@@ -26,7 +26,7 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.ROBERTA):
+    def get_predictor(classifier=ClassifierType.NAIVE_BAYES):
         combined_df = pd.read_json(f'{project_root}/data/processed/combined.json')
         feature_columns = ["voc", "tlds","tags", "lab", 'lpn', 'sbj', 'dsc', 'curi', 'puri', 'comments']
         try:

@@ -240,18 +240,18 @@ async def async_select_remote_tld(endpoint, limit=1000, timeout=300):
     return tlds
 
 
-async def async_select_remote_property(endpoint, timeout=300):
+async def async_select_remote_property(endpoint, timeout=300, filter=True):
     logger.info(f"[PROP] Starting property query for endpoint: {endpoint}")
     properties = []
     offset = 0
     async with aiohttp.ClientSession() as session:
-        query = """
+        query = f"""
         SELECT ?property (COUNT(?s) AS ?usageCount)
         WHERE {{
             ?s ?property ?o .
   
             # Optional: Filter out rdf:type if you want to exclude it
-            FILTER (?property != rdf:type)
+            {'FILTER (?property != rdf:type)' if filter  else ''}
          }}
         GROUP BY ?property
         ORDER BY DESC(?usageCount)
@@ -269,29 +269,31 @@ async def async_select_remote_property(endpoint, timeout=300):
             offset += 100
         except Exception as e:
             logger.warning(f"[PROP] Query execution error: {e}. Endpoint: {endpoint}")
+            if filter:
+                return await async_select_remote_property(endpoint, timeout=timeout, filter=False)
             return ''
     logger.info(f"[PROP] Finished property query for endpoint: {endpoint} (found {len(properties)} properties)")
     return properties
 
 
-async def async_select_remote_property_names(endpoint, timeout=300):
+async def async_select_remote_property_names(endpoint, timeout=300, filter=True):
     logger.info(f"[PNAME] Starting property name query for endpoint: {endpoint}")
     local_property_names = []
     processed = set()
     offset = 0
     async with aiohttp.ClientSession() as session:
-        query = """
-        SELECT ?property (COUNT(?s) AS ?usageCount)
-        WHERE {{
-            ?s ?property ?o .
-  
-            # Optional: Filter out rdf:type if you want to exclude it
-            FILTER (?property != rdf:type)
-         }}
-        GROUP BY ?property
-        ORDER BY DESC(?usageCount)
-        LIMIT 1000
-        """
+        query = f"""
+                SELECT ?property (COUNT(?s) AS ?usageCount)
+                WHERE {{
+                    ?s ?property ?o .
+
+                    # Optional: Filter out rdf:type if you want to exclude it
+                    {'FILTER (?property != rdf:type)' if filter  else ''}
+                 }}
+                GROUP BY ?property
+                ORDER BY DESC(?usageCount)
+                LIMIT 1000
+                """
         try:
             result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
@@ -315,6 +317,8 @@ async def async_select_remote_property_names(endpoint, timeout=300):
             offset += 100
         except Exception as e:
             logger.warning(f"[PNAME] Query execution error: {e}. Endpoint: {endpoint}")
+            if filter:
+                return await async_select_remote_property_names(endpoint, timeout=timeout, filter=False)
             return ''
     logger.info(
         f"[PNAME] Finished property name query for endpoint: {endpoint} (found {len(local_property_names)} names)")
@@ -634,18 +638,17 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
         'title': title,
         'sbj': data_void[0],
         'dsc': data_void[1],
-        'voc': data[1],
-        'curi': data[2],
-        'puri': data[3],
-        'lcn': data[4],
-        'lpn': data[5],
-        'lab': data[6],
-        'tlds': data[7],
+        'voc': data[2],
+        'curi': data[3],
+        'puri': data[4],
+        'lcn': data[5],
+        'lpn': data[6],
+        'lab': data[7],
+        'tlds': data[8],
         'sparql': endpoint,
-        'creator': data[8],
-        'license': data[9]
+        'creator': data[9],
+        'license': data[10]
     }
-
 
 if __name__ == '__main__':
     asyncio.run(main_void())

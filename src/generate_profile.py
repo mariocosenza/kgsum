@@ -4,7 +4,6 @@ import urllib.parse
 
 import aiohttp
 import pandas as pd
-from flask import jsonify
 
 from predict_category import CategoryPredictor
 from src.dataset_preparation import process_file_full_inplace, logger
@@ -25,7 +24,8 @@ async def generate_profile(endpoint: None | str = None, file: None | str = None)
     if file is not None:
         processed_data = process_all_from_input(process_file_full_inplace(file))
     elif endpoint is not None:
-        processed_data = process_all_from_input(await process_endpoint_full_inplace(endpoint))
+        processed_data = await process_endpoint_full_inplace(endpoint)
+        processed_data = process_all_from_input(processed_data)
     else:
         return {
             'error': 'Upload a file or input a valid SPARQL endpoint'
