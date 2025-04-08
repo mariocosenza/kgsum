@@ -399,7 +399,7 @@ class KnowledgeGraphClassifier:
             self._freeze_roberta_layers(freeze_layers)
 
         training_args = TrainingArguments(
-            output_dir="./results",
+            output_dir="../data/results",
             num_train_epochs=num_train_epochs,
             per_device_train_batch_size=batch_size,
             per_device_eval_batch_size=batch_size,
