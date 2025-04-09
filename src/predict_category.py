@@ -45,3 +45,5 @@ class CategoryPredictor:
             logger.info(f'Feature: {feature}, Best Params: {metrics}')
 
         return CategoryPredictor(models, training_results)
+
+PREDICTOR = CategoryPredictor.get_predictor()

@@ -117,6 +117,9 @@ def normalize_text_list(text_list: list[Any] | str) -> str:
         return ""
     if isinstance(text_list, str):
         return text_list
+    elif isinstance(text_list, list) and len(text_list) <= 0:
+        return ""
+
     return " ".join(str(word) for word in text_list if word is not None)
 
 

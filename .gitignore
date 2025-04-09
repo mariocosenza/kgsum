@@ -197,3 +197,4 @@ data/raw
 .idea/sonarlint/
 /data/processed/
 /data/trained/
+/data/results/
