@@ -183,7 +183,6 @@ Q_LOCAL_DCTERMS_LICENSE = prepareQuery(
     } LIMIT 1
 """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
-#owl same as schema: same as
 
 # Helper functions to run SPARQL queries on parsed RDF graphs
 def select_local_vocabularies(parsed_graph):

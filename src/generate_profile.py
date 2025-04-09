@@ -4,8 +4,6 @@ import urllib.parse
 
 import aiohttp
 import pandas as pd
-from flask import jsonify
-
 from predict_category import CategoryPredictor
 from src.dataset_preparation import process_file_full_inplace, logger
 from src.dataset_preparation_remote import process_endpoint_full_inplace
@@ -52,6 +50,8 @@ async def generate_profile_from_store():
 
 def create_profile(data: dict | pd.DataFrame | pd.Series) -> dict:
     if isinstance(data, pd.DataFrame):
+        data.dropna(inplace=True)
+        data.drop_duplicates(inplace=True)
         data = data.to_dict('records')
     return data
 

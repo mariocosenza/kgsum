@@ -64,6 +64,8 @@ def sanitize_field(value: Any) -> Any:
     """
     if isinstance(value, list) and not value:
         return ""
+    elif isinstance(value, str) and value in '[]':
+        return ""
     return value
 
 
