@@ -18,7 +18,7 @@ async def _fetch_query(session, endpoint, query, timeout):
         return await response.text()
 
 
-async def async_select_remote_vocabularies(endpoint, timeout=300):
+async def async_select_remote_vocabularies(endpoint, timeout=300) -> list:
     logger.info(f"[VOC] Starting vocabulary query for endpoint: {endpoint}")
     vocabularies = set()
     offset = 0
@@ -26,7 +26,7 @@ async def async_select_remote_vocabularies(endpoint, timeout=300):
         query = """
             SELECT DISTINCT ?predicate
             WHERE {
-                ?subject ?predicate ?object .
+                ?subject ?predicate ?object.
             }
             LIMIT 1000
             """
@@ -52,9 +52,9 @@ async def async_select_remote_vocabularies(endpoint, timeout=300):
             offset += 100
         except Exception as e:
             logger.warning(f"[VOC] Query execution error: {e}. Endpoint: {endpoint}")
-            return ''
+            return []
     logger.info(f"[VOC] Finished vocabulary query for endpoint: {endpoint} (found {len(vocabularies)} vocabularies)")
-    return vocabularies
+    return list(vocabularies)
 
 
 async def async_select_remote_class(endpoint, timeout=300):
@@ -343,7 +343,7 @@ async def async_select_remote_class_name(endpoint, timeout=300):
             result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
-            bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
+            bindings = root.findall('.//sparql:binding[@name="class"]/sparql:uri', ns)
             if not bindings:
                 logger.debug(f"[CNAME] No class name bindings found at offset {offset}.")
             for binding in bindings:
@@ -460,10 +460,10 @@ async def async_select_void_creator(endpoint, timeout=300, void_file=False):
                 uri = await async_has_void_file(endpoint, timeout)
                 if uri:
                     return await async_select_void_subject_remote(uri, timeout, True)
-            logger.info(f"[VDESC] Finished VOID description query for endpoint: {endpoint}")
+            logger.info(f"[VCRE] Finished VOID description query for endpoint: {endpoint}")
             return list(descriptions)
         except Exception as e:
-            logger.warning(f"[VDESC] Error in VOID description query: {e}")
+            logger.warning(f"[VCRE] Error in VOID description query: {e}")
             return []
 
 

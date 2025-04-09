@@ -29,7 +29,6 @@ from transformers import (
 )
 import torch
 
-# New type aliases using Python 3.12 features
 FeatureLabels: TypeAlias = str | list[str]
 TextData = NewType('TextData', str)
 
@@ -155,13 +154,14 @@ def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float 
     counts = df[target_label].value_counts()
     max_count = counts.max()
     groups = []
-    for label, group in df.groupby(target_label):
-        target_count = min(max_count, int(len(group) * max_factor))
-        if len(group) < target_count:
-            groups.append(group.sample(target_count, replace=True, random_state=42))
-        else:
-            groups.append(group)
-    return pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
+    return df
+    # for label, group in df.groupby(target_label):
+    #     target_count = min(max_count, int(len(group) * max_factor))
+    #     if len(group) < target_count:
+    #         groups.append(group.sample(target_count, replace=True, random_state=42))
+    #     else:
+    #         groups.append(group)
+    # return pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
 
 
 def train_multiple_models(

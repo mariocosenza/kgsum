@@ -42,7 +42,7 @@ def check_system_load(func):
     return wrapper
 
 
-@app.route('/api/v1/sparql/profile', methods=['POST'])
+@app.route('/api/v1/profile/sparql', methods=['POST'])
 @check_system_load
 async def sparql_profile():
     data = request.get_json()
@@ -58,7 +58,7 @@ async def sparql_profile():
     return jsonify(result)
 
 
-@app.route('/api/v1/dump/profile', methods=['POST'])
+@app.route('/api/v1/profile/file', methods=['POST'])
 @check_system_load
 async def rdf_profile():
     if 'file' not in request.files:

@@ -260,9 +260,19 @@ def combine_with_void_and_lov_data(combined_df: pd.DataFrame, void_df: pd.DataFr
 def remove_empty_list_values(df: pd.DataFrame) -> pd.DataFrame:
     return df.map(lambda x: "" if (isinstance(x, list) and not x) or (isinstance(x, str) and x.strip() == "[]") else x)
 
+def remove_duplicates(series: pd.Series) -> list[str]:
+     l = list(set(series.tolist()))
+
+     if None in l:
+         l.remove(None)
+     if 'None' in l:
+         l.remove('None')
+     if '' in l:
+        l.remove('')
+
+     return l
 
 def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[str, list[Any]]:
-    # Convert dict to DataFrame if needed.
     if isinstance(input_data, dict):
         converted: dict[str, list[Any]] = {}
         for key, value in input_data.items():
@@ -278,12 +288,26 @@ def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[st
     logger.info("Converted input data to DataFrame with %d rows", len(df))
     combined_df = preprocess_combined(df)
     void_df = preprocess_void(df)
-    merged_df = combine_with_void(combined_df, void_df)
-    logger.info("Full processing completed")
-    # Remove any empty list representations.
-    cleaned_df = remove_empty_list_values(merged_df)
-    return cleaned_df.to_dict(orient='list')
 
+    logger.info("Full processing completed")
+
+    return {
+        'id': combined_df['id'][0],
+        'title': remove_duplicates(combined_df['title']),
+        'lab': remove_duplicates(combined_df['lab']),
+        'lcn': remove_duplicates(combined_df['lcn']),
+        'lpn': remove_duplicates(combined_df['lpn']),
+        'curi': remove_duplicates(combined_df['curi']),
+        'puri': remove_duplicates(combined_df['puri']),
+        'voc': remove_duplicates(combined_df['voc']),
+        'tlds': remove_duplicates(combined_df['tlds']),
+        'sparql': remove_duplicates(combined_df['sparql']),
+        'creator': remove_duplicates(combined_df['creator']),
+        'license': remove_duplicates(combined_df['license']),
+        'language': remove_duplicates(combined_df['language']),
+        'dsc' : remove_duplicates(void_df['dsc']),
+        'sbj': remove_duplicates(void_df['sbj'])
+    }
 
 def process_lov_data_row(row: dict[str, Any], index: int, total: int) -> dict[str, Any]:
     logger.info("Processing LOV row %d/%d started.", index, total)
