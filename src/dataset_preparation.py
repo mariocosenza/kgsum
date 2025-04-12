@@ -237,7 +237,7 @@ def select_local_property(parsed_graph):
 
 def select_local_endpoint(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_VOID_SPARQL)
-    return {str(row.sparql) for row in qres}
+    return list({str(row.sparql) for row in qres})
 
 
 def select_local_creator(parsed_graph):
@@ -307,9 +307,9 @@ def select_local_void_description(parsed_graph):
     return {row.desc for row in qres}
 
 
-def select_local_void_title(parsed_graph):
+def select_local_void_title(parsed_graph) -> list[str]:
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
-    return {row.desc for row in qres}
+    return list({row.desc for row in qres})
 
 
 def _guess_format_and_parse(path):
@@ -349,20 +349,20 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
 
 
         return {
-            'id': [title],
-            'title': [title],
-            'sbj': [subject],
-            'dsc': [description],
-            'voc': [vocabulary],
-            'curi': [class_val],
-            'puri': [property_val],
-            'lcn': [cname],
-            'lpn': [pname],
-            'lab': [label],
-            'sparql': [sparql],
-            'tlds': [tld],
-            'creator': [creator],
-            'license': [licenses]
+            'id': title,
+            'title': title,
+            'sbj': list(subject),
+            'dsc': list(description),
+            'voc': list(vocabulary),
+            'curi': list(class_val),
+            'puri': list(property_val),
+            'lcn': list(cname),
+            'lpn': list(pname),
+            'lab': list(label),
+            'sparql': list(sparql),
+            'tlds': list(tld),
+            'creator': list(creator),
+            'license': list(licenses)
         }
 
     except Exception as e:
@@ -475,16 +475,16 @@ def create_local_void_dataset(offset=0, limit=10000):
 
 if __name__ == '__main__':
     import multiprocessing
-
     multiprocessing.freeze_support()
-   # create_local_void_dataset(offset=1101, limit=1125)  # Process items 1101 to 1150 (50 items)
-    #time.sleep(120)
-    #create_local_void_dataset(offset=1126, limit=1150)
-   # create_local_void_dataset(offset=1151, limit=1200)  # Process items 1151 to 1200 (50 items)
-    #create_local_void_dataset(offset=1201, limit=1250)
-  #  create_local_void_dataset(offset=1251, limit=1300)  # Process items 1151 to 1200 (50 items)
-   # create_local_void_dataset(offset=1301, limit=1350)
-   # create_local_void_dataset(offset=1351, limit=1400)
+
+    create_local_void_dataset(offset=0, limit=200)
+    create_local_void_dataset(offset=1101, limit=1125)
+    create_local_void_dataset(offset=1126, limit=1150)
+    create_local_void_dataset(offset=1151, limit=1200)
+    create_local_void_dataset(offset=1201, limit=1250)
+    create_local_void_dataset(offset=1251, limit=1300)
+    create_local_void_dataset(offset=1301, limit=1350)
+    create_local_void_dataset(offset=1351, limit=1400)
 
 
     #create_local_dataset(offset=1201, limit=1250)  # Process items 1201 to 1250 (50 items)

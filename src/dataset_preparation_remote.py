@@ -203,7 +203,7 @@ async def async_select_remote_title(endpoint, timeout=300):
     return title
 
 
-async def async_select_remote_tld(endpoint, limit=1000, timeout=300):
+async def async_select_remote_tld(endpoint, limit=1000, timeout=300) -> list:
     logger.info(f"[TLD] Starting TLD query for endpoint: {endpoint}")
     tlds = set()
     offset = 0
@@ -235,9 +235,9 @@ async def async_select_remote_tld(endpoint, limit=1000, timeout=300):
             offset += 100
         except Exception as e:
             logger.warning(f"[TLD] Query execution error: {e}. Endpoint: {endpoint}")
-            return ''
+            return []
     logger.info(f"[TLD] Finished TLD query for endpoint: {endpoint} (found {len(tlds)} TLDs)")
-    return tlds
+    return list(tlds)
 
 
 async def async_select_remote_property(endpoint, timeout=300, filter=True):
@@ -443,7 +443,7 @@ async def async_select_void_license(endpoint, timeout=300, void_file=False):
 
 
 async def async_select_void_creator(endpoint, timeout=300, void_file=False):
-    logger.info(f"[VDESC] Starting VOID description query for endpoint: {endpoint}")
+    logger.info(f"[VCRE] Starting VOID description query for endpoint: {endpoint}")
     query = """
           PREFIX dcterms: <http://purl.org/dc/terms/> 
           SELECT ?desc WHERE {
@@ -636,8 +636,8 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
     return {
         'id': endpoint,
         'title': title,
-        'sbj': data_void[0],
-        'dsc': data_void[1],
+        'sbj': data_void[1],
+        'dsc': data_void[2],
         'voc': data[2],
         'curi': data[3],
         'puri': data[4],
@@ -646,8 +646,8 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
         'lab': data[7],
         'tlds': data[8],
         'sparql': endpoint,
-        'creator': data[9],
-        'license': data[10]
+        'creator': data[10],
+        'license': data[11]
     }
 
 if __name__ == '__main__':
