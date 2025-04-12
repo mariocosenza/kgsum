@@ -49,7 +49,6 @@ async def generate_profile_from_store():
 
 
 def create_profile(data: dict | pd.DataFrame | pd.Series) -> dict:
-    print(data)
     if isinstance(data, pd.DataFrame):
         data.dropna(inplace=True)
         data.drop_duplicates(inplace=True)
