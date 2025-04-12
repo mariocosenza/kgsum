@@ -37,7 +37,7 @@ for lang, model in [
     ("pt", "pt_core_news_lg"),
 ]:
     try:
-        # spacy.prefer_gpu()
+        #spacy.prefer_gpu()
         pipeline_dict[lang] = spacy.load(model)
     except Exception as e:
         logger.error("Error loading %s pipeline: %s", lang, e)
@@ -66,6 +66,9 @@ def sanitize_field(value: Any) -> Any:
         return ""
     elif isinstance(value, str) and value in '[]':
         return ""
+    elif isinstance(value, list):
+        return remove_duplicates(value)
+
     return value
 
 
@@ -126,6 +129,30 @@ def normalize_text_list(text_list: list[Any] | str) -> str:
 def process_normalize_text(text_list: list[Any]) -> list[str]:
     """Process and normalize each element in a list of texts."""
     return [process_text(str(word)) for word in text_list if word is not None]
+
+
+def extract_named_entities(lab: list[str]) -> list[str]:
+    entity_types = set()
+    if not lab or not isinstance(lab, list):
+        return []
+
+    for text in lab:
+        if not text or not isinstance(text, str):
+            continue
+        try:
+            # Detect language using the main pipeline.
+            doc = nlp(text)
+            lang = doc._.language.get("language", "xx")
+            # Select the language-specific pipeline, or fallback if not available.
+            chosen_nlp = pipeline_dict.get(lang, fallback_pipeline)
+            doc = chosen_nlp(text)
+            # Add each entity's type (label) to the set.
+            for ent in doc.ents:
+                if ent.label_:
+                    entity_types.add(ent.label_)
+        except Exception as e:
+            logger.error("Error extracting named entity types from text '%s': %s", text, e)
+    return list(entity_types)
 
 
 def merge_dataset() -> pd.DataFrame:
@@ -193,7 +220,7 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
         curi = sanitize_field(row.get("curi", []))
         puri = sanitize_field(row.get("puri", []))
         voc = sanitize_field(row.get("voc", []))
-        tld = sanitize_field(row.get("tld", []))
+        tld = sanitize_field(row.get("tlds", []))
         sparql = sanitize_field(row.get("sparql", []))
         combined_rows.append({
             "id": row.get("id", ""),
@@ -209,6 +236,7 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
             "sparql": sparql,
             "creator": row.get("creator", ""),
             "license": row.get("license", ""),
+            "ner": extract_named_entities(row.get("lab", "")), #TODO remove it
             "language": find_language(lab_text[:1000])
         })
         logger.info("Processing row %d/%d completed.", i, total_rows)
@@ -260,9 +288,11 @@ def combine_with_void_and_lov_data(combined_df: pd.DataFrame, void_df: pd.DataFr
 def remove_empty_list_values(df: pd.DataFrame) -> pd.DataFrame:
     return df.map(lambda x: "" if (isinstance(x, list) and not x) or (isinstance(x, str) and x.strip() == "[]") else x)
 
-def remove_duplicates(series: pd.Series) -> list[str]:
-     l = list(set(series.tolist()))
-
+def remove_duplicates(series: pd.Series | list) -> list[str]:
+     if isinstance(series, pd.Series):
+         l = list(set(series.tolist()))
+     else:
+         l = list(set(series))
      if None in l:
          l.remove(None)
      if 'None' in l:
@@ -306,7 +336,8 @@ def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[st
         'license': remove_duplicates(combined_df['license']),
         'language': remove_duplicates(combined_df['language']),
         'dsc' : remove_duplicates(void_df['dsc']),
-        'sbj': remove_duplicates(void_df['sbj'])
+        'sbj': remove_duplicates(void_df['sbj']),
+        'ner': extract_named_entities(combined_df['lab'].tolist())
     }
 
 def process_lov_data_row(row: dict[str, Any], index: int, total: int) -> dict[str, Any]:
