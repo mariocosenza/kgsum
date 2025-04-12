@@ -28,6 +28,7 @@ from transformers import (
     DataCollatorWithPadding,
 )
 import torch
+import gc
 
 FeatureLabels: TypeAlias = str | list[str]
 TextData = NewType('TextData', str)
@@ -123,7 +124,11 @@ def _predict_category_for_instance(
                 continue
             feature_data = [value]
         try:
-            pred = model.predict(feature_data)[0]
+            # Use predict_batched if the classifier is ROBERTA
+            if model.classifier_type == ClassifierType.ROBERTA:
+                pred = model.predict_batched(feature_data)[0]
+            else:
+                pred = model.predict(feature_data)[0]
             score = getattr(model, "accuracy", 0.5)
             votes.append((pred, score, feature))
         except Exception as err:
@@ -150,18 +155,18 @@ def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFr
     return result
 
 
-def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.2) -> pd.DataFrame:
+def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.1) -> pd.DataFrame:
     counts = df[target_label].value_counts()
     max_count = counts.max()
     groups = []
-    return df
-    # for label, group in df.groupby(target_label):
-    #     target_count = min(max_count, int(len(group) * max_factor))
-    #     if len(group) < target_count:
-    #         groups.append(group.sample(target_count, replace=True, random_state=42))
-    #     else:
-    #         groups.append(group)
-    # return pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
+    # return df
+    for label, group in df.groupby(target_label):
+        target_count = min(max_count, int(len(group) * max_factor))
+        if len(group) < target_count:
+            groups.append(group.sample(target_count, replace=True, random_state=42))
+        else:
+            groups.append(group)
+    return pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
 
 
 def train_multiple_models(
@@ -271,7 +276,6 @@ class KnowledgeGraphClassifier:
             )
             return encoding
         else:
-            # For non-ROBERTA classifiers we now rely on a Pipeline, so _vectorize is not used.
             if isinstance(processed, str):
                 processed = [processed]
             return processed
@@ -356,10 +360,9 @@ class KnowledgeGraphClassifier:
         max_length: int = 512,
         freeze_layers: int | None = 6,
         num_train_epochs: int = 5,
-        batch_size: int = 16,
+        batch_size: int = 8,  # Reduced default batch size
         weight_decay: float = 0.01,
     ) -> dict[str, Any]:
-        """Simplified RoBERTa training using the Trainer API with progress bar enabled."""
         self.feature_labels = feature_labels
         frame = frame.reset_index(drop=True)
         frame = frame.dropna(subset=[target_label])
@@ -369,6 +372,7 @@ class KnowledgeGraphClassifier:
             if (counts.min() / counts.max()) < 0.75:
                 logger.info("Unbalanced classes; applying oversampling.")
                 frame = oversample_dataframe(frame, target_label, max_factor=2.0)
+
         data_x = self._prepare_features(frame, feature_labels)
         data_y = frame[target_label]
         unique_labels = sorted(data_y.unique())
@@ -377,7 +381,7 @@ class KnowledgeGraphClassifier:
         if data_y.nunique() < 2:
             raise ValueError(f"Only one unique class: {data_y.unique()}")
 
-        self.roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-large')
+        self.roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
         self.max_length = max_length
         texts = [self._clean_text(text) for text in data_x.tolist()]
         encodings = self.roberta_tokenizer(texts, truncation=True, padding=True, max_length=self.max_length)
@@ -404,13 +408,14 @@ class KnowledgeGraphClassifier:
             per_device_train_batch_size=batch_size,
             per_device_eval_batch_size=batch_size,
             weight_decay=weight_decay,
-            eval_strategy="epoch",           # Updated parameter replacing deprecated evaluation_strategy
+            eval_strategy="epoch",
             logging_strategy="epoch",
             save_strategy="epoch",
-            disable_tqdm=False,              # Enables the progress bar
+            disable_tqdm=False,
             seed=42,
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
+            fp16=True  # Mixed precision enabled
         )
 
         def compute_metrics(eval_pred):
@@ -429,6 +434,10 @@ class KnowledgeGraphClassifier:
         )
 
         trainer.train()
+        # Explicitly clear GPU memory after training to help avoid OOM later
+        torch.cuda.empty_cache()
+        gc.collect()
+
         eval_results = trainer.evaluate()
         final_f1 = eval_results.get("eval_f1", 0.0)
         final_acc = eval_results.get("eval_accuracy", 0.0)
@@ -451,7 +460,7 @@ class KnowledgeGraphClassifier:
             frame: pd.DataFrame,
             feature_labels: FeatureLabels,
             target_label: str = 'category',
-            cv_folds: int = 2,  # Default is now 2 folds
+            cv_folds: int = 2,
             max_length: int = 512,
             freeze_layers: int | None = 6,
     ) -> dict[str, Any]:
@@ -546,6 +555,8 @@ class KnowledgeGraphClassifier:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
         if self.classifier_type == ClassifierType.ROBERTA:
+            # For smaller inputs, you may use this method;
+            # however, if you encounter memory issues with large batches, consider using predict_batched.
             x_vectorized = self._vectorize(data, feature_labels)
             try:
                 self.model.eval()
@@ -580,6 +591,49 @@ class KnowledgeGraphClassifier:
             except Exception as e:
                 logger.error("Prediction error: %s", e)
                 raise ValueError(f"Prediction failed: {e}")
+        if self.target_label_inverse_mapping:
+            return np.array([self.target_label_inverse_mapping[int(idx)] for idx in numerical_preds])
+        return numerical_preds
+
+    def predict_batched(
+        self,
+        data: str | list[str] | pd.Series | pd.DataFrame,
+        batch_size: int = 8,
+        feature_labels: FeatureLabels | None = None,
+    ) -> np.ndarray:
+        """
+        A new batched prediction method for the RoBERTa branch.
+        Use this method for large datasets to avoid large tensor allocations.
+        """
+        if self.model is None:
+            raise ValueError("Model not trained. Call train() first.")
+        if self.classifier_type != ClassifierType.ROBERTA:
+            # For non-ROBERTA models, fall back to the standard predict().
+            return self.predict(data, feature_labels)
+        x_vectorized = self._vectorize(data, feature_labels)
+        # Assume all tensors have the same number of examples.
+        keys = list(x_vectorized.keys())
+        from torch.utils.data import TensorDataset, DataLoader
+        # Create a TensorDataset from the encoded inputs; sort keys to maintain consistent order.
+        input_tensors = [x_vectorized[k] for k in sorted(x_vectorized.keys())]
+        dataset = TensorDataset(*input_tensors)
+        loader = DataLoader(dataset, batch_size=batch_size)
+        all_logits = []
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.eval()
+        with torch.no_grad():
+            for batch in loader:
+                batch_dict = {}
+                for i, key in enumerate(sorted(x_vectorized.keys())):
+                    batch_dict[key] = batch[i].to(device)
+                outputs = self.model(**batch_dict)
+                all_logits.append(outputs.logits.cpu())
+        logits = torch.cat(all_logits, dim=0)
+        num_labels = self.model.config.num_labels
+        if num_labels > 1:
+            numerical_preds = torch.argmax(logits, dim=1).numpy()
+        else:
+            numerical_preds = (torch.sigmoid(logits).numpy().flatten() > 0.5).astype(int)
         if self.target_label_inverse_mapping:
             return np.array([self.target_label_inverse_mapping[int(idx)] for idx in numerical_preds])
         return numerical_preds
