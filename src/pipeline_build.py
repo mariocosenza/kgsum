@@ -1,24 +1,25 @@
 from __future__ import annotations
 
+import ast
+import gc
 import logging
 import os
 import pickle
 import re
 import warnings
+from collections import Counter
 from enum import Enum, auto
-from typing import Any, Tuple, NewType, TypeAlias, Self
+from typing import Any, Tuple, NewType, TypeAlias
 
 import numpy as np
 import pandas as pd
 from sklearn import svm
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
+from sklearn.model_selection import train_test_split, PredefinedSplit, GridSearchCV
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, make_scorer
-from collections import Counter
 from sklearn.pipeline import Pipeline
-
 from transformers import (
     RobertaForSequenceClassification,
     RobertaTokenizer,
@@ -28,17 +29,18 @@ from transformers import (
     DataCollatorWithPadding,
 )
 import torch
-import gc
-
-FeatureLabels: TypeAlias = str | list[str]
-TextData = NewType('TextData', str)
 
 hf_logging.set_verbosity_error()
 np.seterr(invalid='ignore')
+warnings.filterwarnings("ignore", category=UserWarning,
+                        message="The parameter 'token_pattern' will not be used*")
 
-warnings.filterwarnings("ignore", category=UserWarning, message="The parameter 'token_pattern' will not be used*")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Type aliases.
+FeatureLabels: TypeAlias = str | list[str]
+TextData = NewType('TextData', str)
 
 
 class ClassifierType(Enum):
@@ -49,55 +51,28 @@ class ClassifierType(Enum):
 
 
 def majority_vote(predictions: list[Any]) -> Any:
-    # If predictions is actually a string, treat it as a single prediction.
+    # Retained for potential intra-instance voting; not used for pre-aggregated data.
     if isinstance(predictions, str):
         return predictions
-
-    if not predictions:
-        logger.info("No predictions available for majority vote.")
+    filtered_predictions = [p for p in predictions if p is not None]
+    if not filtered_predictions:
+        logger.info("No valid predictions available for majority vote.")
         return None
-
-    # Check if votes are weighted with feature info.
-    if isinstance(predictions[0], (tuple, list)):
-        if len(predictions[0]) == 3 and isinstance(predictions[0][1], (float, int)):
-            candidate_info = {}  # candidate -> {'features': [(feature, f1), ...], 'score': total_score}
-            for pred, f1, feature in predictions:
-                if pred in candidate_info:
-                    candidate_info[pred]['features'].append((feature, f1))
-                    candidate_info[pred]['score'] += f1
-                else:
-                    candidate_info[pred] = {'features': [(feature, f1)], 'score': f1}
-            # Log candidate contributions.
-            for candidate, info in candidate_info.items():
-                features_str = ", ".join(f"{feat} (F1={f1:.2f})" for feat, f1 in info['features'])
-                logger.info("Candidate '%s': features -> %s, total F1 sum = %.4f", candidate, features_str, info['score'])
-            chosen, chosen_info = max(candidate_info.items(), key=lambda x: x[1]['score'])
-            logger.info("Weighted majority vote result: chosen candidate '%s' with total F1 sum %.4f", chosen, chosen_info['score'])
-            return chosen
-        elif len(predictions[0]) == 2 and isinstance(predictions[0][1], (float, int)):
-            # Weighted votes without feature info: use sum.
-            products = {}
-            for pred, f1 in predictions:
-                products[pred] = products.get(pred, 0) + f1
-            chosen, score = max(products.items(), key=lambda x: x[1])
-            logger.info("Weighted majority vote result: label '%s' with total F1 sum %.4f", chosen, score)
-            return chosen
-        else:
-            filtered_predictions = [p for p in predictions if p is not None]
-            if not filtered_predictions:
-                logger.info("No valid predictions available for majority vote.")
-                return None
-            chosen = Counter(filtered_predictions).most_common(1)[0][0]
-            logger.info("Standard majority vote result: label '%s'", chosen)
-            return chosen
-    else:
-        filtered_predictions = [p for p in predictions if p is not None]
-        if not filtered_predictions:
-            logger.info("No valid predictions available for majority vote.")
-            return None
-        chosen = Counter(filtered_predictions).most_common(1)[0][0]
-        logger.info("Standard majority vote result: label '%s'", chosen)
-        return chosen
+    if isinstance(filtered_predictions[0], (tuple, list)):
+        candidate_info = {}
+        for tup in filtered_predictions:
+            label = tup[0]
+            try:
+                weight = float(tup[1])
+            except Exception:
+                weight = 1.0
+            candidate_info[label] = candidate_info.get(label, 0.0) + weight
+        best_label = max(candidate_info.items(), key=lambda x: x[1])[0]
+        logger.info("Majority vote: candidate '%s' total weight: %.4f", best_label, candidate_info[best_label])
+        return best_label
+    best_label = Counter(filtered_predictions).most_common(1)[0][0]
+    logger.info("Majority vote result: candidate '%s'", best_label)
+    return best_label
 
 
 def _predict_category_for_instance(
@@ -124,7 +99,6 @@ def _predict_category_for_instance(
                 continue
             feature_data = [value]
         try:
-            # Use predict_batched if the classifier is ROBERTA
             if model.classifier_type == ClassifierType.ROBERTA:
                 pred = model.predict_batched(feature_data)[0]
             else:
@@ -155,25 +129,27 @@ def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFr
     return result
 
 
-def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.1) -> pd.DataFrame:
+def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.2) -> pd.DataFrame:
     counts = df[target_label].value_counts()
+    logger.info("Original class counts: %s", counts.to_dict())
     max_count = counts.max()
     groups = []
-    # return df
     for label, group in df.groupby(target_label):
         target_count = min(max_count, int(len(group) * max_factor))
         if len(group) < target_count:
             groups.append(group.sample(target_count, replace=True, random_state=42))
         else:
             groups.append(group)
-    return pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
+    oversampled = pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
+    logger.info("After oversampling: %s", oversampled[target_label].value_counts().to_dict())
+    return oversampled
 
 
 def train_multiple_models(
     training_data: pd.DataFrame,
     feature_columns: list[str],
     target_label: str = 'category',
-    classifier_type: ClassifierType = ClassifierType.SVM
+    classifier_type: ClassifierType = ClassifierType.SVM,
 ) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     models: dict[str, KnowledgeGraphClassifier] = {}
     training_results: dict[str, Any] = {}
@@ -193,9 +169,6 @@ def train_multiple_models(
         model = KnowledgeGraphClassifier(classifier_type=classifier_type, balance_classes=True)
         try:
             result = model.train(df_feature, feature, target_label=target_label)
-        except ValueError as err:
-            logger.info("Skipping '%s': %s", feature, err)
-            continue
         except Exception as err:
             logger.error("Error training model for '%s': %s", feature, err)
             continue
@@ -229,12 +202,12 @@ class KnowledgeGraphClassifier:
             max_features=1000000,
             ngram_range=(1, 3),
             min_df=1,
-            max_df=0.9,
+            max_df=0.8,
             sublinear_tf=True,
             use_idf=True,
             norm='l2'
         )
-        self.model: GridSearchCV | torch.nn.Module | RobertaForSequenceClassification | None = None
+        self.model: Pipeline | torch.nn.Module | RobertaForSequenceClassification | None = None
         self.roberta_tokenizer: RobertaTokenizer | None = None
         self.target_label_mapping: dict[Any, int] | None = None
         self.target_label_inverse_mapping: dict[int, Any] | None = None
@@ -262,11 +235,13 @@ class KnowledgeGraphClassifier:
             return self._clean_text(data) if isinstance(data, str) else data
 
     def _vectorize(self, data: Any, feature_labels: FeatureLabels | None) -> Any:
-        # This method is used in the RoBERTa branch.
         processed = self._process_input(data, feature_labels)
         if self.classifier_type == ClassifierType.ROBERTA:
             texts = [processed] if isinstance(processed, str) else processed
             texts = [self._clean_text(text) for text in texts]
+            if not torch.cuda.is_available():
+                raise RuntimeError("GPU is required for RoBERTa but was not found.")
+            device = torch.device("cuda")
             encoding = self.roberta_tokenizer(
                 texts,
                 padding='max_length',
@@ -280,56 +255,53 @@ class KnowledgeGraphClassifier:
                 processed = [processed]
             return processed
 
-    def _get_param_grid(self) -> dict[str, list[Any]] | list[dict[str, Any]]:
+    def _get_param_grid(self) -> dict | list[dict]:
         if self.classifier_type == ClassifierType.SVM:
             if self.balance_classes:
                 return [
-                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["linear"], "class_weight": ["balanced"]},
-                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["rbf"], "gamma": ["scale", 0.01, 0.1],
-                     "class_weight": ["balanced"]},
-                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["poly"], "degree": [2], "gamma": ["scale", 0.01],
-                     "class_weight": ["balanced"]}
+                    {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["linear"], "class_weight": ["balanced"]},
+                    {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["rbf"], "gamma": ["scale", 0.001, 0.01, 0.1], "class_weight": ["balanced"]},
+                    {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["poly"], "degree": [2], "gamma": ["scale", 0.01], "class_weight": ["balanced"]}
                 ]
             else:
                 return [
-                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["linear"], "class_weight": [None, "balanced"]},
-                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["rbf"], "gamma": ["scale", 0.01, 0.1],
-                     "class_weight": [None, "balanced"]},
-                    {"C": [0.01, 0.05, 0.1, 0.5, 1], "kernel": ["poly"], "degree": [2], "gamma": ["scale", 0.01],
-                     "class_weight": [None, "balanced"]}
+                    {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["linear"]},
+                    {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["rbf"], "gamma": ["scale", 0.001, 0.01, 0.1]},
+                    {"C": [0.001, 0.01, 0.1, 1, 10], "kernel": ["poly"], "degree": [2], "gamma": ["scale", 0.01]}
                 ]
         elif self.classifier_type == ClassifierType.NAIVE_BAYES:
-            return  {
-                "alpha": [
-                    0.1, 0.2, 0.3, 0.4, 0.5,
-                    0.6, 0.7, 0.8, 0.9, 1.0,
-                    1.2, 1.4, 1.6, 1.8, 2.0,
-                    2.5, 3.0, 3.5, 4.0, 4.5,
-                    5.0, 5.5, 6.0, 6.5, 7.0,
-                    7.5, 8.0, 8.5, 9.0, 10.0
-                ],
-                "fit_prior": [True, False]
-            }
+            return {"alpha": [0.1, 0.5, 1.0, 2.0, 5.0, 10.0], "fit_prior": [True, False]}
         elif self.classifier_type == ClassifierType.KNN:
-            return {
-                "n_neighbors": [11, 15, 21, 25, 31],
-                "weights": ["uniform", "distance"],
-                "metric": ["euclidean", "manhattan"],
-                "leaf_size": [20, 30, 40]
-            }
+            return {"n_neighbors": [3, 5, 7, 9, 11],
+                    "weights": ["uniform", "distance"],
+                    "metric": ["euclidean", "manhattan"],
+                    "leaf_size": [20, 30, 40]}
         return {}
 
     def custom_tokenizer(self, text: str) -> list[str]:
         return self._clean_text(text).split()
 
     def _prepare_features(self, frame: pd.DataFrame, feature_labels: FeatureLabels) -> pd.Series:
+        # If a feature value is a list or a string representation of a list, join the elements with a space.
+        def process_value(val):
+            if isinstance(val, list):
+                return " ".join(str(x) for x in val)
+            s = str(val)
+            if s.startswith('[') and s.endswith(']'):
+                try:
+                    lst = ast.literal_eval(s)
+                    if isinstance(lst, list):
+                        return " ".join(str(x) for x in lst)
+                except Exception:
+                    pass
+            return s
         if isinstance(feature_labels, str):
-            features = frame[feature_labels].fillna('').astype(str)
+            features = frame[feature_labels].fillna('').apply(process_value)
         else:
-            features = frame[feature_labels[0]].fillna('').astype(str)
+            features = frame[feature_labels[0]].fillna('').apply(process_value)
             for label in feature_labels[1:]:
-                features += " " + frame[label].fillna('').astype(str)
-        return features.apply(self._clean_text)
+                features = features.astype(str) + f" [Feature: {label}] " + frame[label].fillna('').astype(str)
+        return features.apply(lambda x: self._clean_text(x))
 
     def _freeze_roberta_layers(self, num_layers: int) -> None:
         for param in self.model.roberta.embeddings.parameters():
@@ -349,9 +321,6 @@ class KnowledgeGraphClassifier:
         else:
             raise ValueError(f"Base estimator not defined for classifier type: {self.classifier_type}")
 
-    def _get_cv_strategy(self, data_y: pd.Series, cv_folds: int) -> StratifiedKFold:
-        return StratifiedKFold(n_splits=cv_folds, random_state=42, shuffle=True)
-
     def train_roberta(
         self,
         frame: pd.DataFrame,
@@ -359,20 +328,22 @@ class KnowledgeGraphClassifier:
         target_label: str = 'category',
         max_length: int = 512,
         freeze_layers: int | None = 6,
-        num_train_epochs: int = 5,
-        batch_size: int = 8,  # Reduced default batch size
+        num_train_epochs: int = 6,  # Changed default to 6 epochs.
+        batch_size: int = 8,
         weight_decay: float = 0.01,
     ) -> dict[str, Any]:
+        # 80% training, 10% validation, 10% test split for RoBERTa.
         self.feature_labels = feature_labels
         frame = frame.reset_index(drop=True)
         frame = frame.dropna(subset=[target_label])
         frame = frame[frame[target_label] != '']
         if self.balance_classes:
             counts = frame[target_label].value_counts()
+            logger.info("Before oversampling, class counts: %s", counts.to_dict())
             if (counts.min() / counts.max()) < 0.75:
-                logger.info("Unbalanced classes; applying oversampling.")
+                logger.info("Unbalanced classes detected; applying oversampling.")
                 frame = oversample_dataframe(frame, target_label, max_factor=2.0)
-
+                logger.info("After oversampling, class counts: %s", frame[target_label].value_counts().to_dict())
         data_x = self._prepare_features(frame, feature_labels)
         data_y = frame[target_label]
         unique_labels = sorted(data_y.unique())
@@ -381,23 +352,40 @@ class KnowledgeGraphClassifier:
         if data_y.nunique() < 2:
             raise ValueError(f"Only one unique class: {data_y.unique()}")
 
+        if not torch.cuda.is_available():
+            raise RuntimeError("GPU is required for RoBERTa but was not found.")
         self.roberta_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        # Use roberta-large instead of roberta-base.
         self.max_length = max_length
-        texts = [self._clean_text(text) for text in data_x.tolist()]
-        encodings = self.roberta_tokenizer(texts, truncation=True, padding=True, max_length=self.max_length)
-        y_encoded = data_y.map(self.target_label_mapping).tolist()
 
-        dataset = RobertaDataset(encodings, y_encoded)
-        total_len = len(dataset)
-        train_size = int(0.9 * total_len)
-        val_size = total_len - train_size
-        train_dataset, val_dataset = torch.utils.data.random_split(
-            dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42)
+        texts = [self._clean_text(text) for text in data_x.tolist()]
+        X_train, X_temp, y_train, y_temp = train_test_split(
+            texts,
+            data_y.map(self.target_label_mapping).tolist(),
+            test_size=0.20,
+            random_state=42,
+            stratify=data_y
         )
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_temp,
+            y_temp,
+            test_size=0.50,
+            random_state=42,
+            stratify=y_temp
+        )
+
+        encodings = self.roberta_tokenizer(X_train, truncation=True, padding=True, max_length=self.max_length)
+        train_dataset = RobertaDataset(encodings, y_train)
+        encodings_val = self.roberta_tokenizer(X_val, truncation=True, padding=True, max_length=self.max_length)
+        val_dataset = RobertaDataset(encodings_val, y_val)
+        encodings_test = self.roberta_tokenizer(X_test, truncation=True, padding=True, max_length=self.max_length)
+        test_dataset = RobertaDataset(encodings_test, y_test)
+
         data_collator = DataCollatorWithPadding(tokenizer=self.roberta_tokenizer)
         num_classes = len(unique_labels)
+        # Use roberta-large.
         self.model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=num_classes)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda")
         self.model.to(device)
         if freeze_layers is not None:
             self._freeze_roberta_layers(freeze_layers)
@@ -415,39 +403,49 @@ class KnowledgeGraphClassifier:
             seed=42,
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
-            fp16=True  # Mixed precision enabled
+            fp16=True
         )
 
         def compute_metrics(eval_pred):
             logits, labels = eval_pred
             preds = torch.argmax(torch.tensor(logits), dim=1).numpy()
-            return {"accuracy": accuracy_score(labels, preds), "f1": f1_score(labels, preds, average='weighted')}
+            return {"accuracy": accuracy_score(labels, preds),
+                    "f1": f1_score(labels, preds, average='weighted')}
 
         trainer = Trainer(
             model=self.model,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
-            processing_class=self.roberta_tokenizer,  # Replaces deprecated tokenizer parameter.
+            processing_class=self.roberta_tokenizer,
             data_collator=data_collator,
             compute_metrics=compute_metrics,
         )
 
         trainer.train()
-        # Explicitly clear GPU memory after training to help avoid OOM later
         torch.cuda.empty_cache()
         gc.collect()
 
-        eval_results = trainer.evaluate()
-        final_f1 = eval_results.get("eval_f1", 0.0)
-        final_acc = eval_results.get("eval_accuracy", 0.0)
-        self.accuracy = final_f1
-        logger.info("Final RoBERTa F1: %.4f, Accuracy: %.4f", final_f1, final_acc)
-        training_history = {"training_args": training_args.to_dict(), "eval_results": eval_results}
+        # Evaluate on validation set.
+        val_results = trainer.evaluate()
+        val_f1 = val_results.get("eval_f1", 0.0)
+        val_acc = val_results.get("eval_accuracy", 0.0)
+        # Evaluate on held-out test set.
+        test_results = trainer.evaluate(test_dataset)
+        test_f1 = test_results.get("eval_f1", 0.0)
+        test_acc = test_results.get("eval_accuracy", 0.0)
+        self.accuracy = val_f1
+
+        logger.info("Validation - RoBERTa F1 score: %.4f, Accuracy: %.4f", val_f1, val_acc)
+        logger.info("Test - RoBERTa F1 score: %.4f, Accuracy: %.4f", test_f1, test_acc)
+
+        training_history = {"training_args": training_args.to_dict(), "val_results": val_results, "test_results": test_results}
         return {
             'history': training_history,
-            'final_f1': final_f1,
-            'final_accuracy': final_acc,
+            'val_f1': val_f1,
+            'val_accuracy': val_acc,
+            'test_f1': test_f1,
+            'test_accuracy': test_acc,
             'num_classes': num_classes,
             'max_length': self.max_length,
             'target_label_mapping': self.target_label_mapping,
@@ -456,13 +454,12 @@ class KnowledgeGraphClassifier:
         }
 
     def train(
-            self,
-            frame: pd.DataFrame,
-            feature_labels: FeatureLabels,
-            target_label: str = 'category',
-            cv_folds: int = 2,
-            max_length: int = 512,
-            freeze_layers: int | None = 6,
+        self,
+        frame: pd.DataFrame,
+        feature_labels: FeatureLabels,
+        target_label: str = 'category',
+        max_length: int = 512,
+        freeze_layers: int | None = 6,
     ) -> dict[str, Any]:
         if self.classifier_type == ClassifierType.ROBERTA:
             return self.train_roberta(
@@ -473,7 +470,7 @@ class KnowledgeGraphClassifier:
                 freeze_layers=freeze_layers,
             )
         else:
-            # Set the feature_labels for future use (e.g., in predict())
+            # Non-Roberta branch: 80/10/10 split with GridSearchCV.
             self.feature_labels = feature_labels
             data_x = self._prepare_features(frame, feature_labels)
             data_y = frame[target_label]
@@ -481,62 +478,85 @@ class KnowledgeGraphClassifier:
             self.target_label_mapping = {label: idx for idx, label in enumerate(unique_labels)}
             self.target_label_inverse_mapping = {idx: label for label, idx in self.target_label_mapping.items()}
 
-            # Preliminary check: ensure the vectorizer can generate features.
-            try:
-                x_temp = self.vectorizer.fit_transform(data_x)
-                if x_temp.shape[1] == 0:
-                    raise ValueError("No features generated during vectorization.")
-            except Exception as e:
-                logger.error("Vectorization error: %s", e)
-                raise ValueError(f"Vectorization failed: {e}")
+            X_train, X_temp, y_train, y_temp = train_test_split(
+                data_x,
+                data_y.map(self.target_label_mapping).values,
+                test_size=0.20,
+                random_state=42,
+                stratify=data_y
+            )
+            X_val, X_test, y_val, y_test = train_test_split(
+                X_temp, y_temp,
+                test_size=0.50,
+                random_state=42,
+                stratify=y_temp
+            )
+            X_combo = pd.concat([X_train, X_val])
+            y_combo = np.concatenate([y_train, y_val])
+            test_fold = [-1] * len(X_train) + [0] * len(X_val)
+            ps = PredefinedSplit(test_fold)
 
-            # Create a pipeline to ensure the vectorizer is fit within each cross-validation fold.
             pipeline = Pipeline([
                 ('vectorizer', self.vectorizer),
                 ('classifier', self._get_base_estimator())
             ])
 
-            # Modify parameter grid keys to work with the pipeline (prefix with 'classifier__').
-            param_grid = self._get_param_grid()
-            if isinstance(param_grid, list):
-                modified_param_grid = []
-                for grid_dict in param_grid:
-                    modified_dict = {"classifier__" + k: v for k, v in grid_dict.items()}
-                    modified_param_grid.append(modified_dict)
-            elif isinstance(param_grid, dict):
-                modified_param_grid = {"classifier__" + k: v for k, v in param_grid.items()}
+            clf_grid = self._get_param_grid()
+            if isinstance(clf_grid, list):
+                updated_clf_grid = []
+                for d in clf_grid:
+                    updated = {f"classifier__{k}": v for k, v in d.items()}
+                    updated_clf_grid.append(updated)
+            elif isinstance(clf_grid, dict):
+                updated_clf_grid = {f"classifier__{k}": v for k, v in clf_grid.items()}
             else:
-                modified_param_grid = param_grid
+                updated_clf_grid = {}
 
-            y_encoded = data_y.map(self.target_label_mapping).values
-            scorer = make_scorer(f1_score, average='weighted', zero_division=0)
-            cv_strategy = StratifiedKFold(n_splits=cv_folds, random_state=67, shuffle=True)
-            try:
-                grid = GridSearchCV(
-                    estimator=pipeline,
-                    param_grid=modified_param_grid,
-                    cv=cv_strategy,
-                    scoring=scorer,
-                    return_train_score=True,
-                    verbose=1,
-                    n_jobs=-1,
-                    error_score=np.nan,
-                )
-                grid.fit(data_x, y_encoded)
-            except Exception as e:
-                logger.error("Grid search error: %s", e)
-                raise ValueError(f"Grid search failed: {e}")
-            try:
-                y_pred = grid.predict(data_x)
-                final_f1 = f1_score(y_encoded, y_pred, average='weighted')
-                final_acc = accuracy_score(y_encoded, y_pred)
-                self.accuracy = final_f1
-                conf_mat = confusion_matrix(y_encoded, y_pred)
-                logger.info("Final Model F1: %.4f, Accuracy: %.4f", final_f1, final_acc)
-            except Exception as e:
-                logger.error("Evaluation error: %s", e)
-                final_f1, final_acc, conf_mat = np.nan, np.nan, None
-            self.model = grid
+            tfidf_grid = {
+                "vectorizer__ngram_range": [(1, 1), (1, 2), (1, 3)],
+                "vectorizer__min_df": [1, 2],
+                "vectorizer__max_df": [0.8, 0.9]
+            }
+            if isinstance(updated_clf_grid, list):
+                param_grid = []
+                for d in updated_clf_grid:
+                    merged = d.copy()
+                    merged.update(tfidf_grid)
+                    param_grid.append(merged)
+            elif isinstance(updated_clf_grid, dict):
+                updated_clf_grid.update(tfidf_grid)
+                param_grid = updated_clf_grid
+            else:
+                param_grid = tfidf_grid
+
+            grid = GridSearchCV(
+                estimator=pipeline,
+                param_grid=param_grid,
+                cv=ps,
+                scoring='f1_weighted',
+                verbose=1,
+                n_jobs=-1,
+                error_score=np.nan
+            )
+            grid.fit(X_combo, y_combo)
+            best_estimator = grid.best_estimator_
+
+            y_pred_numeric = best_estimator.predict(X_test)
+            final_f1 = f1_score(y_test, y_pred_numeric, average='weighted')
+            final_acc = accuracy_score(y_test, y_pred_numeric)
+            self.accuracy = final_f1
+            conf_mat = confusion_matrix(y_test, y_pred_numeric)
+            logger.info("Final non-Roberta Model F1 score: %.4f, Accuracy: %.4f", final_f1, final_acc)
+
+            for idx, (pred_num, true_num) in enumerate(zip(y_pred_numeric, y_test)):
+                pred_label = self.target_label_inverse_mapping.get(pred_num, pred_num)
+                true_label_val = self.target_label_inverse_mapping.get(true_num, true_num)
+                if pred_label != true_label_val:
+                    tokenized = self.custom_tokenizer(X_test.iloc[idx])
+                    logger.info("Misclassified sample index %d: True label: %s, Predicted: %s, Tokenized data: %s",
+                                idx, true_label_val, pred_label, tokenized)
+
+            self.model = best_estimator
             return {
                 'best_params': grid.best_params_,
                 'final_f1': final_f1,
@@ -555,12 +575,12 @@ class KnowledgeGraphClassifier:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
         if self.classifier_type == ClassifierType.ROBERTA:
-            # For smaller inputs, you may use this method;
-            # however, if you encounter memory issues with large batches, consider using predict_batched.
             x_vectorized = self._vectorize(data, feature_labels)
+            if not torch.cuda.is_available():
+                raise RuntimeError("GPU is required for RoBERTa but was not found.")
+            device = torch.device("cuda")
             try:
                 self.model.eval()
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 x_vectorized = {k: v.to(device) for k, v in x_vectorized.items()}
                 with torch.no_grad():
                     outputs = self.model(**x_vectorized)
@@ -570,10 +590,9 @@ class KnowledgeGraphClassifier:
                                    if num_labels > 1
                                    else (torch.sigmoid(logits).cpu().numpy().flatten() > 0.5).astype(int))
             except Exception as e:
-                logger.error("Prediction error: %s", e)
+                logger.error("RoBERTa Prediction error: %s", e)
                 raise ValueError(f"Prediction failed: {e}")
         else:
-            # For non-ROBERTA classifiers (using pipeline), pass raw text directly.
             if feature_labels is None and self.feature_labels:
                 feature_labels = self.feature_labels
             if isinstance(data, pd.DataFrame):
@@ -592,7 +611,7 @@ class KnowledgeGraphClassifier:
                 logger.error("Prediction error: %s", e)
                 raise ValueError(f"Prediction failed: {e}")
         if self.target_label_inverse_mapping:
-            return np.array([self.target_label_inverse_mapping[int(idx)] for idx in numerical_preds])
+            return np.array([self.target_label_inverse_mapping.get(int(idx), idx) for idx in numerical_preds])
         return numerical_preds
 
     def predict_batched(
@@ -601,31 +620,24 @@ class KnowledgeGraphClassifier:
         batch_size: int = 8,
         feature_labels: FeatureLabels | None = None,
     ) -> np.ndarray:
-        """
-        A new batched prediction method for the RoBERTa branch.
-        Use this method for large datasets to avoid large tensor allocations.
-        """
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
         if self.classifier_type != ClassifierType.ROBERTA:
-            # For non-ROBERTA models, fall back to the standard predict().
             return self.predict(data, feature_labels)
         x_vectorized = self._vectorize(data, feature_labels)
-        # Assume all tensors have the same number of examples.
         keys = list(x_vectorized.keys())
         from torch.utils.data import TensorDataset, DataLoader
-        # Create a TensorDataset from the encoded inputs; sort keys to maintain consistent order.
         input_tensors = [x_vectorized[k] for k in sorted(x_vectorized.keys())]
         dataset = TensorDataset(*input_tensors)
         loader = DataLoader(dataset, batch_size=batch_size)
         all_logits = []
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if not torch.cuda.is_available():
+            raise RuntimeError("GPU is required for RoBERTa but was not found.")
+        device = torch.device("cuda")
         self.model.eval()
         with torch.no_grad():
             for batch in loader:
-                batch_dict = {}
-                for i, key in enumerate(sorted(x_vectorized.keys())):
-                    batch_dict[key] = batch[i].to(device)
+                batch_dict = {key: batch[i].to(device) for i, key in enumerate(sorted(x_vectorized.keys()))}
                 outputs = self.model(**batch_dict)
                 all_logits.append(outputs.logits.cpu())
         logits = torch.cat(all_logits, dim=0)
@@ -635,7 +647,7 @@ class KnowledgeGraphClassifier:
         else:
             numerical_preds = (torch.sigmoid(logits).numpy().flatten() > 0.5).astype(int)
         if self.target_label_inverse_mapping:
-            return np.array([self.target_label_inverse_mapping[int(idx)] for idx in numerical_preds])
+            return np.array([self.target_label_inverse_mapping.get(int(idx), idx) for idx in numerical_preds])
         return numerical_preds
 
     def predict_proba(
@@ -647,16 +659,18 @@ class KnowledgeGraphClassifier:
             raise ValueError("Model not trained. Call train() first.")
         if self.classifier_type == ClassifierType.ROBERTA:
             x_vectorized = self._vectorize(data, feature_labels)
+            if not torch.cuda.is_available():
+                raise RuntimeError("GPU is required for RoBERTa but was not found.")
+            device = torch.device("cuda")
             try:
                 self.model.eval()
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 x_vectorized = {k: v.to(device) for k, v in x_vectorized.items()}
                 with torch.no_grad():
                     outputs = self.model(**x_vectorized)
                 logits = outputs.logits
                 return torch.nn.functional.softmax(logits, dim=1).cpu().numpy()
             except Exception as e:
-                logger.error("Predict_proba error: %s", e)
+                logger.error("RoBERTa Predict_proba error: %s", e)
                 raise ValueError(f"Probability prediction failed: {e}")
         else:
             if feature_labels is None and self.feature_labels:
@@ -708,9 +722,11 @@ class KnowledgeGraphClassifier:
             raise ValueError(f"Failed to save model: {e}")
 
     @classmethod
-    def load(cls, filepath: str | None = None, classifier_type: ClassifierType = ClassifierType.SVM) -> Self:
+    def load(cls, filepath: str | None = None, classifier_type: ClassifierType = ClassifierType.SVM) -> KnowledgeGraphClassifier:
         if filepath is None:
             filepath = f'../data/trained/model-{classifier_type.name}.pkl'
+        if not os.path.exists(filepath):
+            raise ValueError(f"Model file {filepath} does not exist. Please train and save the model first.")
         try:
             with open(filepath, 'rb') as f:
                 data = pickle.load(f)
@@ -755,6 +771,8 @@ def save_multiple_models(
 def load_multiple_models(filepath: str | None = None) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     if filepath is None:
         filepath = '../data/trained/multiple_models.pkl'
+    if not os.path.exists(filepath):
+        raise ValueError(f"Multiple models file {filepath} does not exist. Please run training and save the models first.")
     try:
         with open(filepath, 'rb') as f:
             data = pickle.load(f)
