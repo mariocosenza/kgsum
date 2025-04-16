@@ -8,6 +8,7 @@ from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
 
 from src.util import match_file_lod, CATEGORIES
+from util import is_voc_allowed, is_curi_allowed
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation")
@@ -164,6 +165,14 @@ Q_LOCAL_DCTERMS_TITLE = prepareQuery(
     } LIMIT 1
     """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
 
+Q_LOCAL_CON = prepareQuery(
+    """
+    SELECT DISTINCT ?o 
+    WHERE {
+        ?s owl:sameAs ?o
+    } LIMIT 1000
+    """, initNs={"owl": 'http://www.w3.org/2002/07/owl#'})
+
 Q_LOCAL_VOID_SPARQL = prepareQuery("""
     SELECT DISTINCT ?sparql
     WHERE {
@@ -200,14 +209,19 @@ def select_local_vocabularies(parsed_graph):
                 vocabulary_uri = "/".join(parts[:-1]) if len(parts) > 1 else predicate_uri
             else:
                 vocabulary_uri = predicate_uri
-            if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
+            if vocabulary_uri and is_voc_allowed(vocabulary_uri):
                 vocabularies.add(vocabulary_uri)
     return vocabularies
 
 
 def select_local_class(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_CLASS)
-    return [str(row.classUri) for row in qres]
+    classes = set()
+    for row in qres:
+        predicate_uri = str(row.classUri)
+        if is_curi_allowed(predicate_uri):
+            classes.add(predicate_uri)
+    return list(classes)
 
 
 def select_local_label(parsed_graph):
@@ -215,6 +229,7 @@ def select_local_label(parsed_graph):
     if len(qres) < 2:
         qres = parsed_graph.query(Q_LOCAL_LABEL)
     return {str(row.o) for row in qres}
+
 
 
 def select_local_tld(parsed_graph):
@@ -234,7 +249,12 @@ def select_local_tld(parsed_graph):
 
 def select_local_property(parsed_graph):
     qres = parsed_graph.query(Q_LOCAL_PROPERTY)
-    return {str(row.property) for row in qres}
+    properties = set()
+    for row in qres:
+        property_uri = str(row.property)
+        if is_voc_allowed(property_uri):
+            properties.add(property_uri)
+    return list(properties)
 
 
 def select_local_endpoint(parsed_graph):
@@ -258,7 +278,7 @@ def select_local_property_names(parsed_graph):
     processed_local_names = set()
     for row in qres:
         property_uri = str(row.property)
-        if not property_uri:
+        if not property_uri or not is_voc_allowed(property_uri):
             continue
         if "#" in property_uri:
             local_name = property_uri.split("#")[-1]
@@ -277,7 +297,7 @@ def select_local_class_name(parsed_graph):
     local_names = set()
     for row in qres:
         class_uri = str(row.classUri)
-        if not class_uri:
+        if not class_uri and not is_curi_allowed(class_uri):
             continue
         if "#" in class_uri:
             local_name = class_uri.split("#")[-1]
@@ -313,6 +333,9 @@ def select_local_void_title(parsed_graph) -> list[str]:
     qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
     return list({row.desc for row in qres})
 
+def select_local_con(parsed_graph) -> list[str]:
+    qres = parsed_graph.query(Q_LOCAL_CON)
+    return list({row.o for row in qres})
 
 def _guess_format_and_parse(path):
     g = Graph()
@@ -344,6 +367,7 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         sparql = select_local_endpoint(result)
         creator = select_local_creator(result)
         licenses = select_local_license(result)
+        con = select_local_con(result)
 
         if not title or title == '':
             if sparql is not None:
@@ -364,7 +388,8 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
             'sparql': list(sparql),
             'tlds': list(tld),
             'creator': list(creator),
-            'license': list(licenses)
+            'license': list(licenses),
+            'con': con
         }
 
     except Exception as e:
@@ -393,6 +418,7 @@ def process_local_dataset_file(category, file, lod_frame, offset, limit):
             select_local_endpoint(result),
             select_local_creator(result),
             select_local_license(result),
+            select_local_con(result),
             lod_frame['category'][file_num]
         ]
         return row
@@ -451,7 +477,7 @@ def create_local_dataset(offset=0, limit=10000):
             logger.info(f"Progress: {i}/{total_tasks} tasks completed.")
     df = pd.DataFrame(
         results,
-        columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'category']
+        columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'con', 'category']
     )
     df.to_json(f'../data/raw/local/local_feature_set{offset}-{limit}.json', index=False)
 

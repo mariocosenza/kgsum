@@ -6,6 +6,8 @@ import xml.etree.ElementTree as eT
 import aiohttp
 import pandas as pd
 
+from util import is_curi_allowed, is_voc_allowed
+
 MAX_OFFSET = 1000
 ENDPOINT_TIMEOUT = 600
 
@@ -47,7 +49,7 @@ async def async_select_remote_vocabularies(endpoint, timeout=300) -> list:
                         vocabulary_uri = "/".join(parts[:-1]) if len(parts) > 1 else predicate_uri
                     else:
                         vocabulary_uri = predicate_uri
-                    if vocabulary_uri and not vocabulary_uri.startswith("http://www.w3.org/"):
+                    if vocabulary_uri and is_voc_allowed(vocabulary_uri):
                         vocabularies.add(vocabulary_uri)
             offset += 100
         except Exception as e:
@@ -79,11 +81,39 @@ async def async_select_remote_class(endpoint, timeout=300):
             if not bindings:
                 logger.debug(f"[CLS] No class bindings found at offset {offset}.")
             for binding in bindings:
-                classes.append(binding.text)
+                if is_curi_allowed(binding.text):
+                    classes.append(binding.text)
         except Exception as e:
             logger.warning(f"[CLS] Query execution error: {e}. Endpoint: {endpoint}")
             return ''
     logger.info(f"[CLS] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
+    return classes
+
+async def async_select_remote_connection(endpoint, timeout=300):
+    logger.info(f"[CON] Starting class query for endpoint: {endpoint}")
+    classes = []
+    offset = 0
+    async with aiohttp.ClientSession() as session:
+        query = """
+                PREFIX owl: <http://www.w3.org/2002/07/owl#>
+                SELECT DISTINCT ?o 
+                WHERE {
+                    ?s owl:sameAs ?o .
+                } LIMIT 1000
+              """
+        try:
+            result_text = await _fetch_query(session, endpoint, query, timeout)
+            root = eT.fromstring(result_text)
+            ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
+            bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
+            if not bindings:
+                logger.debug(f"[CLS] No class bindings found at offset {offset}.")
+            for binding in bindings:
+                classes.append(binding.text)
+        except Exception as e:
+            logger.warning(f"[CLS] Query execution error: {e}. Endpoint: {endpoint}")
+            return ''
+    logger.info(f"[CON] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
     return classes
 
 
@@ -267,7 +297,8 @@ async def async_select_remote_property(endpoint, timeout=300, filter_en=True):
             if not bindings:
                 logger.debug(f"[PROP] No property bindings found at offset {offset}.")
             for binding in bindings:
-                properties.append(binding.text)
+                if is_voc_allowed(binding.text):
+                    properties.append(binding.text)
             offset += 100
         except Exception as e:
             logger.warning(f"[PROP] Query execution error: {e}. Endpoint: {endpoint}")
@@ -305,7 +336,7 @@ async def async_select_remote_property_names(endpoint, timeout=300, filter_en=Tr
                 logger.debug(f"[PNAME] No property name bindings found at offset {offset}.")
             for binding in bindings:
                 prop_uri = binding.text
-                if not prop_uri:
+                if not prop_uri and not is_voc_allowed(prop_uri):
                     continue
                 if "#" in prop_uri:
                     local_name = prop_uri.split("#")[-1]
@@ -350,7 +381,7 @@ async def async_select_remote_class_name(endpoint, timeout=300):
                 logger.debug(f"[CNAME] No class name bindings found at offset {offset}.")
             for binding in bindings:
                 class_uri = binding.text
-                if not class_uri:
+                if not class_uri and not is_curi_allowed(class_uri):
                     continue
                 if "#" in class_uri:
                     local_name = class_uri.split("#")[-1]
@@ -527,7 +558,8 @@ async def process_endpoint(row):
         'lab': async_select_remote_label(endpoint),
         'tlds': async_select_remote_tld(endpoint),
         'creator': async_select_void_creator(endpoint),
-        'license': async_select_void_license(endpoint)
+        'license': async_select_void_license(endpoint),
+        'con': async_select_remote_connection(endpoint),
     }
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
     result_dict = dict(zip(tasks.keys(), results))
@@ -535,7 +567,7 @@ async def process_endpoint(row):
     return [row['id'], result_dict.get('title'), result_dict.get('voc'), result_dict.get('curi'),
             result_dict.get('puri'), result_dict.get('lcn'), result_dict.get('lpn'),
             result_dict.get('lab'), result_dict.get('tlds'), row['sparql_url'], result_dict.get('creator'),
-            result_dict.get('license'), row['category']]
+            result_dict.get('license'), result_dict.get('con'), row['category']]
 
 
 async def process_endpoint_void(row):
@@ -581,7 +613,7 @@ async def main_normal():
         logger.info(f"[MAIN] Processed {processed}/{total} endpoints")
     df = pd.DataFrame(
         results,
-        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license',
+        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'con',
                  'category']
     )
     df.to_json('../data/raw/remote/remote_feature_set_sparqlwrapper.json', orient='records')
@@ -651,7 +683,8 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
         'tlds': data[8],
         'sparql': endpoint,
         'creator': data[10],
-        'license': data[11]
+        'license': data[11],
+        'con': data[12]
     }
 
 if __name__ == '__main__':
