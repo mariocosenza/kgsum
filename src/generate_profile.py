@@ -87,7 +87,8 @@ async def store_profile(profile: dict, category: str):
     for title in _to_list(profile.get('title')):
         triples.append(f'{iri_formatted} dcterms:title "{title}"')
     for language in _to_list(profile.get('language')):
-        triples.append(f'{iri_formatted} dcterms:language "{language}"')
+        if language not in 'UNKNOWN':
+            triples.append(f'{iri_formatted} dcterms:language "{language}"')
     for dsc in _to_list(profile.get('dsc')):
         triples.append(f'{iri_formatted} dcterms:description "{dsc}"')
     for creator in _to_list(profile.get('creator')):
