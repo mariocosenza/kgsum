@@ -87,7 +87,7 @@ async def async_select_remote_class(endpoint, timeout=300):
     return classes
 
 
-async def async_select_remote_label(endpoint, limit=1000, timeout=300, en = True):
+async def async_select_remote_label(endpoint, timeout=300, en = True):
     logger.info(f"[LAB] Starting label query for endpoint: {endpoint}")
     labels = []
     offset = 0
@@ -102,7 +102,8 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300, en = True
             PREFIX schema: <http://schema.org/>
             SELECT DISTINCT ?o
             WHERE {
-                {?class rdfs:label ?o}
+                ?s a ?label .
+                {?s rdfs:label ?o}
                 UNION
                 {?s foaf:name ?o}
                 UNION
@@ -147,7 +148,8 @@ async def async_select_remote_label(endpoint, limit=1000, timeout=300, en = True
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                     SELECT DISTINCT ?o
                     WHERE {
-                        ?class rdfs:label ?o
+                        ?s a ?label .
+                        ?s rdfs:label ?o
                 """
                 if en:
                     query += """
@@ -240,7 +242,7 @@ async def async_select_remote_tld(endpoint, limit=1000, timeout=300) -> list:
     return list(tlds)
 
 
-async def async_select_remote_property(endpoint, timeout=300, filter=True):
+async def async_select_remote_property(endpoint, timeout=300, filter_en=True):
     logger.info(f"[PROP] Starting property query for endpoint: {endpoint}")
     properties = []
     offset = 0
@@ -251,7 +253,7 @@ async def async_select_remote_property(endpoint, timeout=300, filter=True):
             ?s ?property ?o .
   
             # Optional: Filter out rdf:type if you want to exclude it
-            {'FILTER (?property != rdf:type)' if filter  else ''}
+            {'FILTER (?property != rdf:type)' if filter_en  else ''}
          }}
         GROUP BY ?property
         ORDER BY DESC(?usageCount)
@@ -269,14 +271,14 @@ async def async_select_remote_property(endpoint, timeout=300, filter=True):
             offset += 100
         except Exception as e:
             logger.warning(f"[PROP] Query execution error: {e}. Endpoint: {endpoint}")
-            if filter:
-                return await async_select_remote_property(endpoint, timeout=timeout, filter=False)
+            if filter_en:
+                return await async_select_remote_property(endpoint, timeout=timeout, filter_en=False)
             return ''
     logger.info(f"[PROP] Finished property query for endpoint: {endpoint} (found {len(properties)} properties)")
     return properties
 
 
-async def async_select_remote_property_names(endpoint, timeout=300, filter=True):
+async def async_select_remote_property_names(endpoint, timeout=300, filter_en=True):
     logger.info(f"[PNAME] Starting property name query for endpoint: {endpoint}")
     local_property_names = []
     processed = set()
@@ -288,7 +290,7 @@ async def async_select_remote_property_names(endpoint, timeout=300, filter=True)
                     ?s ?property ?o .
 
                     # Optional: Filter out rdf:type if you want to exclude it
-                    {'FILTER (?property != rdf:type)' if filter  else ''}
+                    {'FILTER (?property != rdf:type)' if filter_en  else ''}
                  }}
                 GROUP BY ?property
                 ORDER BY DESC(?usageCount)
@@ -317,8 +319,8 @@ async def async_select_remote_property_names(endpoint, timeout=300, filter=True)
             offset += 100
         except Exception as e:
             logger.warning(f"[PNAME] Query execution error: {e}. Endpoint: {endpoint}")
-            if filter:
-                return await async_select_remote_property_names(endpoint, timeout=timeout, filter=False)
+            if filter_en:
+                return await async_select_remote_property_names(endpoint, timeout=timeout, filter_en=False)
             return ''
     logger.info(
         f"[PNAME] Finished property name query for endpoint: {endpoint} (found {len(local_property_names)} names)")
@@ -553,6 +555,7 @@ async def main_normal():
     logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
     try:
         lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() == 'user_generated'].index, inplace=True)
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
@@ -589,6 +592,7 @@ async def main_void():
     logger.info("[VOID-MAIN] Starting asynchronous VOID dataset processing.")
     try:
         lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
+        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() == 'user_generated'].index, inplace=True)
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)

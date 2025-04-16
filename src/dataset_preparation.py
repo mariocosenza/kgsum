@@ -37,7 +37,8 @@ Q_LOCAL_CLASS = prepareQuery("""
 Q_LOCAL_LABEL = prepareQuery("""
     SELECT DISTINCT ?o
     WHERE {
-        {?class rdfs:label ?o}
+        ?s a ?label
+        {?S rdfs:label ?o}
         UNION
         {?s foaf:name ?o}
         UNION
@@ -68,7 +69,8 @@ Q_LOCAL_LABEL = prepareQuery("""
 Q_LOCAL_LABEL_EN = prepareQuery("""
     SELECT DISTINCT ?o
     WHERE {
-        {?class rdfs:label ?o}
+        ?s a ?label
+        {?s rdfs:label ?o}
         UNION
         {?s foaf:name ?o}
         UNION
@@ -477,14 +479,17 @@ if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()
 
-    create_local_void_dataset(offset=0, limit=200)
-    create_local_void_dataset(offset=1101, limit=1125)
-    create_local_void_dataset(offset=1126, limit=1150)
-    create_local_void_dataset(offset=1151, limit=1200)
-    create_local_void_dataset(offset=1201, limit=1250)
-    create_local_void_dataset(offset=1251, limit=1300)
-    create_local_void_dataset(offset=1301, limit=1350)
-    create_local_void_dataset(offset=1351, limit=1400)
+    create_local_dataset(offset=2000, limit=4000)
+    create_local_void_dataset(offset=2000, limit=4000)
+
+   # create_local_void_dataset(offset=0, limit=200)
+   # create_local_void_dataset(offset=1101, limit=1125)
+   # create_local_void_dataset(offset=1126, limit=1150)
+   # create_local_void_dataset(offset=1151, limit=1200)
+   # create_local_void_dataset(offset=1201, limit=1250)
+   # create_local_void_dataset(offset=1251, limit=1300)
+   # create_local_void_dataset(offset=1301, limit=1350)
+   # create_local_void_dataset(offset=1351, limit=1400)
 
 
     #create_local_dataset(offset=1201, limit=1250)  # Process items 1201 to 1250 (50 items)
