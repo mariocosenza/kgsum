@@ -1,7 +1,7 @@
 import logging
 import re
 from os import listdir
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 import spacy
