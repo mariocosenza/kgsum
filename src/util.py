@@ -31,7 +31,8 @@ CURI_FILTER = {
     'http://www.w3.org/1999/02/22-rdf-syntax-ns',
     'http://www.w3.org/2000/01/rdf-schema',
     'http://www.w3.org/ns/shacl',
-    'http://www.w3.org/ns/prov'
+    'http://www.w3.org/ns/prov',
+    'http://rdfs.org/ns/void#Dataset'
 }
 
 VOC_FILTER = {
@@ -51,13 +52,13 @@ VOC_FILTER = {
 
 def is_curi_allowed(uri: str) -> bool:
     for url in CURI_FILTER:
-        if uri in url:
+        if url in uri:
             return False
     return True
 
 def is_voc_allowed(uri: str) -> bool:
     for url in VOC_FILTER:
-        if uri in url:
+        if url in uri:
             return False
     return True
 
