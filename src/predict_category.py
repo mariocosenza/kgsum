@@ -26,9 +26,9 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.NAIVE_BAYES):
+    def get_predictor(classifier=ClassifierType.MISTRAL):
         combined_df = pd.read_json(f'{project_root}/data/processed/combined.json')
-        feature_columns = ["voc", "tlds","tags", "lab", 'lpn', 'sbj', 'dsc', 'curi', 'puri', 'comments']
+        feature_columns = ["lab"]
         try:
             models, training_results = load_multiple_models(file_path)
         except Exception as _:
@@ -45,3 +45,8 @@ class CategoryPredictor:
             logger.info(f'Feature: {feature}, Best Params: {metrics}')
 
         return CategoryPredictor(models, training_results)
+
+if __name__ == "__main__":
+    PREDICTOR = CategoryPredictor.get_predictor()
+
+
