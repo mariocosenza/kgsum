@@ -274,26 +274,38 @@ class KnowledgeGraphClassifier:
         return text.strip()
 
     def _prepare_features(self, frame, feature_labels):
-        # Fast path: no lists, no parsing
-        if isinstance(feature_labels, (list, tuple)):
-            # Join all columns as strings, vectorized
-            return frame.loc[:, feature_labels].astype(str).agg(" ".join, axis=1)
-        else:
-            col = frame[feature_labels]
+        import ast
+        import json
 
-            # Only parse rows that look like a list, otherwise just str
-            def process(val):
-                if isinstance(val, str) and val.startswith('[') and val.endswith(']'):
+        def parse_possible_list(val):
+            # Try to interpret as a Python list, JSON list, or just string
+            if isinstance(val, (list, tuple, set)):
+                return " ".join(str(v) for v in val)
+            if isinstance(val, str):
+                s = val.strip()
+                # Try Python literal_eval first (works for "['a', 'b']")
+                if s.startswith("[") and s.endswith("]"):
                     try:
-                        parsed = ast.literal_eval(val)
+                        parsed = ast.literal_eval(s)
                         if isinstance(parsed, (list, tuple, set)):
-                            return " ".join(map(str, parsed))
+                            return " ".join(str(v) for v in parsed)
                     except Exception:
                         pass
-                return str(val)
+                    # Try JSON in case it's a JSON list (["a", "b"])
+                    try:
+                        parsed = json.loads(s.replace("'", '"'))
+                        if isinstance(parsed, (list, tuple, set)):
+                            return " ".join(str(v) for v in parsed)
+                    except Exception:
+                        pass
+            return str(val)
 
-            return col.map(process)
-
+        if isinstance(feature_labels, (list, tuple)):
+            # Apply per cell, then join per row
+            return frame.loc[:, feature_labels].applymap(parse_possible_list).agg(" ".join, axis=1)
+        else:
+            col = frame[feature_labels]
+            return col.map(parse_possible_list)
 
     def _get_param_distributions(self, classic_type: ClassifierType = None, y_train=None) -> dict:
         ctype = classic_type or self.classifier_type
@@ -344,7 +356,7 @@ class KnowledgeGraphClassifier:
             frame: pd.DataFrame,
             feature_labels: FeatureLabels,
             target_label: str = 'category',
-            max_length: int = 256,
+            max_length: int = 8000,
     ) -> dict[str, Any]:
         import random
         from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
