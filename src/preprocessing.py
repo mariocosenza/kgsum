@@ -89,9 +89,14 @@ def analyze_uri(uri: str) -> dict[str, str]:
         result["tld"] = tld_match.group(1)
     return result
 
+def remove_non_ascii(text: str) -> str:
+    """Remove all non-ASCII characters from the input text."""
+    if not isinstance(text, str):
+        return text
+    return text.encode("ascii", "ignore").decode("ascii")
 
 def process_text(text: str) -> str:
-    """Process text using language detection and language-specific pipelines."""
+    """Process text using language detection and language-specific pipelines, then remove non-ASCII chars."""
     if not text or not isinstance(text, str) or len(text) > 100000:
         return ""
     try:
@@ -99,10 +104,11 @@ def process_text(text: str) -> str:
         lang = doc._.language.get("language", "xx")
         chosen_nlp = pipeline_dict.get(lang, fallback_pipeline)
         docs = list(chosen_nlp.pipe([text]))
-        return docs[0].text if docs else ""
+        clean_text = docs[0].text if docs else ""
+        return remove_non_ascii(clean_text)
     except Exception as exc:
         logger.error("Error processing text: %s", exc)
-        return text
+        return remove_non_ascii(text)
 
 
 def find_language(text: str) -> str:
@@ -127,7 +133,7 @@ def normalize_text_list(text_list: list[Any] | str) -> str:
 
 
 def process_normalize_text(text_list: list[Any]) -> list[str]:
-    """Process and normalize each element in a list of texts."""
+    """Process and normalize each element in a list of texts (also cleans to ASCII)."""
     return [process_text(str(word)) for word in text_list if word is not None]
 
 
