@@ -1,5 +1,5 @@
 import logging
-from multiprocessing import Pool, get_context, TimeoutError
+from multiprocessing import get_context, TimeoutError
 from os import listdir
 import os
 
@@ -16,187 +16,20 @@ logger = logging.getLogger("dataset_preparation")
 
 FORMATS = {'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'}
 
-# Precompile SPARQL queries
-Q_LOCAL_VOCABULARIES = prepareQuery("""
-    SELECT DISTINCT ?predicate
-    WHERE {
-        ?subject ?predicate ?object .
-        FILTER (STRSTARTS(STR(?predicate), "http://"))
-        FILTER (!STRSTARTS(STR(STRBEFORE(STR(?predicate), "#")), "http://www.w3.org/"))
-    } LIMIT 1000
-""")
+# SPARQL queries are now compiled inside worker functions for better multiprocess compatibility
 
-Q_LOCAL_CLASS = prepareQuery("""
-    SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
-    WHERE {
-        ?instance a ?classUri .
-    }
-    GROUP BY ?classUri
-    ORDER BY DESC(?instanceCount)
-    LIMIT 1000
-""")
-
-Q_LOCAL_LABEL = prepareQuery("""
-    SELECT DISTINCT ?o
-    WHERE {
-        ?s a ?label
-        {?s rdfs:label ?o}
-        UNION
-        {?s foaf:name ?o}
-        UNION
-        {?s skos:prefLabel ?o}
-        UNION
-        {?s rdfs:comment ?o}
-        UNION
-        {?s awol:label ?o}
-        UNION
-        {?s skos:note ?o}
-        UNION
-        {?s wdrs:text ?o}
-        UNION
-        {?s skosxl:prefLabel ?o}
-        UNION
-        {?s skosxl:literalForm ?o}
-        UNION
-        {?s schema:name ?o}
-    } LIMIT 1000
-""", initNs={
-    "schema": 'http://schema.org',
-    "skos": 'http://www.w3.org/2004/02/skos/core#',
-    "rdfs": 'http://www.w3.org/2000/01/rdf-schema#',
-    "foaf": 'http://xmlns.com/foaf/0.1/',
-    "awol": 'http://bblfish.net/work/atom-owl/2006-06-06/#',
-    "wdrs": 'http://www.w3.org/2007/05/powder-s#',
-    "skosxl": 'http://www.w3.org/2008/05/skos-xl#'
-})
-
-Q_LOCAL_LABEL_EN = prepareQuery("""
-    SELECT DISTINCT ?o
-    WHERE {
-        ?s a ?label
-        {?s rdfs:label ?o}
-        UNION
-        {?s foaf:name ?o}
-        UNION
-        {?s skos:prefLabel ?o}
-        UNION
-        {?s rdfs:comment ?o}
-        UNION
-        {?s awol:label ?o}
-        UNION
-        {?s skos:note ?o}
-        UNION
-        {?s wdrs:text ?o}
-        UNION
-        {?s skosxl:prefLabel ?o}
-        UNION
-        {?s skosxl:literalForm ?o}
-        UNION
-        {?s schema:name ?o}
-        FILTER(langMatches(lang(?o), "en"))
-    } LIMIT 1000
-""", initNs={
-    "schema": 'http://schema.org',
-    "skos": 'http://www.w3.org/2004/02/skos/core#',
-    "rdfs": 'http://www.w3.org/2000/01/rdf-schema#',
-    "foaf": 'http://xmlns.com/foaf/0.1/',
-    "awol": 'http://bblfish.net/work/atom-owl/2006-06-06/#',
-    "wdrs": 'http://www.w3.org/2007/05/powder-s#',
-    "skosxl": 'http://www.w3.org/2008/05/skos-xl#'
-})
-
-Q_LOCAL_TLD = prepareQuery("""
-    SELECT DISTINCT ?o
-    WHERE {
-        ?s ?p ?o .
-        FILTER(isIRI(?o))
-    } LIMIT 1000
-""")
-
-Q_LOCAL_PROPERTY = prepareQuery("""
-    SELECT ?property (COUNT(?s) AS ?usageCount)
-    WHERE {
-        ?s ?property ?o .
-        FILTER (?property != rdf:type)
-    }
-    GROUP BY ?property
-    ORDER BY DESC(?usageCount)
-    LIMIT 1000
-""", initNs={"rdf": rdflib.RDF})
-
-Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
-    SELECT ?property (COUNT(?s) AS ?usageCount)
-    WHERE {
-        ?s ?property ?o .
-        FILTER (?property != rdf:type)
-    }
-    GROUP BY ?property
-    ORDER BY DESC(?usageCount)
-    LIMIT 1000
-""", initNs={"rdf": rdflib.RDF})
-
-Q_LOCAL_CLASS_NAME = prepareQuery("""
-    SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
-    WHERE {
-        ?instance a ?classUri .
-    }
-    GROUP BY ?classUri
-    ORDER BY DESC(?instanceCount)
-    LIMIT 1000
-""", initNs={"rdf": rdflib.RDF})
-
-Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
-    SELECT DISTINCT ?s
-    WHERE {
-        ?s rdf:type void:Dataset .
-    } LIMIT 100
-""", initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
-
-Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery("""
-    SELECT ?desc WHERE {
-        {?s dcterms:description ?desc}
-        UNION
-        {?s schema:description ?desc}
-    } LIMIT 100
-""", initNs={"dcterms": 'http://purl.org/dc/terms/', "schema": 'http://schema.org/'})
-
-Q_LOCAL_DCTERMS_TITLE = prepareQuery("""
-    SELECT ?desc WHERE {
-        ?s dcterms:title ?desc .
-    } LIMIT 1
-""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
-
-Q_LOCAL_CON = prepareQuery("""
-    SELECT DISTINCT ?o 
-    WHERE {
-        ?s owl:sameAs ?o
-    } LIMIT 1000
-""", initNs={"owl": 'http://www.w3.org/2002/07/owl#'})
-
-Q_LOCAL_VOID_SPARQL = prepareQuery("""
-    SELECT DISTINCT ?o
-    WHERE {
-        ?s void:sparqlEndpoint ?o.
-    } LIMIT 2
-""", initNs={"void": 'http://rdfs.org/ns/void#'})
-
-Q_LOCAL_DCTERMS_CREATOR = prepareQuery("""
-    SELECT ?creator WHERE {
-        ?s dcterms:creator ?creator .
-    } LIMIT 5
-""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
-
-Q_LOCAL_DCTERMS_LICENSE = prepareQuery("""
-    SELECT ?license WHERE {
-        ?s dcterms:license ?license . 
-    } LIMIT 1
-""", initNs={"dcterms": 'http://purl.org/dc/terms/'})
-
-# Helper functions to run SPARQL queries on parsed RDF graphs
 def log_query(query):
     logger.info(f"SPARQL Query: {query}")
 
 def select_local_vocabularies(parsed_graph):
+    Q_LOCAL_VOCABULARIES = prepareQuery("""
+        SELECT DISTINCT ?predicate
+        WHERE {
+            ?subject ?predicate ?object .
+            FILTER (STRSTARTS(STR(?predicate), "http://"))
+            FILTER (!STRSTARTS(STR(STRBEFORE(STR(?predicate), "#")), "http://www.w3.org/"))
+        } LIMIT 1000
+    """)
     log_query(Q_LOCAL_VOCABULARIES)
     try:
         qres = parsed_graph.query(Q_LOCAL_VOCABULARIES)
@@ -219,6 +52,15 @@ def select_local_vocabularies(parsed_graph):
     return vocabularies
 
 def select_local_class(parsed_graph):
+    Q_LOCAL_CLASS = prepareQuery("""
+        SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
+        WHERE {
+            ?instance a ?classUri .
+        }
+        GROUP BY ?classUri
+        ORDER BY DESC(?instanceCount)
+        LIMIT 1000
+    """)
     log_query(Q_LOCAL_CLASS)
     try:
         qres = parsed_graph.query(Q_LOCAL_CLASS)
@@ -233,6 +75,73 @@ def select_local_class(parsed_graph):
     return list(classes)
 
 def select_local_label(parsed_graph):
+    Q_LOCAL_LABEL = prepareQuery("""
+        SELECT DISTINCT ?o
+        WHERE {
+            ?s a ?label
+            {?s rdfs:label ?o}
+            UNION
+            {?s foaf:name ?o}
+            UNION
+            {?s skos:prefLabel ?o}
+            UNION
+            {?s rdfs:comment ?o}
+            UNION
+            {?s awol:label ?o}
+            UNION
+            {?s skos:note ?o}
+            UNION
+            {?s wdrs:text ?o}
+            UNION
+            {?s skosxl:prefLabel ?o}
+            UNION
+            {?s skosxl:literalForm ?o}
+            UNION
+            {?s schema:name ?o}
+        } LIMIT 1000
+    """, initNs={
+        "schema": 'http://schema.org',
+        "skos": 'http://www.w3.org/2004/02/skos/core#',
+        "rdfs": 'http://www.w3.org/2000/01/rdf-schema#',
+        "foaf": 'http://xmlns.com/foaf/0.1/',
+        "awol": 'http://bblfish.net/work/atom-owl/2006-06-06/#',
+        "wdrs": 'http://www.w3.org/2007/05/powder-s#',
+        "skosxl": 'http://www.w3.org/2008/05/skos-xl#'
+    })
+    Q_LOCAL_LABEL_EN = prepareQuery("""
+        SELECT DISTINCT ?o
+        WHERE {
+            ?s a ?label
+            {?s rdfs:label ?o}
+            UNION
+            {?s foaf:name ?o}
+            UNION
+            {?s skos:prefLabel ?o}
+            UNION
+            {?s rdfs:comment ?o}
+            UNION
+            {?s awol:label ?o}
+            UNION
+            {?s skos:note ?o}
+            UNION
+            {?s wdrs:text ?o}
+            UNION
+            {?s skosxl:prefLabel ?o}
+            UNION
+            {?s skosxl:literalForm ?o}
+            UNION
+            {?s schema:name ?o}
+            FILTER(langMatches(lang(?o), "en"))
+        } LIMIT 1000
+    """, initNs={
+        "schema": 'http://schema.org',
+        "skos": 'http://www.w3.org/2004/02/skos/core#',
+        "rdfs": 'http://www.w3.org/2000/01/rdf-schema#',
+        "foaf": 'http://xmlns.com/foaf/0.1/',
+        "awol": 'http://bblfish.net/work/atom-owl/2006-06-06/#',
+        "wdrs": 'http://www.w3.org/2007/05/powder-s#',
+        "skosxl": 'http://www.w3.org/2008/05/skos-xl#'
+    })
     log_query(Q_LOCAL_LABEL_EN)
     try:
         qres = parsed_graph.query(Q_LOCAL_LABEL_EN)
@@ -249,6 +158,13 @@ def select_local_label(parsed_graph):
     return {str(row.o) for row in qres}
 
 def select_local_tld(parsed_graph):
+    Q_LOCAL_TLD = prepareQuery("""
+        SELECT DISTINCT ?o
+        WHERE {
+            ?s ?p ?o .
+            FILTER(isIRI(?o))
+        } LIMIT 1000
+    """)
     log_query(Q_LOCAL_TLD)
     try:
         qres = parsed_graph.query(Q_LOCAL_TLD)
@@ -268,6 +184,16 @@ def select_local_tld(parsed_graph):
     return tlds
 
 def select_local_property(parsed_graph):
+    Q_LOCAL_PROPERTY = prepareQuery("""
+        SELECT ?property (COUNT(?s) AS ?usageCount)
+        WHERE {
+            ?s ?property ?o .
+            FILTER (?property != rdf:type)
+        }
+        GROUP BY ?property
+        ORDER BY DESC(?usageCount)
+        LIMIT 1000
+    """, initNs={"rdf": rdflib.RDF})
     log_query(Q_LOCAL_PROPERTY)
     try:
         qres = parsed_graph.query(Q_LOCAL_PROPERTY)
@@ -282,6 +208,12 @@ def select_local_property(parsed_graph):
     return list(properties)
 
 def select_local_endpoint(parsed_graph):
+    Q_LOCAL_VOID_SPARQL = prepareQuery("""
+        SELECT DISTINCT ?o
+        WHERE {
+            ?s void:sparqlEndpoint ?o.
+        } LIMIT 2
+    """, initNs={"void": 'http://rdfs.org/ns/void#'})
     log_query(Q_LOCAL_VOID_SPARQL)
     try:
         qres = parsed_graph.query(Q_LOCAL_VOID_SPARQL)
@@ -291,6 +223,11 @@ def select_local_endpoint(parsed_graph):
     return list({str(row.o) for row in qres})
 
 def select_local_creator(parsed_graph):
+    Q_LOCAL_DCTERMS_CREATOR = prepareQuery("""
+        SELECT ?creator WHERE {
+            ?s dcterms:creator ?creator .
+        } LIMIT 5
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
     log_query(Q_LOCAL_DCTERMS_CREATOR)
     try:
         qres = parsed_graph.query(Q_LOCAL_DCTERMS_CREATOR)
@@ -300,6 +237,11 @@ def select_local_creator(parsed_graph):
     return {str(row.creator) for row in qres}
 
 def select_local_license(parsed_graph):
+    Q_LOCAL_DCTERMS_LICENSE = prepareQuery("""
+        SELECT ?license WHERE {
+            ?s dcterms:license ?license .
+        } LIMIT 1
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
     log_query(Q_LOCAL_DCTERMS_LICENSE)
     try:
         qres = parsed_graph.query(Q_LOCAL_DCTERMS_LICENSE)
@@ -309,6 +251,16 @@ def select_local_license(parsed_graph):
     return {str(row.license) for row in qres}
 
 def select_local_property_names(parsed_graph):
+    Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
+        SELECT ?property (COUNT(?s) AS ?usageCount)
+        WHERE {
+            ?s ?property ?o .
+            FILTER (?property != rdf:type)
+        }
+        GROUP BY ?property
+        ORDER BY DESC(?usageCount)
+        LIMIT 1000
+    """, initNs={"rdf": rdflib.RDF})
     log_query(Q_LOCAL_PROPERTY_NAMES)
     try:
         qres = parsed_graph.query(Q_LOCAL_PROPERTY_NAMES)
@@ -333,6 +285,15 @@ def select_local_property_names(parsed_graph):
     return local_property_names
 
 def select_local_class_name(parsed_graph):
+    Q_LOCAL_CLASS_NAME = prepareQuery("""
+        SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
+        WHERE {
+            ?instance a ?classUri .
+        }
+        GROUP BY ?classUri
+        ORDER BY DESC(?instanceCount)
+        LIMIT 1000
+    """, initNs={"rdf": rdflib.RDF})
     log_query(Q_LOCAL_CLASS_NAME)
     try:
         qres = parsed_graph.query(Q_LOCAL_CLASS_NAME)
@@ -354,6 +315,12 @@ def select_local_class_name(parsed_graph):
     return local_names
 
 def select_local_void_subject(parsed_graph):
+    Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
+        SELECT DISTINCT ?s
+        WHERE {
+            ?s rdf:type void:Dataset .
+        } LIMIT 100
+    """, initNs={"rdf": rdflib.RDF, "void": 'http://rdfs.org/ns/void#'})
     log_query(Q_LOCAL_VOID_DESCRIPTION)
     try:
         qres = parsed_graph.query(Q_LOCAL_VOID_DESCRIPTION)
@@ -378,6 +345,13 @@ def select_local_void_subject(parsed_graph):
     return subject
 
 def select_local_void_description(parsed_graph):
+    Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery("""
+        SELECT ?desc WHERE {
+            {?s dcterms:description ?desc}
+            UNION
+            {?s schema:description ?desc}
+        } LIMIT 100
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/', "schema": 'http://schema.org/'})
     log_query(Q_LOCAL_DCTERMS_DESCRIPTION)
     try:
         qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
@@ -387,6 +361,11 @@ def select_local_void_description(parsed_graph):
     return {str(row.desc) for row in qres}
 
 def select_local_void_title(parsed_graph):
+    Q_LOCAL_DCTERMS_TITLE = prepareQuery("""
+        SELECT ?desc WHERE {
+            ?s dcterms:title ?desc .
+        } LIMIT 1
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
     log_query(Q_LOCAL_DCTERMS_TITLE)
     try:
         qres = parsed_graph.query(Q_LOCAL_DCTERMS_TITLE)
@@ -396,6 +375,12 @@ def select_local_void_title(parsed_graph):
     return [str(row.desc) for row in qres]
 
 def select_local_con(parsed_graph):
+    Q_LOCAL_CON = prepareQuery("""
+        SELECT DISTINCT ?o 
+        WHERE {
+            ?s owl:sameAs ?o
+        } LIMIT 1000
+    """, initNs={"owl": 'http://www.w3.org/2002/07/owl#'})
     log_query(Q_LOCAL_CON)
     try:
         qres = parsed_graph.query(Q_LOCAL_CON)
@@ -474,16 +459,11 @@ def process_local_void_dataset_file(args):
 
 def robust_pool_map(pool, func, tasks, timeout=600):
     results = []
-    for i, args in enumerate(tasks, 1):
-        try:
-            res = pool.apply_async(func, (args,))
-            result = res.get(timeout=timeout)
-            if result is not None:
-                results.append(result)
-        except TimeoutError:
-            logger.warning(f"Task timed out after {timeout}s: {args}")
-        except Exception as e:
-            logger.warning(f"Task crashed: {args}, error: {e}")
+    # Use imap_unordered for true multiprocessing and immediate results
+    it = pool.imap_unordered(func, tasks)
+    for i, result in enumerate(it, 1):
+        if result is not None:
+            results.append(result)
         logger.info(f"Progress: {i}/{len(tasks)} tasks completed.")
     return results
 
@@ -497,19 +477,18 @@ def create_local_dataset(offset=0, limit=10000):
             continue
         for file in listdir(directory):
             if file.startswith('.'):
-                continue  # skip hidden files
+                continue
             tasks.append((category, file, offset, limit))
     if not tasks:
         logger.warning("No tasks scheduled for local dataset.")
         return
     ctx = get_context("spawn")
-    results = []
     with ctx.Pool(processes=8, maxtasksperchild=10, initializer=init_worker, initargs=(lod_frame_path,)) as pool:
         results = robust_pool_map(pool, process_local_dataset_file, tasks, timeout=6000)
     if results:
         df = pd.DataFrame(
             results,
-            columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'con', 'category']
+            columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds', 'sparql', 'creator', 'license', 'con', 'category']
         )
         out_path = f'../data/raw/local/local_feature_set{offset}-{limit}.json'
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -527,7 +506,7 @@ def create_local_void_dataset(offset=0, limit=10000):
             continue
         for file in listdir(directory):
             if file.startswith('.'):
-                continue  # skip hidden files
+                continue
             tasks.append((category, file, offset, limit))
     if not tasks:
         logger.warning("No tasks scheduled for local void dataset.")
@@ -547,5 +526,4 @@ if __name__ == '__main__':
     import multiprocessing
     multiprocessing.freeze_support()
 
-    # Example runs
-    create_local_dataset(offset=2000, limit=4000)
+

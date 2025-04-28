@@ -587,7 +587,7 @@ async def main_normal():
     logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
     try:
         lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() == 'user_generated'].index, inplace=True)
+        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() in ['user_generated']].index, inplace=True)
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
@@ -613,7 +613,7 @@ async def main_normal():
         logger.info(f"[MAIN] Processed {processed}/{total} endpoints")
     df = pd.DataFrame(
         results,
-        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tld', 'sparql', 'creator', 'license', 'con',
+        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds', 'sparql', 'creator', 'license', 'con',
                  'category']
     )
     df.to_json('../data/raw/remote/remote_feature_set_sparqlwrapper.json', orient='records')
@@ -624,7 +624,7 @@ async def main_void():
     logger.info("[VOID-MAIN] Starting asynchronous VOID dataset processing.")
     try:
         lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() == 'user_generated'].index, inplace=True)
+        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() in ['user_generated']].index, inplace=True)
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
