@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import ast
 import logging
 import os
 import pickle
@@ -9,29 +7,26 @@ import warnings
 from collections import Counter
 from enum import Enum, auto
 from typing import Any, Tuple, NewType, TypeAlias
-
 import numpy as np
 import pandas as pd
+import torch
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
-import torch
 from tqdm import tqdm
 from transformers import (
     AutoTokenizer, AutoModelForSequenceClassification, logging as hf_logging, TrainerCallback, TrainerState,
     TrainerControl
 )
-
 try:
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 except ImportError:
     LoraConfig = None
     get_peft_model = None
     prepare_model_for_kbit_training = None
-
 hf_logging.set_verbosity_error()
 np.seterr(invalid='ignore')
 warnings.filterwarnings("ignore", category=UserWarning, message="The parameter 'token_pattern' will not be used*")
@@ -41,23 +36,18 @@ warnings.filterwarnings(
 )
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 FeatureLabels: TypeAlias = str | list[str]
 TextData = NewType('TextData', str)
-
 class ClassifierType(Enum):
     SVM = auto()
     NAIVE_BAYES = auto()
     KNN = auto()
     MISTRAL = auto()
-
 def is_uri(token):
     uri_regex = re.compile(
         r"^(?:https?|ftp|file)://[^\s<>'\"`]+$|^www\.[^\s<>'\"`]+$|^[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+\.[a-zA-Z]{2,}.*$"
     )
     return bool(uri_regex.match(token))
-
 def hybrid_tokenizer(text):
     tokens = text.split()
     processed = []
@@ -67,24 +57,22 @@ def hybrid_tokenizer(text):
         else:
             processed.extend(re.findall(r"(?u)\b\w\w+\b", tok))
     return processed
-
 def get_custom_tfidf_vectorizer(**kwargs):
     return TfidfVectorizer(
-        ngram_range=(1, 1),
+        ngram_range=(1, 2),
         lowercase=True,
         tokenizer=hybrid_tokenizer,
         token_pattern=None,
+        binary=False,
         norm='l2',
         **kwargs
     )
-
 def get_custom_count_vectorizer(**kwargs):
     return CountVectorizer(
         tokenizer=hybrid_tokenizer,
         token_pattern=None,
         **kwargs
     )
-
 def majority_vote(predictions: list[Any]) -> Any:
     if isinstance(predictions, str):
         return predictions
@@ -110,7 +98,6 @@ def majority_vote(predictions: list[Any]) -> Any:
     best_label = Counter(filtered_predictions).most_common(1)[0][0]
     logger.info("Majority vote result: candidate '%s'", best_label)
     return best_label
-
 def _predict_category_for_instance(
     models: dict[str, 'KnowledgeGraphClassifier'],
     instance: dict[str, Any]
@@ -142,7 +129,6 @@ def _predict_category_for_instance(
             logger.error("Prediction error for %s: %s", feature, err)
     label_votes = [v[0] for v in votes]
     return majority_vote(label_votes)
-
 def predict_category_multi(
     models: dict[str, 'KnowledgeGraphClassifier'],
     instance: dict[str, Any] | pd.DataFrame
@@ -150,7 +136,6 @@ def predict_category_multi(
     if isinstance(instance, pd.DataFrame):
         return instance.apply(lambda row: _predict_category_for_instance(models, row.to_dict()), axis=1).tolist()
     return _predict_category_for_instance(models, instance)
-
 def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFrame:
     if isinstance(labels, str):
         labels = [labels]
@@ -159,8 +144,7 @@ def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFr
         result = result.dropna(subset=[label])
         result = result[result[label] != '']
     return result
-
-def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.2) -> pd.DataFrame:
+def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float = 1.5) -> pd.DataFrame:
     counts = df[target_label].value_counts()
     logger.info("Original class counts: %s", counts.to_dict())
     max_count = counts.max()
@@ -176,7 +160,6 @@ def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float 
     oversampled = pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
     logger.info("After oversampling: %s", oversampled[target_label].value_counts().to_dict())
     return oversampled
-
 def train_multiple_models(
     training_data: pd.DataFrame,
     feature_columns: list[str],
@@ -203,48 +186,38 @@ def train_multiple_models(
         models[feature] = model
         training_results[feature] = result
     return models, training_results
-
-
 class TqdmDataCallback(TrainerCallback):
     def __init__(self, total_steps: int):
         self.total_steps = total_steps
         self.pbar = None
         self.current_step = 0
-
     def on_train_begin(self, args, state: TrainerState, control: TrainerControl, **kwargs):
         from tqdm import tqdm
         if state.is_local_process_zero:
             self.pbar = tqdm(total=self.total_steps, desc="Training samples", position=0, leave=True)
             self.current_step = 0
-
     def on_step_end(self, args, state: TrainerState, control: TrainerControl, **kwargs):
         if state.is_local_process_zero and self.pbar is not None:
             step = state.global_step - self.current_step
             if step > 0:
                 self.pbar.update(step)
             self.current_step = state.global_step
-
     def on_train_end(self, args, state: TrainerState, control: TrainerControl, **kwargs):
         if state.is_local_process_zero and self.pbar is not None:
             self.pbar.n = self.total_steps
             self.pbar.refresh()
             self.pbar.close()
             self.pbar = None
-
 class HFDataset(torch.utils.data.Dataset):
     def __init__(self, encodings, labels):
         self.encodings = encodings
         self.labels = labels
-
     def __getitem__(self, idx):
         item = {key: torch.tensor(val[idx]) for key, val in self.encodings.items()}
         item['labels'] = torch.tensor(self.labels[idx])
         return item
-
     def __len__(self):
         return len(self.labels)
-
-
 class KnowledgeGraphClassifier:
     def __init__(self, classifier_type: ClassifierType =ClassifierType.NAIVE_BAYES, balance_classes=False, vectorizer_type="tfidf", feature_labels=None, **kwargs):
         self.classifier_type: ClassifierType= classifier_type
@@ -259,31 +232,25 @@ class KnowledgeGraphClassifier:
         self.feature_labels: FeatureLabels | None = None
         self.max_length: int | None = None
         self.accuracy: float = 0.0
-
     def _init_vectorizer(self, **kwargs):
         if self.vectorizer_type == "tfidf":
             return get_custom_tfidf_vectorizer(**kwargs)
         else:
             return get_custom_count_vectorizer(**kwargs)
-
     def _clean_text(self, text: str) -> str:
         text = re.sub(r'\[\s*\]', '', text)
         text = re.sub(r'\(\s*\)', '', text)
         text = re.sub(r'\{\s*\}', '', text)
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
-
     def _prepare_features(self, frame, feature_labels):
         import ast
         import json
-
         def parse_possible_list(val):
-            # Try to interpret as a Python list, JSON list, or just string
             if isinstance(val, (list, tuple, set)):
                 return " ".join(str(v) for v in val)
             if isinstance(val, str):
                 s = val.strip()
-                # Try Python literal_eval first (works for "['a', 'b']")
                 if s.startswith("[") and s.endswith("]"):
                     try:
                         parsed = ast.literal_eval(s)
@@ -291,7 +258,6 @@ class KnowledgeGraphClassifier:
                             return " ".join(str(v) for v in parsed)
                     except Exception:
                         pass
-                    # Try JSON in case it's a JSON list (["a", "b"])
                     try:
                         parsed = json.loads(s.replace("'", '"'))
                         if isinstance(parsed, (list, tuple, set)):
@@ -299,14 +265,11 @@ class KnowledgeGraphClassifier:
                     except Exception:
                         pass
             return str(val)
-
         if isinstance(feature_labels, (list, tuple)):
-            # Apply per cell, then join per row
             return frame.loc[:, feature_labels].applymap(parse_possible_list).agg(" ".join, axis=1)
         else:
             col = frame[feature_labels]
             return col.map(parse_possible_list)
-
     def _get_param_distributions(self, classic_type: ClassifierType = None, y_train=None) -> dict:
         ctype = classic_type or self.classifier_type
         safe_max = None
@@ -314,7 +277,6 @@ class KnowledgeGraphClassifier:
             unique_classes = len(np.unique(y_train))
             if unique_classes > 1:
                 safe_max = max(2, min(15, int(0.8 * len(y_train) / unique_classes)))
-
         if ctype == ClassifierType.SVM:
             return {
                 "classifier__C": np.logspace(-3, 2, 20),
@@ -336,7 +298,6 @@ class KnowledgeGraphClassifier:
                 "classifier__leaf_size": list(range(10, 51, 5))
             }
         return {}
-
     def _get_base_estimators(self):
         svm_clf = svm.SVC(probability=True, kernel="rbf", C=10, class_weight="balanced", random_state=42)
         nb_clf = MultinomialNB(alpha=0.5)
@@ -350,49 +311,46 @@ class KnowledgeGraphClassifier:
             ("rf", rf_clf),
             ("knn", knn_clf)
         ]
-
     def train(
             self,
             frame: pd.DataFrame,
             feature_labels: FeatureLabels,
             target_label: str = 'category',
-            max_length: int = 8000,
+            max_length: int = 256
     ) -> dict[str, Any]:
         import random
-        from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
+        from sklearn.model_selection import train_test_split, RandomizedSearchCV
         from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, classification_report
-
         clf_type = self.classifier_type
-
         if clf_type == ClassifierType.MISTRAL:
             return self.train_mistral(frame, feature_labels, target_label=target_label, max_length=max_length)
-
-
         self.feature_labels = feature_labels
         data_x = self._prepare_features(frame, feature_labels)
         data_y = frame[target_label]
         unique_labels = sorted(data_y.unique())
         if len(unique_labels) < 2:
             raise ValueError(f"Need at least 2 unique classes in target '{target_label}', found {len(unique_labels)}")
-
         self.target_label_mapping = {label: idx for idx, label in enumerate(unique_labels)}
         self.target_label_inverse_mapping = {idx: label for label, idx in self.target_label_mapping.items()}
-
         y_numeric = data_y.map(self.target_label_mapping).values
-
         if len(data_x) != len(y_numeric):
             raise ValueError("Feature and target lengths mismatch after preparation.")
         if len(data_x) == 0:
             raise ValueError("No data available for training after preparation.")
-
-        X_train, X_test, y_train, y_test = train_test_split(
+        X_train, X_temp, y_train, y_temp = train_test_split(
             data_x,
             y_numeric,
             test_size=0.20,
             random_state=42,
             stratify=y_numeric
         )
-
+        X_val, X_test, y_val, y_test = [], [], [], []
+        if len(X_temp) > 1 and len(set(y_temp)) > 1:
+            X_val, X_test, y_val, y_test = train_test_split(
+                X_temp, y_temp, test_size=0.50, random_state=42, stratify=y_temp
+            )
+        elif len(X_temp) > 0:
+            X_val, y_val = X_temp, y_temp
         if self.balance_classes:
             value_counts = pd.Series(y_train).value_counts()
             if len(value_counts) > 1 and (value_counts.min() / value_counts.max()) < 0.75:
@@ -406,7 +364,6 @@ class KnowledgeGraphClassifier:
                                 pd.Series(y_train).value_counts().to_dict())
                 else:
                     logger.warning("Oversampling resulted in an empty dataframe. Proceeding without oversampling.")
-
         clf_type = self.classifier_type
         if clf_type == ClassifierType.SVM:
             estimator = svm.SVC(probability=True, random_state=42)
@@ -430,35 +387,32 @@ class KnowledgeGraphClassifier:
             }
         else:
             raise ValueError("Unsupported classic model type.")
-
         from sklearn.pipeline import Pipeline
         pipeline = Pipeline([
             ("vectorizer", self.vectorizer),
             ("classifier", estimator),
         ])
-
         if param_distributions:
             single_param = random.choice(list(param_distributions.keys()))
             single_value = param_distributions[single_param]
             print(f"[LOG] Random search parameter used: {single_param} = {single_value}")
-
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        if len(X_val) > 0:
+            X_search, y_search = X_val, y_val
+        else:
+            X_search, y_search = X_train, y_train
         n_iter = 10
-
         def get_total_possible(param_distributions):
             total = 1
             for v in param_distributions.values():
                 total *= len(v)
             return total
-
         total_possible = get_total_possible(param_distributions)
         n_fits = min(n_iter, total_possible)
-
         search = RandomizedSearchCV(
             estimator=pipeline,
             param_distributions=param_distributions,
             n_iter=n_iter,
-            cv=cv,
+            cv=2,
             scoring='f1_weighted',
             verbose=3,
             n_jobs=1,
@@ -466,14 +420,11 @@ class KnowledgeGraphClassifier:
             random_state=42,
             return_train_score=False
         )
-
         print(f"Starting RandomizedSearchCV with up to {n_fits} parameter sets...")
         search.fit(X_train, y_train)
-
         print("[LOG] All fit parameter sets tried during RandomizedSearchCV:")
         for i, params in enumerate(search.cv_results_['params']):
             print(f"Set {i + 1}: {params}")
-
         best_estimator = search.best_estimator_
         y_pred_numeric = best_estimator.predict(X_test)
         final_f1 = f1_score(y_test, y_pred_numeric, average='weighted', zero_division=0)
@@ -508,17 +459,16 @@ class KnowledgeGraphClassifier:
             'classifier_type': self.classifier_type,
             'classification_report': report
         }
-
     def train_mistral(
             self,
             frame: pd.DataFrame,
             feature_labels: FeatureLabels,
             target_label: str = 'category',
-            max_length: int = 256,
-            qlora_r: int = 16,
-            qlora_alpha: int = 32,
+            max_length: int = 512,
+            qlora_r: int = 32,
+            qlora_alpha: int = 64,
             batch_size: int = 8,
-            epochs: int = 10
+            epochs: int = 100
     ) -> dict[str | Any, float | int | dict[str, int] | str | list[str] | Any] | None:
         import os
         import gc
@@ -529,31 +479,24 @@ class KnowledgeGraphClassifier:
             TrainingArguments, Trainer, DataCollatorWithPadding, BitsAndBytesConfig
         )
         from sklearn.metrics import accuracy_score, f1_score
-
         torch.backends.cudnn.benchmark = True
-
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is required for Mistral training.")
         if LoraConfig is None or get_peft_model is None or prepare_model_for_kbit_training is None:
             raise ImportError("peft is not installed. Please install with pip install peft")
-
         frame = frame.reset_index(drop=True)
         frame = frame.dropna(subset=[target_label])
         frame = frame[frame[target_label] != '']
-
         data_x = self._prepare_features(frame, feature_labels)
         data_y = frame[target_label]
-
         unique_labels = sorted(data_y.unique())
         if len(unique_labels) < 2:
             raise ValueError(f"Need at least 2 unique classes in target '{target_label}', found {len(unique_labels)}")
         self.target_label_mapping = {str(label): int(idx) for idx, label in enumerate(unique_labels)}
         self.target_label_inverse_mapping = {int(idx): str(label) for idx, label in enumerate(unique_labels)}
         num_classes = len(unique_labels)
-
         texts = [self._clean_text(str(text)) for text in data_x.tolist()]
         y_numeric = [self.target_label_mapping[str(label)] for label in data_y.tolist()]
-
         X_train, X_temp, y_train, y_temp = train_test_split(
             texts,
             y_numeric,
@@ -568,7 +511,6 @@ class KnowledgeGraphClassifier:
             )
         elif len(X_temp) > 0:
             X_val, y_val = X_temp, y_temp
-
         model_id = "mistralai/Mistral-7B-Instruct-v0.3"
         self.mistral_tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
         self.mistral_tokenizer.padding_side = "right"
@@ -576,33 +518,28 @@ class KnowledgeGraphClassifier:
             self.mistral_tokenizer.pad_token = self.mistral_tokenizer.eos_token
             self.mistral_tokenizer.pad_token_id = self.mistral_tokenizer.eos_token_id
         self.max_length = max_length
-
         enc_train = self.mistral_tokenizer(X_train, truncation=True, padding='max_length', max_length=self.max_length)
         train_dataset = HFDataset(enc_train, y_train)
         enc_val = self.mistral_tokenizer(X_val, truncation=True, padding='max_length', max_length=self.max_length) if X_val else None
         val_dataset = HFDataset(enc_val, y_val) if X_val else None
         enc_test = self.mistral_tokenizer(X_test, truncation=True, padding='max_length', max_length=self.max_length) if X_test else None
         test_dataset = HFDataset(enc_test, y_test) if X_test else None
-
         data_collator = DataCollatorWithPadding(
             tokenizer=self.mistral_tokenizer,
             padding="max_length",
             max_length=self.max_length,
             pad_to_multiple_of=8
         )
-
         output_dir = "../data/trained/mistral-results"
         logging_dir = "../data/trained/mistral-logs"
         os.makedirs(output_dir, exist_ok=True)
         os.makedirs(logging_dir, exist_ok=True)
-
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.bfloat16,
             bnb_4bit_use_double_quant=True,
             bnb_4bit_quant_type="nf4"
         )
-
         model = AutoModelForSequenceClassification.from_pretrained(
             model_id,
             num_labels=num_classes,
@@ -620,13 +557,12 @@ class KnowledgeGraphClassifier:
         lora_config = LoraConfig(
             r=qlora_r,
             lora_alpha=qlora_alpha,
-            lora_dropout=0.05,
+            lora_dropout=0.01,
             bias="none",
             task_type="SEQ_CLS"
         )
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
-
         training_args = TrainingArguments(
             output_dir=output_dir,
             eval_strategy="epoch",
@@ -634,7 +570,7 @@ class KnowledgeGraphClassifier:
             logging_strategy="epoch",
             learning_rate=2e-4,
             per_device_train_batch_size=batch_size,
-            logging_steps=100,
+            logging_steps=1000,
             num_train_epochs=epochs,
             weight_decay=0.01,
             load_best_model_at_end=True,
@@ -651,7 +587,6 @@ class KnowledgeGraphClassifier:
             warmup_steps=2,
             optim="paged_adamw_8bit",
         )
-
         def compute_metrics(eval_pred):
             logits, labels = eval_pred
             preds = np.argmax(logits, axis=-1)
@@ -659,10 +594,8 @@ class KnowledgeGraphClassifier:
                 "accuracy": accuracy_score(labels, preds),
                 "f1": f1_score(labels, preds, average='weighted', zero_division=0)
             }
-
         total_train_examples = len(train_dataset)
         callbacks = [TqdmDataCallback(total_steps=total_train_examples)]
-
         trainer = Trainer(
             model=model,
             args=training_args,
@@ -672,7 +605,6 @@ class KnowledgeGraphClassifier:
             compute_metrics=compute_metrics,
             callbacks=callbacks,
         )
-
         try:
             trainer.train()
         except Exception as e:
@@ -680,18 +612,14 @@ class KnowledgeGraphClassifier:
         finally:
             torch.cuda.empty_cache()
             gc.collect()
-
         val_results = trainer.evaluate(eval_dataset=val_dataset) if val_dataset is not None else {}
         test_results = trainer.evaluate(eval_dataset=test_dataset) if test_dataset is not None else {}
-
         val_f1 = float(val_results.get("eval_f1", 0.0))
         val_acc = float(val_results.get("eval_accuracy", 0.0))
         test_f1 = float(test_results.get("eval_f1", 0.0)) if test_dataset is not None else 0.0
         test_acc = float(test_results.get("eval_accuracy", 0.0)) if test_dataset is not None else 0.0
-
         self.accuracy = val_f1
         self.model = trainer.model
-
         return {
             "val_f1": val_f1,
             "val_accuracy": val_acc,
@@ -704,7 +632,6 @@ class KnowledgeGraphClassifier:
             "classifier_type": str(self.classifier_type),
             "model_output_dir": str(training_args.output_dir)
         }
-
     def predict(
             self,
             data: str | list[str] | pd.Series | pd.DataFrame,
@@ -712,12 +639,10 @@ class KnowledgeGraphClassifier:
     ) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not trained or loaded. Call train() or load() first.")
-
         if feature_labels is None and self.feature_labels:
             feature_labels = self.feature_labels
         elif feature_labels is None and self.feature_labels is None:
             raise ValueError("feature_labels must be provided for prediction if not set during training.")
-
         if isinstance(data, pd.DataFrame):
             texts = self._prepare_features(data, feature_labels).tolist()
         elif isinstance(data, pd.Series):
@@ -731,10 +656,8 @@ class KnowledgeGraphClassifier:
             texts = [self._clean_text(data)]
         else:
             raise ValueError("Unsupported data type for prediction. Use str, list, pd.Series, or pd.DataFrame.")
-
         if not texts:
             return np.array([])
-
         if self.classifier_type == ClassifierType.MISTRAL:
             import torch
             from tqdm import tqdm
@@ -744,7 +667,6 @@ class KnowledgeGraphClassifier:
                 raise ValueError("Mistral tokenizer not available. Load the model first.")
             if self.target_label_inverse_mapping is None:
                 raise ValueError("Target label mapping not available. Load the model first.")
-
             results = []
             batch_size = 16
             self.model.eval()
@@ -757,16 +679,13 @@ class KnowledgeGraphClassifier:
                     max_length=self.max_length,
                     return_tensors="pt"
                 ).to(self.model.device)
-
                 with torch.no_grad():
                     logits = self.model(**inputs).logits
                     preds = torch.argmax(logits, dim=-1).cpu().numpy()
                 results.extend(preds)
-
             if self.target_label_inverse_mapping:
                 return np.array([self.target_label_inverse_mapping.get(int(idx), None) for idx in results])
             return np.array(results)
-
         else:
             if not hasattr(self.model, 'predict'):
                 raise ValueError("Loaded classic model does not have a predict method.")
@@ -775,11 +694,9 @@ class KnowledgeGraphClassifier:
             except Exception as e:
                 logger.error("Classic model prediction error: %s", e)
                 raise ValueError(f"Prediction failed for classic model: {e}")
-
             if self.target_label_inverse_mapping:
                 return np.array([self.target_label_inverse_mapping.get(int(idx), None) for idx in numerical_preds])
             return numerical_preds
-
     def save(self, filepath: str | None = None) -> None:
         if self.model is None:
             raise ValueError("No trained model to save.")
@@ -808,42 +725,34 @@ class KnowledgeGraphClassifier:
                 data_to_save['vectorizer'] = self.vectorizer
                 data_to_save['model'] = self.model
                 metadata_path = filepath
-
             with open(metadata_path, 'wb') as f:
                 pickle.dump(data_to_save, f)
             logger.info("Model data saved to %s", metadata_path)
             if self.classifier_type == ClassifierType.MISTRAL and model_dir is not None:
                 logger.info("Mistral weights/tokenizer saved in %s", model_dir)
-
         except Exception as e:
             logger.error("Save error: %s", e)
             raise ValueError(f"Failed to save model: {e}")
-
     @classmethod
     def load(cls, filepath: str | None = None, classifier_type_hint: ClassifierType | None = None) -> 'KnowledgeGraphClassifier':
         if filepath is None and classifier_type_hint:
             filepath = f'../data/trained/model-{classifier_type_hint.name}.pkl'
         elif filepath is None:
             raise ValueError("Filepath must be provided if classifier_type_hint is not.")
-
         if not os.path.exists(filepath):
             raise ValueError(f"Model file/metadata {filepath} does not exist. Please train and save the model first.")
-
         try:
             with open(filepath, 'rb') as f:
                 data = pickle.load(f)
-
             cls_type = data.get('classifier_type')
             if not isinstance(cls_type, ClassifierType):
                 cls_type = ClassifierType[cls_type]
-
             instance = cls(classifier_type=cls_type)
             instance.target_label_mapping = data.get('target_label_mapping')
             instance.target_label_inverse_mapping = data.get('target_label_inverse_mapping')
             instance.feature_labels = data.get('feature_labels')
             instance.max_length = data.get('max_length')
             instance.accuracy = data.get('accuracy', 0.0)
-
             if instance.classifier_type == ClassifierType.MISTRAL:
                 model_dir = data.get('model_dir')
                 if model_dir is None or not os.path.isdir(model_dir):
@@ -864,7 +773,6 @@ class KnowledgeGraphClassifier:
         except Exception as e:
             logger.error("Load error: %s", e)
             raise ValueError(f"Failed to load model from {filepath}: {e}")
-
 def save_multiple_models(
     models: dict[str, KnowledgeGraphClassifier],
     training_results: dict[str, Any],
@@ -896,7 +804,6 @@ def save_multiple_models(
         to_pickle['models'][feature] = meta
     with open(filepath, 'wb') as f:
         pickle.dump(to_pickle, f)
-
 def load_multiple_models(filepath: str | None = None) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     if filepath is None:
         filepath = '../data/trained/multiple_models.pkl'
