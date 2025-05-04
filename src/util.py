@@ -51,16 +51,10 @@ VOC_FILTER = {
 }
 
 def is_curi_allowed(uri: str) -> bool:
-    for url in CURI_FILTER:
-        if url in uri:
-            return False
-    return True
+    return not any(url in uri for url in CURI_FILTER)
 
 def is_voc_allowed(uri: str) -> bool:
-    for url in VOC_FILTER:
-        if url in uri:
-            return False
-    return True
+    return not any(url in uri for url in VOC_FILTER)
 
 def is_endpoint_working(endpoint) -> bool:
     query_string = """
@@ -104,6 +98,7 @@ def match_file_lod(file, limit, offset, lod_frame) -> int | None:
                 return num
     if num == -1:
         return None
+    return None
 
 
 def rename_new_file(offset):
