@@ -587,7 +587,7 @@ async def main_normal():
     logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
     try:
         lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() in ['user_generated']].index, inplace=True)
+        lod_frame.drop(lod_frame[lod_frame['category'].str.strip().isin(['user_generated'])].index, inplace=True)
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
@@ -624,7 +624,7 @@ async def main_void():
     logger.info("[VOID-MAIN] Starting asynchronous VOID dataset processing.")
     try:
         lod_frame = pd.read_csv('../data/raw/sparql_full_download.csv')
-        lod_frame.drop(lod_frame[lod_frame['category'].str.strip() in ['user_generated']].index, inplace=True)
+        lod_frame.drop(lod_frame[lod_frame['category'].str.strip().isin(['user_generated'])].index, inplace=True)
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
@@ -688,5 +688,5 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
     }
 
 if __name__ == '__main__':
-    asyncio.run(main_void())
     asyncio.run(main_normal())
+    asyncio.run(main_void())
