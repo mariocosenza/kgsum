@@ -243,7 +243,8 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
             "creator": row.get("creator", ""),
             "license": row.get("license", ""),
             "ner": extract_named_entities(row.get("lab", "")), #TODO remove it
-            "language": find_language(lab_text[:1000])
+            "language": find_language(lab_text[:1000]),
+            'con': row.get('con', '')
         })
         logger.info("Processing row %d/%d completed.", i, total_rows)
     combined_df = pd.DataFrame(combined_rows)
@@ -343,7 +344,8 @@ def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[st
         'language': remove_duplicates(combined_df['language']),
         'dsc' : remove_duplicates(void_df['dsc']),
         'sbj': remove_duplicates(void_df['sbj']),
-        'ner': extract_named_entities(combined_df['lab'].tolist())
+        'ner': extract_named_entities(combined_df['lab'].tolist()),
+        'con': remove_duplicates(combined_df['con'])
     }
 
 def process_lov_data_row(row: dict[str, Any], index: int, total: int) -> dict[str, Any]:
