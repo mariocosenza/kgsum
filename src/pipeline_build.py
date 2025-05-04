@@ -14,8 +14,10 @@ from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import GridSearchCV
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 from transformers import (
     AutoTokenizer, AutoModelForSequenceClassification, logging as hf_logging, TrainerCallback, TrainerState,
@@ -271,33 +273,45 @@ class KnowledgeGraphClassifier:
             col = frame[feature_labels]
             return col.map(parse_possible_list)
     def _get_param_distributions(self, classic_type: ClassifierType = None, y_train=None) -> dict:
+        """
+        Returns a dict of hyperparameter distributions for RandomizedSearchCV,
+        expanded for broader search ranges.
+        """
         ctype = classic_type or self.classifier_type
+        # Determine a safe upper bound for n_neighbors based on data size
         safe_max = None
         if y_train is not None and len(y_train) > 0:
             unique_classes = len(np.unique(y_train))
             if unique_classes > 1:
-                safe_max = max(2, min(15, int(0.8 * len(y_train) / unique_classes)))
+                safe_max = max(2, min(25, int(0.8 * len(y_train) / unique_classes)))
+
         if ctype == ClassifierType.SVM:
             return {
-                "classifier__C": np.logspace(-3, 2, 20),
-                "classifier__kernel": ["linear", "rbf"],
-                "classifier__class_weight": ["balanced"],
-                "classifier__gamma": ["scale", "auto"] + list(np.logspace(-3, 1, 10))
+                "classifier__C": np.logspace(-5, 5, 50),
+                "classifier__kernel": ["linear", "rbf", "poly", "sigmoid"],
+                "classifier__degree": [2, 3, 4, 5],
+                "classifier__gamma": ["scale", "auto"] + np.logspace(-4, 2, 20).tolist(),
+                "classifier__coef0": np.linspace(0.0, 1.0, 5).tolist(),
+                "classifier__class_weight": ["balanced", None]
             }
         elif ctype == ClassifierType.NAIVE_BAYES:
             return {
-                "classifier__alpha": np.linspace(0.01, 10, 50),
+                "classifier__alpha": np.logspace(-3, 1, 40),
                 "classifier__fit_prior": [True, False]
             }
         elif ctype == ClassifierType.KNN:
-            n_neighbors_range = list(range(1, safe_max + 1)) if safe_max else list(range(1, 16))
+            # Expand search range for neighbors and leaf size
+            n_neighbors = list(range(1, safe_max + 1)) if safe_max else list(range(1, 31))
             return {
-                "classifier__n_neighbors": n_neighbors_range,
+                "classifier__n_neighbors": n_neighbors,
                 "classifier__weights": ["uniform", "distance"],
-                "classifier__metric": ["euclidean", "manhattan", "chebyshev", "cosine"],
-                "classifier__leaf_size": list(range(10, 51, 5))
+                "classifier__metric": ["euclidean", "manhattan", "chebyshev", "minkowski"],
+                "classifier__p": [1, 2],
+                "classifier__leaf_size": list(range(10, 101, 10))
             }
-        return {}
+        else:
+            # Default: no extra hyperparameters
+            return {}
     def _get_base_estimators(self):
         svm_clf = svm.SVC(probability=True, kernel="rbf", C=10, class_weight="balanced", random_state=42)
         nb_clf = MultinomialNB(alpha=0.5)
@@ -367,64 +381,68 @@ class KnowledgeGraphClassifier:
         clf_type = self.classifier_type
         if clf_type == ClassifierType.SVM:
             estimator = svm.SVC(probability=True, random_state=42)
-            param_distributions = {
-                "classifier__C": np.logspace(-2, 2, 8),
-                "classifier__kernel": ["linear", "rbf", "sigmoid"],
+            param_grid = {
+                "classifier__C": np.logspace(-3, 3, 7),
+                "classifier__kernel": ["linear", "rbf", "sigmoid", "poly"],
                 "classifier__gamma": ["scale", "auto"],
+                "classifier__degree": [2, 3, 4],
+                "classifier__coef0": [0.0, 0.1, 0.5],
+                "classifier__shrinking": [True, False],
+                "classifier__tol": [1e-3, 1e-4, 1e-5],
             }
+
         elif clf_type == ClassifierType.NAIVE_BAYES:
             estimator = MultinomialNB()
-            param_distributions = {
-                "classifier__alpha": np.linspace(0.1, 2, 7),
+            param_grid = {
+                "classifier__alpha": np.linspace(0.1, 2.0, 10),
                 "classifier__fit_prior": [True, False],
             }
+
         elif clf_type == ClassifierType.KNN:
             estimator = KNeighborsClassifier()
-            param_distributions = {
-                "classifier__n_neighbors": list(range(2, 7)),
+            # only metrics valid for sparse input with brute force
+            valid_sparse_metrics = ["euclidean", "manhattan", "cosine", "l1", "l2"]
+            param_grid = {
+                "classifier__n_neighbors": list(range(1, 8)),
                 "classifier__weights": ["uniform", "distance"],
-                "classifier__metric": ["euclidean", "manhattan"],
+                "classifier__metric": valid_sparse_metrics,
+                "classifier__p": [1, 2],
+                "classifier__leaf_size": [10, 20, 30, 40],
+                "classifier__algorithm": ["auto", "brute"],  # brute handles sparse metrics
             }
         else:
             raise ValueError("Unsupported classic model type.")
-        from sklearn.pipeline import Pipeline
+
+        # 2) build pipeline
         pipeline = Pipeline([
             ("vectorizer", self.vectorizer),
             ("classifier", estimator),
         ])
-        if param_distributions:
-            single_param = random.choice(list(param_distributions.keys()))
-            single_value = param_distributions[single_param]
-            print(f"[LOG] Random search parameter used: {single_param} = {single_value}")
+
+        # 3) pick training data for search
         if len(X_val) > 0:
             X_search, y_search = X_val, y_val
         else:
             X_search, y_search = X_train, y_train
-        n_iter = 10
-        def get_total_possible(param_distributions):
-            total = 1
-            for v in param_distributions.values():
-                total *= len(v)
-            return total
-        total_possible = get_total_possible(param_distributions)
-        n_fits = min(n_iter, total_possible)
-        search = RandomizedSearchCV(
+
+        # 4) grid-search
+        search = GridSearchCV(
             estimator=pipeline,
-            param_distributions=param_distributions,
-            n_iter=n_iter,
+            param_grid=param_grid,
             cv=2,
-            scoring='f1_weighted',
-            verbose=3,
-            n_jobs=1,
-            error_score=0.0,
-            random_state=42,
+            scoring="f1_weighted",
+            n_jobs=-1,
+            verbose=1,
+            error_score="raise",
             return_train_score=False
         )
-        print(f"Starting RandomizedSearchCV with up to {n_fits} parameter sets...")
-        search.fit(X_train, y_train)
-        print("[LOG] All fit parameter sets tried during RandomizedSearchCV:")
-        for i, params in enumerate(search.cv_results_['params']):
-            print(f"Set {i + 1}: {params}")
+
+        # 5) fit & inspect
+        search.fit(X_search, y_search)
+        print(f"Best CV score: {search.best_score_:.4f}")
+        print("Best hyper-parameters:")
+        for k, v in search.best_params_.items():
+            print(f"  • {k} = {v}")
         best_estimator = search.best_estimator_
         y_pred_numeric = best_estimator.predict(X_test)
         final_f1 = f1_score(y_test, y_pred_numeric, average='weighted', zero_division=0)
@@ -468,7 +486,7 @@ class KnowledgeGraphClassifier:
             qlora_r: int = 32,
             qlora_alpha: int = 64,
             batch_size: int = 8,
-            epochs: int = 100
+            epochs: int = 15
     ) -> dict[str | Any, float | int | dict[str, int] | str | list[str] | Any] | None:
         import os
         import gc
