@@ -188,5 +188,26 @@ def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
     return merged_df.drop_duplicates(subset=['id'])
 
 
+def merge_dump_sparql(csv1_path='../data/raw/graphs.csv', csv2_path='../data/raw/datasetsAndCategories.csv') -> pd.DataFrame:
+
+    df1 = pd.read_csv(csv1_path)
+    df2 = pd.read_csv(csv2_path)
+    output_df = pd.DataFrame(columns=['id', 'category', 'download_url', 'sparql_url', 'graphs_uri'])
+
+
+    for index, row in df2.iterrows():
+        uri = []
+        for i, line in df1.iterrows():
+            if row["id"][6:] in line["g"]: #should use binary search
+                uri.append(line["g"])
+        row['graphs_uri'] = uri
+        output_df.loc[len(output_df)] = row
+        print(output_df)
+
+    output_df.to_csv('../data/raw/graphs_with_uri.csv', index=True)
+    return  df2
+
+
+
 if __name__ == '__main__':
-    merge_github_sparql()
+    merge_dump_sparql()
