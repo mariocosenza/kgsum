@@ -1,21 +1,20 @@
 import logging
 import os
 
-
 import pandas as pd
 
 import src.pipeline_build
-from src.pipeline_build import ClassifierType, majority_vote, predict_category_multi, save_multiple_models, \
+from src.pipeline_build import ClassifierType, select_best_accuracy, predict_category_multi, save_multiple_models, \
     load_multiple_models
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
 data_folder_path = os.path.join(project_root, 'data\\trained')
 file_path = os.path.join(data_folder_path, 'multiple_models.pkl')
+
 
 class CategoryPredictor:
     def __init__(self, models, training_results):
@@ -23,12 +22,13 @@ class CategoryPredictor:
         self.training_results = training_results
 
     def predict_category(self, processed_data):
-        return majority_vote(predict_category_multi(self.models, processed_data))
+        return select_best_accuracy(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.MISTRAL):
+    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None):
         combined_df = pd.read_json(f'{project_root}/data/processed/combined.json')
-        feature_columns = ["lab"]
+        if feature_columns is None:
+            feature_columns = ["curi"]
         try:
             models, training_results = load_multiple_models(file_path)
         except Exception as _:
@@ -46,7 +46,63 @@ class CategoryPredictor:
 
         return CategoryPredictor(models, training_results)
 
+
 if __name__ == "__main__":
-    PREDICTOR = CategoryPredictor.get_predictor()
+    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES,
+                                                feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
+                                                                 'comments'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['voc'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['curi'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['puri'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['lcn'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['lpn'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['lab'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['comments'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['voc'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['curi'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['puri'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['lcn'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['lpn'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['lab'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['comments'])
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['voc'])
+    # os.removedirs('../data/trained/mistral_voc')
+    # os.removedirs('../data/trained/mistral-result')
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['curi'])
+    # os.removedirs('../data/trained/mistral_curi')
+    # os.removedirs('../data/trained/mistral-result')
 
-
+    # # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['puri'])
+    # os.removedirs('../data/trained/mistral_puri')
+    # os.removedirs('../data/trained/mistral-result')
+    # # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['lcn'])
+    # os.removedirs('../data/trained/mistral_lcn')
+    # os.removedirs('../data/trained/mistral-result')
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['lpn'])
+    # os.removedirs('../data/trained/mistral_lpn')
+    # os.removedirs('../data/trained/mistral-result')
+    # # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['lab'])
+    # os.removedirs('../data/trained/mistral_lab')
+    # os.removedirs('../data/trained/mistral-result')
+    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['comments'])

@@ -75,35 +75,46 @@ def get_custom_count_vectorizer(**kwargs):
         token_pattern=None,
         **kwargs
     )
-def majority_vote(predictions: list[Any]) -> Any:
-    if isinstance(predictions, str):
-        return predictions
-    filtered_predictions = [p for p in predictions if p is not None]
-    if not filtered_predictions:
-        logger.info("No valid predictions available for majority vote.")
+def select_best_accuracy(predictions: list[Any]) -> Any:
+    if not predictions:
+        logger.info("No predictions provided.")
         return None
-    if isinstance(filtered_predictions[0], (tuple, list)) and len(filtered_predictions[0]) > 1:
-        candidate_info = {}
-        for tup in filtered_predictions:
-            label = tup[0]
-            try:
-                weight = float(tup[1])
-            except Exception:
-                weight = 1.0
-            candidate_info[label] = candidate_info.get(label, 0.0) + weight
-        if not candidate_info:
-            logger.info("No weighted predictions available for majority vote.")
-            return None
-        best_label = max(candidate_info.items(), key=lambda x: x[1])[0]
-        logger.info("Majority vote: candidate '%s' total weight: %.4f", best_label, candidate_info[best_label])
-        return best_label
-    best_label = Counter(filtered_predictions).most_common(1)[0][0]
-    logger.info("Majority vote result: candidate '%s'", best_label)
+
+    # Accept tuples of length >= 3 (ignore extra values)
+    filtered = [p for p in predictions if p is not None and len(p) >= 3]
+    if not filtered:
+        logger.info("No valid model predictions for voting.")
+        return None
+
+
+    for tup in filtered:
+        label, accuracy, feature = tup[:3]
+        try:
+            accuracy_float = float(accuracy)
+        except Exception:
+            accuracy_float = 0.0
+        msg = f"'{feature}': {label} Accuracy {accuracy_float:.3f}"
+        logger.info(msg)
+
+    # Select the tuple with the highest accuracy (first three values only)
+    best = max(filtered, key=lambda tup: float(tup[1]) if tup[1] is not None else float('-inf'))
+    best_label, best_accuracy, best_feature = best[:3]
+
+    try:
+        best_accuracy_float = float(best_accuracy)
+    except Exception:
+        best_accuracy_float = 0.0
+
+    selection_msg = (f"Selected feature: '{best_feature}' | Category: '{best_label}' "
+                     f"(Accuracy: {best_accuracy_float:.3f})")
+    logger.info(selection_msg)
+
     return best_label
+
 def _predict_category_for_instance(
     models: dict[str, 'KnowledgeGraphClassifier'],
     instance: dict[str, Any]
-) -> Any | None:
+) -> list[tuple[Any, float, str]]:
     votes: list[tuple[Any, float, str]] = []
     for feature, model in models.items():
         value = instance.get(feature)
@@ -129,15 +140,17 @@ def _predict_category_for_instance(
             votes.append((pred, score, feature))
         except Exception as err:
             logger.error("Prediction error for %s: %s", feature, err)
-    label_votes = [v[0] for v in votes]
-    return majority_vote(label_votes)
+    return votes
+
 def predict_category_multi(
     models: dict[str, 'KnowledgeGraphClassifier'],
     instance: dict[str, Any] | pd.DataFrame
-) -> Any | list[Any | None]:
+) -> list[tuple[Any, float, str]] | list[list[tuple[Any, float, str]]]:
     if isinstance(instance, pd.DataFrame):
         return instance.apply(lambda row: _predict_category_for_instance(models, row.to_dict()), axis=1).tolist()
     return _predict_category_for_instance(models, instance)
+
+
 def remove_empty_rows(frame: pd.DataFrame, labels: str | list[str]) -> pd.DataFrame:
     if isinstance(labels, str):
         labels = [labels]
@@ -162,6 +175,7 @@ def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float 
     oversampled = pd.concat(groups).sample(frac=1, random_state=42).reset_index(drop=True)
     logger.info("After oversampling: %s", oversampled[target_label].value_counts().to_dict())
     return oversampled
+
 def train_multiple_models(
     training_data: pd.DataFrame,
     feature_columns: list[str],

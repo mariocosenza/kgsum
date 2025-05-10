@@ -398,6 +398,57 @@ def _guess_format_and_parse(path):
             continue
     raise Exception(f'Format not supported for file: {path}')
 
+
+def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] | None:
+    if file_path is None:
+        return None
+    try:
+        logger.info(f"Processing graph id: {file_path}")
+        result = _guess_format_and_parse(file_path)
+
+        # Get all the values
+        title = select_local_void_title(result)
+        subject = select_local_void_subject(result)
+        description = select_local_void_description(result)
+        vocabulary = select_local_vocabularies(result)
+        class_val = select_local_class(result)
+        property_val = select_local_property(result)
+        cname = select_local_class_name(result)
+        pname = select_local_property_names(result)
+        label = select_local_label(result)
+        tld = select_local_tld(result)
+        sparql = select_local_endpoint(result)
+        creator = select_local_creator(result)
+        licenses = select_local_license(result)
+        con = select_local_con(result)
+
+        if not title or title == '':
+            if sparql is not None:
+                title = sparql
+
+
+        return {
+            'id': title,
+            'title': title,
+            'sbj': list(subject),
+            'dsc': list(description),
+            'voc': list(vocabulary),
+            'curi': list(class_val),
+            'puri': list(property_val),
+            'lcn': list(cname),
+            'lpn': list(pname),
+            'lab': list(label),
+            'sparql': list(sparql),
+            'tlds': list(tld),
+            'creator': list(creator),
+            'license': list(licenses),
+            'con': con
+        }
+
+    except Exception as e:
+        logger.warning(f"Error processing file {file_path}: {str(e)}")
+        return None
+
 # --- Multiprocessing Setup ---
 lod_frame_global = None
 
