@@ -1,7 +1,7 @@
 import logging
-from multiprocessing import get_context, TimeoutError
-from os import listdir
 import os
+from multiprocessing import get_context
+from os import listdir
 
 import pandas as pd
 import rdflib
@@ -16,10 +16,10 @@ logger = logging.getLogger("dataset_preparation")
 
 FORMATS = {'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'}
 
-# SPARQL queries are now compiled inside worker functions for better multiprocess compatibility
 
 def log_query(query):
     logger.info(f"SPARQL Query: {query}")
+
 
 def select_local_vocabularies(parsed_graph):
     Q_LOCAL_VOCABULARIES = prepareQuery("""
@@ -51,6 +51,7 @@ def select_local_vocabularies(parsed_graph):
                 vocabularies.add(vocabulary_uri)
     return vocabularies
 
+
 def select_local_class(parsed_graph):
     Q_LOCAL_CLASS = prepareQuery("""
         SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
@@ -73,6 +74,7 @@ def select_local_class(parsed_graph):
         if is_curi_allowed(predicate_uri):
             classes.add(predicate_uri)
     return list(classes)
+
 
 def select_local_label(parsed_graph):
     Q_LOCAL_LABEL = prepareQuery("""
@@ -157,6 +159,7 @@ def select_local_label(parsed_graph):
             return set()
     return {str(row.o) for row in qres}
 
+
 def select_local_tld(parsed_graph):
     Q_LOCAL_TLD = prepareQuery("""
         SELECT DISTINCT ?o
@@ -183,6 +186,7 @@ def select_local_tld(parsed_graph):
                 logger.warning(f'Unable to find tld in {url}: {exc}')
     return tlds
 
+
 def select_local_property(parsed_graph):
     Q_LOCAL_PROPERTY = prepareQuery("""
         SELECT ?property (COUNT(?s) AS ?usageCount)
@@ -207,6 +211,7 @@ def select_local_property(parsed_graph):
             properties.add(property_uri)
     return list(properties)
 
+
 def select_local_endpoint(parsed_graph):
     Q_LOCAL_VOID_SPARQL = prepareQuery("""
         SELECT DISTINCT ?o
@@ -222,6 +227,7 @@ def select_local_endpoint(parsed_graph):
         return []
     return list({str(row.o) for row in qres})
 
+
 def select_local_creator(parsed_graph):
     Q_LOCAL_DCTERMS_CREATOR = prepareQuery("""
         SELECT ?creator WHERE {
@@ -236,6 +242,7 @@ def select_local_creator(parsed_graph):
         return set()
     return {str(row.creator) for row in qres}
 
+
 def select_local_license(parsed_graph):
     Q_LOCAL_DCTERMS_LICENSE = prepareQuery("""
         SELECT ?license WHERE {
@@ -249,6 +256,7 @@ def select_local_license(parsed_graph):
         logger.warning(f"SPARQL error in select_local_license: {e}")
         return set()
     return {str(row.license) for row in qres}
+
 
 def select_local_property_names(parsed_graph):
     Q_LOCAL_PROPERTY_NAMES = prepareQuery("""
@@ -284,6 +292,7 @@ def select_local_property_names(parsed_graph):
             processed_local_names.add(local_name)
     return local_property_names
 
+
 def select_local_class_name(parsed_graph):
     Q_LOCAL_CLASS_NAME = prepareQuery("""
         SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
@@ -313,6 +322,7 @@ def select_local_class_name(parsed_graph):
             local_name = class_uri
         local_names.add(local_name)
     return local_names
+
 
 def select_local_void_subject(parsed_graph):
     Q_LOCAL_VOID_DESCRIPTION = prepareQuery("""
@@ -344,14 +354,13 @@ def select_local_void_subject(parsed_graph):
             logger.warning(f"SPARQL error in select_local_void_subject loop: {e}")
     return subject
 
+
 def select_local_void_description(parsed_graph):
     Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery("""
         SELECT ?desc WHERE {
-            {?s dcterms:description ?desc}
-            UNION
-            {?s schema:description ?desc}
+            ?s dcterms:description ?desc
         } LIMIT 100
-    """, initNs={"dcterms": 'http://purl.org/dc/terms/', "schema": 'http://schema.org/'})
+    """, initNs={"dcterms": 'http://purl.org/dc/terms/'})
     log_query(Q_LOCAL_DCTERMS_DESCRIPTION)
     try:
         qres = parsed_graph.query(Q_LOCAL_DCTERMS_DESCRIPTION)
@@ -359,6 +368,7 @@ def select_local_void_description(parsed_graph):
         logger.warning(f"SPARQL error in select_local_void_description: {e}")
         return set()
     return {str(row.desc) for row in qres}
+
 
 def select_local_void_title(parsed_graph):
     Q_LOCAL_DCTERMS_TITLE = prepareQuery("""
@@ -374,6 +384,7 @@ def select_local_void_title(parsed_graph):
         return []
     return [str(row.desc) for row in qres]
 
+
 def select_local_con(parsed_graph):
     Q_LOCAL_CON = prepareQuery("""
         SELECT DISTINCT ?o 
@@ -388,6 +399,7 @@ def select_local_con(parsed_graph):
         logger.warning(f"SPARQL error in select_local_con: {e}")
         return []
     return [str(row.o) for row in qres]
+
 
 def _guess_format_and_parse(path):
     g = Graph()
@@ -426,7 +438,6 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
             if sparql is not None:
                 title = sparql
 
-
         return {
             'id': title,
             'title': title,
@@ -449,12 +460,15 @@ def process_file_full_inplace(file_path) -> dict[str, list | set | str | None] |
         logger.warning(f"Error processing file {file_path}: {str(e)}")
         return None
 
+
 # --- Multiprocessing Setup ---
 lod_frame_global = None
+
 
 def init_worker(lod_frame_path):
     global lod_frame_global
     lod_frame_global = pd.read_csv(lod_frame_path)
+
 
 def process_local_dataset_file(args):
     category, file, offset, limit = args
@@ -486,6 +500,7 @@ def process_local_dataset_file(args):
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
 
+
 def process_local_void_dataset_file(args):
     category, file, offset, limit = args
     global lod_frame_global
@@ -508,6 +523,7 @@ def process_local_void_dataset_file(args):
         logger.warning(f"Error processing file {path}: {str(e)}")
         return None
 
+
 def robust_pool_map(pool, func, tasks, timeout=600):
     results = []
     # Use imap_unordered for true multiprocessing and immediate results
@@ -517,6 +533,7 @@ def robust_pool_map(pool, func, tasks, timeout=600):
             results.append(result)
         logger.info(f"Progress: {i}/{len(tasks)} tasks completed.")
     return results
+
 
 def create_local_dataset(offset=0, limit=10000):
     lod_frame_path = '../data/raw/sparql_full_download.csv'
@@ -539,13 +556,15 @@ def create_local_dataset(offset=0, limit=10000):
     if results:
         df = pd.DataFrame(
             results,
-            columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds', 'sparql', 'creator', 'license', 'con', 'category']
+            columns=['id', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds', 'sparql', 'creator', 'license', 'con',
+                     'category']
         )
         out_path = f'../data/raw/local/local_feature_set{offset}-{limit}.json'
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         df.to_json(out_path, index=False)
     else:
         logger.warning("No results produced for local dataset.")
+
 
 def create_local_void_dataset(offset=0, limit=10000):
     lod_frame_path = '../data/raw/sparql_full_download.csv'
@@ -573,10 +592,11 @@ def create_local_void_dataset(offset=0, limit=10000):
     else:
         logger.warning("No results produced for local void dataset.")
 
+
 if __name__ == '__main__':
     import multiprocessing
-    multiprocessing.freeze_support()
 
+    multiprocessing.freeze_support()
 
     create_local_dataset(offset=0, limit=200)
     create_local_dataset(offset=1001, limit=1025)
@@ -590,7 +610,6 @@ if __name__ == '__main__':
     create_local_dataset(offset=1301, limit=1350)
     create_local_dataset(offset=2000, limit=4000)
 
-
     create_local_void_dataset(offset=0, limit=200)
     create_local_void_dataset(offset=1001, limit=1025)
     create_local_void_dataset(offset=1026, limit=1050)
@@ -602,8 +621,3 @@ if __name__ == '__main__':
     create_local_void_dataset(offset=1251, limit=1300)
     create_local_void_dataset(offset=1301, limit=1350)
     create_local_void_dataset(offset=2000, limit=4000)
-
-
-
-
-

@@ -89,6 +89,7 @@ async def async_select_remote_class(endpoint, timeout=300):
     logger.info(f"[CLS] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
     return classes
 
+
 async def async_select_remote_connection(endpoint, timeout=300):
     logger.info(f"[CON] Starting class query for endpoint: {endpoint}")
     classes = []
@@ -107,17 +108,17 @@ async def async_select_remote_connection(endpoint, timeout=300):
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
             if not bindings:
-                logger.debug(f"[CLS] No class bindings found at offset {offset}.")
+                logger.debug(f"[CON] No class bindings found at offset {offset}.")
             for binding in bindings:
                 classes.append(binding.text)
         except Exception as e:
-            logger.warning(f"[CLS] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[CON] Query execution error: {e}. Endpoint: {endpoint}")
             return ''
-    logger.info(f"[CON] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
+    logger.info(f"[CON] Finished class query for endpoint: {endpoint} (found {len(classes)} connections)")
     return classes
 
 
-async def async_select_remote_label(endpoint, timeout=300, en = True):
+async def async_select_remote_label(endpoint, timeout=300, en=True):
     logger.info(f"[LAB] Starting label query for endpoint: {endpoint}")
     labels = []
     offset = 0
@@ -209,7 +210,6 @@ async def async_select_remote_label(endpoint, timeout=300, en = True):
 async def async_select_remote_title(endpoint, timeout=300):
     logger.info(f"[TITLE] Starting class query for endpoint: {endpoint}")
     title = ''
-    offset = 0
     async with aiohttp.ClientSession() as session:
         query = f"""
                PREFIX dcterms: <http://purl.org/dc/terms/> 
@@ -224,7 +224,7 @@ async def async_select_remote_title(endpoint, timeout=300):
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="classUri"]/sparql:uri', ns)
             if not bindings:
-                logger.debug(f"[TITLE] No class bindings found at offset {offset}.")
+                logger.debug(f"[TITLE] No class bindings found.")
             else:
                 for binding in bindings:
                     title = binding.text
@@ -235,10 +235,9 @@ async def async_select_remote_title(endpoint, timeout=300):
     return title
 
 
-async def async_select_remote_tld(endpoint, limit=1000, timeout=300) -> list:
+async def async_select_remote_tld(endpoint: str, limit=1000, timeout=300) -> list[str]:
     logger.info(f"[TLD] Starting TLD query for endpoint: {endpoint}")
     tlds = set()
-    offset = 0
     async with aiohttp.ClientSession() as session:
         query = f"""
             SELECT DISTINCT ?o
@@ -254,7 +253,7 @@ async def async_select_remote_tld(endpoint, limit=1000, timeout=300) -> list:
             ns = {'sparql': 'http://www.w3.org/2005/sparql-results#'}
             bindings = root.findall('.//sparql:binding[@name="o"]/sparql:uri', ns)
             if not bindings:
-                logger.debug(f"[TLD] No TLD bindings found at offset {offset}.")
+                logger.debug(f"[TLDS] No TLD bindings found.")
             for binding in bindings:
                 url = binding.text
                 if url and (url.startswith('http') or url.startswith('https')):
@@ -263,12 +262,11 @@ async def async_select_remote_tld(endpoint, limit=1000, timeout=300) -> list:
                         if 1 < len(tld) <= 10:
                             tlds.add(tld)
                     except Exception as e:
-                        logger.debug(f"[TLD] Error parsing TLD for URL {url}: {e}")
-            offset += 100
+                        logger.debug(f"[TLDS] Error parsing TLD for URL {url}: {e}")
         except Exception as e:
-            logger.warning(f"[TLD] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[TLDS] Query execution error: {e}. Endpoint: {endpoint}")
             return []
-    logger.info(f"[TLD] Finished TLD query for endpoint: {endpoint} (found {len(tlds)} TLDs)")
+    logger.info(f"[TLDS] Finished TLDS query for endpoint: {endpoint} (found {len(tlds)} TLDs)")
     return list(tlds)
 
 
@@ -283,7 +281,7 @@ async def async_select_remote_property(endpoint, timeout=300, filter_en=True):
             ?s ?property ?o .
   
             # Optional: Filter out rdf:type if you want to exclude it
-            {'FILTER (?property != rdf:type)' if filter_en  else ''}
+            {'FILTER (?property != rdf:type)' if filter_en else ''}
          }}
         GROUP BY ?property
         ORDER BY DESC(?usageCount)
@@ -321,7 +319,7 @@ async def async_select_remote_property_names(endpoint, timeout=300, filter_en=Tr
                     ?s ?property ?o .
 
                     # Optional: Filter out rdf:type if you want to exclude it
-                    {'FILTER (?property != rdf:type)' if filter_en  else ''}
+                    {'FILTER (?property != rdf:type)' if filter_en else ''}
                  }}
                 GROUP BY ?property
                 ORDER BY DESC(?usageCount)
@@ -613,7 +611,8 @@ async def main_normal():
         logger.info(f"[MAIN] Processed {processed}/{total} endpoints")
     df = pd.DataFrame(
         results,
-        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds', 'sparql', 'creator', 'license', 'con',
+        columns=['id', 'title', 'voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds', 'sparql', 'creator', 'license',
+                 'con',
                  'category']
     )
     df.to_json('../data/raw/remote/remote_feature_set_sparqlwrapper.json', orient='records')
@@ -686,6 +685,7 @@ async def process_endpoint_full_inplace(endpoint) -> dict[str, set | str | None 
         'license': data[11],
         'con': data[12]
     }
+
 
 if __name__ == '__main__':
     asyncio.run(main_normal())
