@@ -23,12 +23,12 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
             result = g_client.models.generate_content(
                 model="gemini-2.0-flash-thinking-exp-01-21",
                 contents=(
-                    f"Given the following README file, find a category from the given list. "
-                    f"Only respond with the category and no other words. "
-                    f"Be precise and use your reasoning. "
-                    f"Use the same format for the categories as instructed. "
-                    f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
-                    f"Description: {description}"
+                    f"""Given the following README file, find a category from the given list. 
+                    Only respond with the category and no other words. 
+                    Be precise and use your reasoning. 
+                    Use the same format for the categories as instructed. 
+                    Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. 
+                    Description: {description}"""
                 )
             )
             return result.text.strip()
@@ -44,20 +44,20 @@ def safe_generate_content(g_client, description, max_retries=5, initial_wait=60)
 
 def safe_generate_content_ollama(description):
     prompt = (
-        f"Given the following description, find a category from this list. "
-        f"Only respond with the category and no other words. Do not add any other words for any reason. "
-        f"Be precise and use your reasoning. "
-        f"Use the same category format. "
-        f"Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
-        f"Description: {description}"
+        f"""Given the following README file, find a category from the given list. 
+        Only respond with the category and no other words. 
+        Be precise and use your reasoning. "
+        Use the same format for the categories as instructed. 
+        Categories: {LOD_CATEGORY_NO_USER_DOMAIN}. "
+        Description: {description}"""
     )
 
     try:
         response = ollama.generate(model="gemma3:12b", prompt=prompt)
         output = response['response'].strip()
-        logger.info(f'Categories: {output}')
+        logger.info(f'Category: {output}')
     except Exception as e:
-        logger.error("Error calling Ollama model: %s", e)
+        logger.error(f"Error calling Ollama model: {e}")
         return ""
 
     return output

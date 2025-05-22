@@ -27,13 +27,13 @@ CATEGORIES_COLOR: dict[str, str] = {
 
 def safe_generate_content_ollama(description, keywords):
     prompt = (
-        f"Given the following description and keywords, find a category given this data. "
-        f"Only respond with the category and no other words. "
-        f"Be precise and use your reasoning. "
-        f"Use the same category format. "
-        f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-        f"Description: {description}"
-        f"Keywords: {keywords}. "
+        f"""Given the following description and keywords, find a category given this data. 
+        Only respond with the category and no other words. 
+        Be precise and use your reasoning. 
+        Use the same category format. 
+        Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. 
+        Description: {description}
+        Keywords: {keywords}. """
     )
 
     try:
@@ -85,13 +85,13 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                                f"Given the following description and keywords, find a category given this data. "
-                                f"Only respond with the category and no other words. "
-                                f"Be precise and use your reasoning. "
-                                f"Use the same category format. "
-                                f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-                                f"Description: {df[col]['description']}"
-                                f"Keywords: {df[col]['keywords']}. "
+                                f"""Given the following description and keywords, find a category given this data. 
+                                Only respond with the category and no other words. 
+                                Be precise and use your reasoning. 
+                                Use the same category format. 
+                                Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. 
+                                Description: {df[col]['description']}
+                                Keywords: {df[col]['keywords']}. """
                             )
                         )
                         break
@@ -206,13 +206,13 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                                f"Given the following description and keywords, find a category given this data. "
-                                f"Only respond with the category and no other words. "
-                                f"Be precise and use your reasoning. "
-                                f"Use the same category format. "
-                                f"Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. "
-                                f"Description: {df[col]['description']}"
-                                f"Keywords: {df[col]['keywords']}. "
+                                f"""Given the following description and keywords, find a category given this data. 
+                                Only respond with the category and no other words. 
+                                Be precise and use your reasoning. 
+                                Use the same category format. 
+                                Categories: {LOD_CATEGORY_NO_MULTIPLE_DOMAIN}. 
+                                Description: {df[col]['description']}
+                                Keywords: {df[col]['keywords']}. """
                             )
                         )
                         break
