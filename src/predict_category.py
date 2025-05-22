@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 import src.pipeline_build
-from src.pipeline_build import ClassifierType, select_best_accuracy, predict_category_multi, save_multiple_models, \
+from src.pipeline_build import ClassifierType, majority_vote, predict_category_multi, save_multiple_models, \
     load_multiple_models
 
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +22,7 @@ class CategoryPredictor:
         self.training_results = training_results
 
     def predict_category(self, processed_data):
-        return select_best_accuracy(predict_category_multi(self.models, processed_data))
+        return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
     def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None):
@@ -51,58 +51,8 @@ if __name__ == "__main__":
     PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES,
                                                 feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
                                                                  'comments'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['voc'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['curi'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['puri'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['lcn'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['lpn'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['lab'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['comments'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['voc'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['curi'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['puri'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['lcn'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['lpn'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['lab'])
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['comments'])
-    # os.remove('../data/trained/multiple_models.pkl')
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
+    #                                                                  'comments'])
+    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
+    #                                                                      'comments'])
     # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['voc'])
-    # os.removedirs('../data/trained/mistral_voc')
-    # os.removedirs('../data/trained/mistral-result')
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['curi'])
-    # os.removedirs('../data/trained/mistral_curi')
-    # os.removedirs('../data/trained/mistral-result')
-
-    # # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['puri'])
-    # os.removedirs('../data/trained/mistral_puri')
-    # os.removedirs('../data/trained/mistral-result')
-    # # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['lcn'])
-    # os.removedirs('../data/trained/mistral_lcn')
-    # os.removedirs('../data/trained/mistral-result')
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['lpn'])
-    # os.removedirs('../data/trained/mistral_lpn')
-    # os.removedirs('../data/trained/mistral-result')
-    # # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['lab'])
-    # os.removedirs('../data/trained/mistral_lab')
-    # os.removedirs('../data/trained/mistral-result')
-    # os.remove('../data/trained/multiple_models.pkl')
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['comments'])
