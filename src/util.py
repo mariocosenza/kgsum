@@ -23,8 +23,7 @@ LOD_CATEGORY_NO_USER_DOMAIN = {
     'linguistics', 'media', 'publications', 'social_networking'
 }
 
-
-CURI_FILTER = {
+CURI_PURI_FILTER = {
     'http://www.w3.org/2002/07/owl',
     'http://www.w3.org/2004/02/skos/core',
     'http://www.w3.org/2000/01/rdf-schema',
@@ -50,11 +49,14 @@ VOC_FILTER = {
     'http://xmls.com/foaf/0.1'
 }
 
+
 def is_curi_allowed(uri: str) -> bool:
-    return not any(url in uri for url in CURI_FILTER)
+    return not any(url in uri for url in CURI_PURI_FILTER)
+
 
 def is_voc_allowed(uri: str) -> bool:
     return not any(url in uri for url in VOC_FILTER)
+
 
 def is_endpoint_working(endpoint) -> bool:
     query_string = """
@@ -115,10 +117,7 @@ def rename_new_file(offset):
                               f'../data/raw/rdf_dump/{category}/{file_num}-{hashlib.sha256(lod_frame['id'][file_num].encode()).hexdigest()}.rdf')
 
 
-def merge_csv_files(csv1_path, csv2_path, output_csv_path):
-    df1 = pd.read_csv(csv1_path)
-    df2 = pd.read_csv(csv2_path)
-
+def _merge(df1, df2, output_csv_path) -> pd.DataFrame:
     # Transform CSV2:
     # Use 'record_link' as 'id' (ignoring 'title' and 'description') and keep 'category'.
     df2_transformed = df2.rename(columns={'record_link': 'id'})[['id', 'category']].copy()
@@ -131,35 +130,24 @@ def merge_csv_files(csv1_path, csv2_path, output_csv_path):
     # Merge the two dataframes vertically.
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
+    merged_df.drop_duplicates(subset=['id'], inplace=True)
     # Write the merged DataFrame to CSV including the index column.
     merged_df.to_csv(output_csv_path, index=True)
 
     return merged_df
 
 
+def merge_csv_files(csv1_path, csv2_path, output_csv_path):
+    df1 = pd.read_csv(csv1_path)
+
+    return _merge(df1, pd.read_csv(csv2_path), output_csv_path)
+
+
 def merge_zenodo_sparql(csv1_path='../data/raw/sparql_full_download.csv',
                         csv2_path='../data/raw/zenodo.csv') -> pd.DataFrame:
     df1 = pd.read_csv(csv1_path, index_col=0)
 
-    # Read CSV2 normally
-    df2 = pd.read_csv(csv2_path)
-
-    # Transform CSV2:
-    # Rename 'record_link' to 'id' and keep only the 'id' and 'category' columns.
-    df2_transformed = df2.rename(columns={'record_link': 'id'})[['id', 'category']].copy()
-    # Add missing columns with empty strings.
-    df2_transformed["download_url"] = ""
-    df2_transformed["sparql_url"] = ""
-    # Reorder columns to match CSV1: id, category, download_url, sparql_url.
-    df2_transformed = df2_transformed[['id', 'category', 'download_url', 'sparql_url']]
-
-    # Merge the two DataFrames (resetting index so there's only one index column)
-    merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
-
-    # Write the merged DataFrame to CSV with one index column
-    merged_df.to_csv(csv1_path, index=True)
-
-    return merged_df.drop_duplicates(subset=['id'])
+    return _merge(df1, pd.read_csv(csv2_path), csv1_path)
 
 
 def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
@@ -183,30 +171,29 @@ def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
     # Save the CSV with the index included (only one index column will be added)
+    merged_df.drop_duplicates(subset=['id'], inplace=True)
     merged_df.to_csv(csv1_path, index=True)
 
-    return merged_df.drop_duplicates(subset=['id'])
+    return merged_df
 
 
-def merge_dump_sparql(csv1_path='../data/raw/graphs.csv', csv2_path='../data/raw/datasetsAndCategories.csv') -> pd.DataFrame:
-
+def merge_dump_sparql(csv1_path='../data/raw/graphs.csv',
+                      csv2_path='../data/raw/datasetsAndCategories.csv') -> pd.DataFrame:
     df1 = pd.read_csv(csv1_path)
     df2 = pd.read_csv(csv2_path)
     output_df = pd.DataFrame(columns=['id', 'category', 'download_url', 'sparql_url', 'graphs_uri'])
 
-
     for index, row in df2.iterrows():
         uri = []
         for i, line in df1.iterrows():
-            if row["id"][6:] in line["g"]: #should use binary search
+            if row["id"][6:] in line["g"]:  # should use binary search
                 uri.append(line["g"])
         row['graphs_uri'] = uri
         output_df.loc[len(output_df)] = row
         print(output_df)
 
     output_df.to_csv('../data/raw/graphs_with_uri.csv', index=True)
-    return  df2
-
+    return df2
 
 
 if __name__ == '__main__':
