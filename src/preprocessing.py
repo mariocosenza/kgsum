@@ -37,7 +37,7 @@ for lang, model in [
     ("pt", "pt_core_news_lg"),
 ]:
     try:
-        #spacy.prefer_gpu()
+        # spacy.prefer_gpu()
         pipeline_dict[lang] = spacy.load(model)
     except Exception as e:
         logger.error("Error loading %s pipeline: %s", lang, e)
@@ -46,7 +46,7 @@ try:
     fallback_pipeline: Language = spacy.load("xx_sent_ud_sm")
 except Exception as e:
     logger.error("Error loading multilingual pipeline: %s", e)
-    fallback_pipeline = pipeline_dict.get("en")  # type: ignore
+    fallback_pipeline = pipeline_dict.get("en")
 
 DATA_DIR = "../data"
 RAW_DIR = f"{DATA_DIR}/raw"
@@ -89,11 +89,13 @@ def analyze_uri(uri: str) -> dict[str, str]:
         result["tld"] = tld_match.group(1)
     return result
 
+
 def remove_non_ascii(text: str) -> str:
     """Remove all non-ASCII characters from the input text."""
     if not isinstance(text, str):
         return text
     return text.encode("ascii", "ignore").decode("ascii")
+
 
 def process_text(text: str) -> str:
     """Process text using language detection and language-specific pipelines, then remove non-ASCII chars."""
@@ -139,18 +141,16 @@ def process_normalize_text(text_list: list[Any]) -> list[str]:
 
 def extract_named_entities(lab: list[str]) -> list[str]:
     entity_types = set()
-    if not lab or not isinstance(lab, list):
+    if not lab:
         return []
 
     for text in lab:
-        if not text or not isinstance(text, str):
-            continue
         try:
             # Detect language using the main pipeline.
             doc = nlp(text)
-            lang = doc._.language.get("language", "xx")
-            # Select the language-specific pipeline, or fallback if not available.
-            chosen_nlp = pipeline_dict.get(lang, fallback_pipeline)
+            language = doc._.language.get("language", "xx")
+            # Select the language-specific pipeline or fallback if not available.
+            chosen_nlp = pipeline_dict.get(language, fallback_pipeline)
             doc = chosen_nlp(text)
             # Add each entity's type (label) to the set.
             for ent in doc.ents:
@@ -242,7 +242,7 @@ def preprocess_combined(input_frame: pd.DataFrame) -> pd.DataFrame:
             "sparql": sparql,
             "creator": row.get("creator", ""),
             "license": row.get("license", ""),
-            "ner": extract_named_entities(row.get("lab", "")), #TODO remove it
+            "ner": extract_named_entities(row.get("lab", "")),  # TODO remove it
             "language": find_language(lab_text[:1000]),
             'con': row.get('con', '')
         })
@@ -295,19 +295,21 @@ def combine_with_void_and_lov_data(combined_df: pd.DataFrame, void_df: pd.DataFr
 def remove_empty_list_values(df: pd.DataFrame) -> pd.DataFrame:
     return df.map(lambda x: "" if (isinstance(x, list) and not x) or (isinstance(x, str) and x.strip() == "[]") else x)
 
+
 def remove_duplicates(series: pd.Series | list) -> list[str]:
-     if isinstance(series, pd.Series):
-         l = list(set(series.tolist()))
-     else:
-         l = list(set(series))
-     if None in l:
-         l.remove(None)
-     if 'None' in l:
-         l.remove('None')
-     if '' in l:
+    if isinstance(series, pd.Series):
+        l = list(set(series.tolist()))
+    else:
+        l = list(set(series))
+    if None in l:
+        l.remove(None)
+    if 'None' in l:
+        l.remove('None')
+    if '' in l:
         l.remove('')
 
-     return l
+    return l
+
 
 def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[str, list[Any]]:
     if isinstance(input_data, dict):
@@ -342,11 +344,12 @@ def process_all_from_input(input_data: pd.DataFrame | dict[str, Any]) -> dict[st
         'creator': remove_duplicates(combined_df['creator']),
         'license': remove_duplicates(combined_df['license']),
         'language': remove_duplicates(combined_df['language']),
-        'dsc' : remove_duplicates(void_df['dsc']),
+        'dsc': remove_duplicates(void_df['dsc']),
         'sbj': remove_duplicates(void_df['sbj']),
         'ner': extract_named_entities(combined_df['lab'].tolist()),
         'con': remove_duplicates(combined_df['con'])
     }
+
 
 def process_lov_data_row(row: dict[str, Any], index: int, total: int) -> dict[str, Any]:
     logger.info("Processing LOV row %d/%d started.", index, total)

@@ -1,15 +1,17 @@
+import logging
 import os
+import re
+import time
+
+import ollama
 import pandas as pd
+from google import genai
 from sklearn.metrics import accuracy_score
 from tqdm import tqdm
-import logging
-import re
-import ollama
-from google import genai
-import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
+
 
 def normalize_label(label):
     """Helper to normalize labels for comparison (strip, lowercase, remove quotes and punctuation)"""
@@ -18,6 +20,7 @@ def normalize_label(label):
     label = label.strip().strip('"').strip("'")
     label = re.sub(r"[^\w\s-]", "", label)
     return label.lower()
+
 
 class OllamaGemmaPredictor:
     def __init__(
@@ -34,12 +37,12 @@ class OllamaGemmaPredictor:
         system = f"{system_message}\n" if system_message else ""
         labels = f"Possible categories (choose only one, answer only with the category name, nothing else): {', '.join(candidate_labels)}."
         prompt = (
-            f"{system}"
-            f"{labels}\n"
-            f"Given the following content, classify it strictly into one of the above categories. "
-            f"Answer only with the category name, exactly as given, and nothing more.\n"
-            f"Content:\n{content}\n"
-            f"Category:"
+            f"""{system}
+            {labels}\n
+            Given the following content, classify it strictly into one of the above categories.
+            Answer only with the category name, exactly as given, and nothing more.\n
+            Content:\n{content}\n
+            Category:"""
         )
         return prompt
 
@@ -120,6 +123,7 @@ class OllamaGemmaPredictor:
 
         return frame
 
+
 class GeminiPredictor:
     def __init__(self, temperature=0.0, model="models/gemini-2.0-flash", max_retries=5, initial_wait=10):
         self.temperature = temperature
@@ -138,14 +142,13 @@ class GeminiPredictor:
     def build_prompt(self, content, candidate_labels=None, system_message=None):
         system = f"{system_message}\n" if system_message else ""
         labels = f"Possible categories (choose only one, answer only with the category name, nothing else): {', '.join(candidate_labels)}."
-        prompt = (
-            f"{system}"
-            f"{labels}\n"
-            f"Given the following content, classify it strictly into one of the above categories. "
-            f"Answer only with the category name, exactly as given, and nothing more.\n"
-            f"Content:\n{content}\n"
-            f"Category:"
-        )
+        prompt = (f"""{system}
+            {labels}\n
+            Given the following content, classify it strictly into one of the above categories. 
+            Answer only with the category name, exactly as given, and nothing more.\n
+            Content:\n{content}\n
+            Category:"""
+                  )
         return prompt
 
     def _rate_limit(self, max_calls=15, period=60):
@@ -167,7 +170,7 @@ class GeminiPredictor:
         while retries < self.max_retries:
             try:
                 self._rate_limit(max_calls=15, period=60)
-                logging.info(f"[Gemini] Calling API with prompt: {prompt[:120]}...")  # Log first part of the prompt
+                logging.info(f"[Gemini] Calling API with prompt: {prompt[:120]}...")  # Log the first part of the prompt
                 model = self.client.models
                 response = model.generate_content(
                     model=self.model,
@@ -253,7 +256,7 @@ class GeminiPredictor:
 
         return frame
 
-# Example usage:
+
 if __name__ == "__main__":
     df = pd.read_json("../data/processed/combined.json")
     system_message = "You are an expert classifier for Linked Open Data. Only answer with one of the given category. Use your reasoning and your knowledge. Do not make up categories."
@@ -270,89 +273,12 @@ if __name__ == "__main__":
         category_column="category",
         system_message=system_message
     )
-    print(df_with_preds)
-    df_with_preds = predictor.predict_frame(
-        df,
-        content_column="curi",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_preds)
-    df_with_preds = predictor.predict_frame(
-        df,
-        content_column="puri",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_preds)
-    df_with_preds = predictor.predict_frame(
-        df,
-        content_column="lcn",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_preds)
-    df_with_preds = predictor.predict_frame(
-        df,
-        content_column="lpn",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_preds)
-    df_with_preds = predictor.predict_frame(
-        df,
-        content_column="comments",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_preds)
 
     # Gemini 2 Flash
     gemini_predictor = GeminiPredictor(
         temperature=0.2,
         model="models/gemini-2.0-flash"
     )
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="voc",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
-
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="curi",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
-
-
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="puri",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
-
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="lcn",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
-
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="lpn",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
-
     df_with_gemini_preds = gemini_predictor.predict_frame(
         df,
         content_column="comments",
