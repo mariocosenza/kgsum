@@ -46,10 +46,10 @@ def check_system_load(func):
 @check_system_load
 async def sparql_profile():
     data = request.get_json()
-    if 'store' in request.args:
-        store = request.args.get('store')
+    if 'store' in data:
+        store = bool(data['store'])
         if store:
-            result = generate_profile_service_store(data['endpoint'], sparql=True)
+            result = await generate_profile_service_store(data['endpoint'], sparql=True)
         else:
             result = await generate_profile_service(data['endpoint'], sparql=True)
         return jsonify(result)
@@ -90,17 +90,6 @@ async def rdf_profile():
         return jsonify(result)
 
     return {"error": "Error Uploading File"}
-
-
-@app.route('/api/v1/search')
-def search():
-    return ''
-
-
-@app.route('/api/v1/info')
-def info_from_db():
-    return ''
-
 
 if __name__ == '__main__':
     app.run()
