@@ -25,7 +25,7 @@ CATEGORIES_COLOR: dict[str, str] = {
 }
 
 
-def safe_generate_content_ollama(description, keywords):
+def safe_generate_content_ollama(description, keywords) -> str:
     prompt = (
         f"""Given the following description and keywords, find a category given this data. 
         Only respond with the category and no other words. 
@@ -38,7 +38,7 @@ def safe_generate_content_ollama(description, keywords):
 
     try:
         response = ollama.generate(model="gemma3:12b", prompt=prompt)
-        output = response['response'].strip()
+        output = response['response'].strip().lower()
         logger.info(f'Categories: {output}')
     except Exception as e:
         logger.error(f"Error calling Ollama model: {e}")
@@ -85,7 +85,7 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                                f"""Given the following description and keywords, find a category given this data. 
+                                f"""Given the following description and keywords, find a category for the given data. 
                                 Only respond with the category and no other words. 
                                 Be precise and use your reasoning. 
                                 Use the same category format. 
@@ -115,11 +115,11 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                             break
 
                     # Skip this item if we couldn't get a result after retries
-                    if result is None:
-                        logger.warning(f"Skipping item {col} due to API errors")
-                        continue
-                    else:
-                        result = result.text.strip()
+                if result is None:
+                    logger.warning(f"Skipping item {col} due to API errors")
+                    continue
+                else:
+                    result = result.text.strip().lower()
             else:
                 result = safe_generate_content_ollama(description=df[col]['description'],
                                                       keywords=df[col]['keywords']).strip()
@@ -206,7 +206,7 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                                f"""Given the following description and keywords, find a category given this data. 
+                                f"""Given the following description and keywords, find a category for the given data. 
                                 Only respond with the category and no other words. 
                                 Be precise and use your reasoning. 
                                 Use the same category format. 
@@ -240,7 +240,7 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                         logger.warning(f"Skipping item {col} due to API errors")
                         continue
                     else:
-                        result = result.text.strip()
+                        result = result.text.strip().lower()
             else:
                 result = safe_generate_content_ollama(description=df[col]['description'],
                                                       keywords=df[col]['keywords']).strip()
@@ -274,4 +274,4 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
 
 if __name__ == '__main__':
     # predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
-    predict_category_from_lod_description(use_ollama=True).to_csv('../../data/raw/lod-gemini.csv')
+    predict_category_from_lod_description(use_ollama=False).to_csv('../../data/raw/lod-gemini.csv')
