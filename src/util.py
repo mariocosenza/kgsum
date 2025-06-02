@@ -28,7 +28,6 @@ CURI_PURI_FILTER = {
     'http://www.w3.org/2004/02/skos/core',
     'http://www.w3.org/2000/01/rdf-schema',
     'http://www.w3.org/1999/02/22-rdf-syntax-ns',
-    'http://www.w3.org/2000/01/rdf-schema',
     'http://www.w3.org/ns/shacl',
     'http://www.w3.org/ns/prov',
     'http://rdfs.org/ns/void#Dataset'
@@ -197,4 +196,5 @@ def merge_dump_sparql(csv1_path='../data/raw/graphs.csv',
 
 
 if __name__ == '__main__':
-    merge_dump_sparql()
+    merge_zenodo_sparql()
+    merge_github_sparql()
