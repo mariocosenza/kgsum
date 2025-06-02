@@ -22,6 +22,7 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 from tqdm import tqdm
 from transformers import (
     AutoTokenizer, AutoModelForSequenceClassification, logging as hf_logging, TrainerCallback, TrainerState,
@@ -54,6 +55,7 @@ class ClassifierType(Enum):
     SVM = auto()
     NAIVE_BAYES = auto()
     KNN = auto()
+    J48 = auto()
     MISTRAL = auto()
 
 
@@ -324,7 +326,7 @@ class KnowledgeGraphClassifier:
             frame: pd.DataFrame,
             feature_labels: FeatureLabels,
             target_label: str = 'category',
-            max_length: int = 80000000
+            max_length: int = 256
     ) -> dict[str, Any]:
 
         clf_type = self.classifier_type
@@ -390,6 +392,17 @@ class KnowledgeGraphClassifier:
                 "classifier__n_neighbors": list(range(2, 7)),
                 "classifier__weights": ["uniform", "distance"],
                 "classifier__metric": ["euclidean", "manhattan"],
+            }
+        elif clf_type == ClassifierType.J48:
+            estimator = DecisionTreeClassifier()
+            param_distributions = {
+                "classifier__criterion": ["gini", "entropy"],
+                "classifier__splitter": ["best", "random"],
+                "classifier__max_depth": [2, 5, 10, None],
+                "classifier__min_samples_split": [2, 5, 10],
+                "classifier__min_samples_leaf": [1, 2, 5],
+                "classifier__max_features": ["sqrt", "log2", None],
+                "classifier__class_weight": [None, "balanced"]
             }
         else:
             raise ValueError("Unsupported classic model type.")
@@ -477,7 +490,7 @@ class KnowledgeGraphClassifier:
             qlora_r: int = 32,
             qlora_alpha: int = 64,
             batch_size: int = 8,
-            epochs: int = 100
+            epochs: int = 15
     ) -> dict[str | Any, float | int | dict[str, int] | str | list[str] | Any] | None:
 
         torch.backends.cudnn.benchmark = True
