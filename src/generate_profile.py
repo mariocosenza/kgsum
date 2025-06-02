@@ -39,7 +39,7 @@ async def generate_profile(endpoint: None | str = None, file: None | str = None)
 
 async def generate_and_store_profile(endpoint=None, file=None):
     row = await generate_profile(endpoint=endpoint, file=file)
-    await store_profile(profile=row['profile'], category=row['category'])
+    await store_profile(profile=row, category=row['category'])
     return row
 
 
