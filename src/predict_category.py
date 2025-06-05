@@ -25,7 +25,7 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None):
+    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample = True):
         combined_df = pd.read_json(f'{project_root}/data/processed/combined.json')
         if feature_columns is None:
             feature_columns = ["curi"]
@@ -36,7 +36,8 @@ class CategoryPredictor:
                 combined_df,
                 feature_columns,
                 target_label="category",
-                classifier_type=classifier
+                classifier_type=classifier,
+                oversample=oversample
             )
             save_multiple_models(models, training_results)
 
@@ -48,11 +49,5 @@ class CategoryPredictor:
 
 
 if __name__ == "__main__":
-    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES,
-                                                feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
-                                                                 'comments'])
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
-    #                                                                  'comments'])
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
-    #                                                                      'comments'])
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['voc'])
+    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns=['puri'], oversample=True)
+    
