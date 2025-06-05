@@ -50,11 +50,18 @@ VOC_FILTER = {
 
 
 def is_curi_allowed(uri: str) -> bool:
-    return not any(url in uri for url in CURI_PURI_FILTER)
+    for url in CURI_PURI_FILTER:
+        if url in uri:
+            print(uri)
+            return False
+    return True
 
 
 def is_voc_allowed(uri: str) -> bool:
-    return not any(url in uri for url in VOC_FILTER)
+    for url in VOC_FILTER:
+        if url in uri:
+            return False
+    return True
 
 
 def is_endpoint_working(endpoint) -> bool:
