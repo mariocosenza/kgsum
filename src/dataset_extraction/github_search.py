@@ -159,7 +159,7 @@ def search_github_files(file_extensions, token, max_pages=10):
 def save_to_csv(results, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv"):
     if not results:
         logger.info("No results to save.")
-        return
+        return None
     df = pd.DataFrame(results)
     df.sort_values("repository", inplace=True)
     df.to_csv(output_file, index=False)

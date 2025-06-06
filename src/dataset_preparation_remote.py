@@ -7,7 +7,7 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
-from util import is_curi_allowed, is_voc_allowed
+from src.util import is_voc_allowed, is_curi_allowed
 
 MAX_OFFSET = 1000
 ENDPOINT_TIMEOUT = 600
@@ -27,7 +27,7 @@ async def async_select_remote_vocabularies(
     filter_voc: bool = True
 ) -> list[str]:
     """
-    Retrieves distinct predicate‐base vocabulary URIs from the endpoint.
+    Retrieves distinct predicate‐based vocabulary URIs from the endpoint.
     If filter_voc=False, skips is_voc_allowed() filtering.
     """
     logger.info(f"[VOC] Starting vocabulary query for endpoint: {endpoint}")
@@ -51,7 +51,6 @@ async def async_select_remote_vocabularies(
                 logger.debug(f"[VOC] No predicate bindings found at endpoint {endpoint}.")
             for binding in bindings:
                 predicate_uri = binding.text or ""
-                # Derive vocabulary URI from predicate: drop fragment or last slash segment
                 if "#" in predicate_uri:
                     vocabulary_uri = predicate_uri.split("#")[0]
                 elif "/" in predicate_uri:
@@ -176,7 +175,6 @@ async def async_select_remote_label(
     labels: list[str] = []
     ns = {"sparql": "http://www.w3.org/2005/sparql-results#"}
 
-    # Primary query: various label predicates
     query = """
         PREFIX skosxl: <http://www.w3.org/2008/05/skos-xl#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -211,7 +209,6 @@ async def async_select_remote_label(
 
             if not bindings:
                 logger.debug(f"[LAB] No label bindings (primary) at endpoint {endpoint}. Trying fallback.")
-                # Fallback to rdfs:label only
                 query_fallback = """
                     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                     SELECT DISTINCT ?o
@@ -273,7 +270,7 @@ async def async_select_remote_title(endpoint: str, timeout: int = 300) -> str:
     return title
 
 
-async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: int = 300) -> list[str]:
+async def async_select_remote_tld(endpoint: str, limit: int = 1000, timeout: int = 300) -> list[str]:
     """
     Retrieves distinct IRIs (?o) from the dataset and extracts their TLD.
     """
@@ -406,7 +403,6 @@ async def async_select_remote_property_names(
                 if filter_voc and not is_voc_allowed(prop_uri):
                     continue
 
-                # Extract local name:
                 if "#" in prop_uri:
                     local_name = prop_uri.split("#")[-1]
                 elif "/" in prop_uri:
@@ -692,7 +688,6 @@ async def async_select_void_subject_remote(
             logger.warning(f"[VSUBJ] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
-    # Now, for each dataset URI, fetch dcterms:subject
     class_names: set[str] = set()
     async with aiohttp.ClientSession() as session:
         for ds_uri in dataset_uris:
@@ -733,8 +728,9 @@ async def process_endpoint(
     Respects filter_curi / filter_voc flags to disable respective filtering.
     Returns a list of results matching the columns in main_normal().
     """
-    endpoint = row["sparql_url"]
-    logger.info(f"[PROC] Processing endpoint {row['id']}")
+    endpoint = str(row["sparql_url"])
+    row_id = str(row["id"])
+    logger.info(f"[PROC] Processing endpoint {row_id}")
 
     tasks = {
         "title": async_select_remote_title(endpoint),
@@ -744,7 +740,7 @@ async def process_endpoint(
         "lcn": async_select_remote_class_name(endpoint, filter_curi=filter_curi),
         "lpn": async_select_remote_property_names(endpoint, filter_voc=filter_voc),
         "lab": async_select_remote_label(endpoint),
-        "tlds": async_select_remote_tlds(endpoint),
+        "tlds": async_select_remote_tld(endpoint),
         "creator": async_select_void_creator(endpoint),
         "license": async_select_void_license(endpoint),
         "con": async_select_remote_connection(endpoint),
@@ -753,9 +749,9 @@ async def process_endpoint(
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
     result_dict = dict(zip(tasks.keys(), results))
 
-    logger.info(f"[PROC] Finished processing endpoint {row['id']}")
+    logger.info(f"[PROC] Finished processing endpoint {row_id}")
     return [
-        row["id"],
+        row_id,
         result_dict.get("title") or "",
         result_dict.get("voc") or [],
         result_dict.get("curi") or [],
@@ -764,11 +760,11 @@ async def process_endpoint(
         result_dict.get("lpn") or [],
         result_dict.get("lab") or [],
         result_dict.get("tlds") or [],
-        row["sparql_url"],
+        endpoint,
         result_dict.get("creator") or [],
         result_dict.get("license") or [],
         result_dict.get("con") or [],
-        row["category"],
+        str(row["category"]),
     ]
 
 
@@ -777,8 +773,9 @@ async def process_endpoint_void(row: pd.Series) -> list[Any]:
     Orchestrates VOID‐related queries for one endpoint row:
      - subject & description from VOID.
     """
-    endpoint = row["sparql_url"]
-    logger.info(f"[VOID-PROC] Processing VOID endpoint {row['id']}")
+    endpoint = str(row["sparql_url"])
+    row_id = str(row["id"])
+    logger.info(f"[VOID-PROC] Processing VOID endpoint {row_id}")
 
     tasks = {
         "sbj": async_select_void_subject_remote(endpoint),
@@ -788,13 +785,51 @@ async def process_endpoint_void(row: pd.Series) -> list[Any]:
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
     result_dict = dict(zip(tasks.keys(), results))
 
-    logger.info(f"[VOID-PROC] Finished processing VOID endpoint {row['id']}")
+    logger.info(f"[VOID-PROC] Finished processing VOID endpoint {row_id}")
     return [
-        row["id"],
+        row_id,
         result_dict.get("sbj") or [],
         result_dict.get("dsc") or [],
-        row["category"],
+        str(row["category"]),
     ]
+
+
+async def process_endpoint_full_inplace(endpoint: str) -> dict[str, Any]:
+    """
+    Combines both ‘process_endpoint’ and ‘process_endpoint_void’ into a single record.
+    Returns a dict with all relevant fields keyed by their names.
+    """
+    # Construct a temporary row-like object for queries
+    row = pd.Series({"id": "", "sparql_url": endpoint, "category": ""})
+
+    void_uri = await async_has_void_file(endpoint)
+    if void_uri:
+        title = await async_select_remote_title(void_uri)
+    else:
+        title = await async_select_remote_title(endpoint)
+    if not title:
+        title = endpoint
+
+    data_list = await process_endpoint(row)
+    void_list = await process_endpoint_void(row)
+
+    return {
+        "id": endpoint,
+        "title": title,
+        "sbj": void_list[1],
+        "dsc": void_list[2],
+        "voc": data_list[2],
+        "curi": data_list[3],
+        "puri": data_list[4],
+        "lcn": data_list[5],
+        "lpn": data_list[6],
+        "lab": data_list[7],
+        "tlds": data_list[8],
+        "sparql": endpoint,
+        "creator": data_list[10],
+        "license": data_list[11],
+        "con": data_list[12],
+    }
 
 
 async def main_normal(
@@ -808,7 +843,6 @@ async def main_normal(
     """
     logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
 
-    # 1) Load CSV and drop user_generated categories
     try:
         lod_frame = pd.read_csv("../data/raw/sparql_full_download.csv")
         lod_frame = lod_frame[~lod_frame["category"].str.strip().isin(["user_generated"])]
@@ -819,7 +853,6 @@ async def main_normal(
     lod_frame = lod_frame.drop_duplicates(subset=["sparql_url"])
     lod_frame = lod_frame[lod_frame["sparql_url"].notna() & (lod_frame["sparql_url"] != "")]
 
-    # 2) Launch tasks
     tasks = [
         asyncio.wait_for(process_endpoint(row, filter_curi=filter_curi, filter_voc=filter_voc), timeout=ENDPOINT_TIMEOUT)
         for _, row in lod_frame.iterrows()
@@ -842,7 +875,6 @@ async def main_normal(
         processed += 1
         logger.info(f"[MAIN] Processed {processed}/{total} endpoints")
 
-    # 3) Build DataFrame and save JSON
     df = pd.DataFrame(
         results,
         columns=[
@@ -877,7 +909,6 @@ async def main_void(
     """
     logger.info("[VOID-MAIN] Starting asynchronous VOID dataset processing.")
 
-    # 1) Load CSV and drop user_generated categories
     try:
         lod_frame = pd.read_csv("../data/raw/sparql_full_download.csv")
         lod_frame = lod_frame[~lod_frame["category"].str.strip().isin(["user_generated"])]
@@ -888,7 +919,6 @@ async def main_void(
     lod_frame = lod_frame.drop_duplicates(subset=["sparql_url"])
     lod_frame = lod_frame[lod_frame["sparql_url"].notna() & (lod_frame["sparql_url"] != "")]
 
-    # 2) Launch VOID tasks
     tasks = [
         asyncio.wait_for(process_endpoint_void(row), timeout=ENDPOINT_TIMEOUT)
         for _, row in lod_frame.iterrows()
@@ -911,7 +941,6 @@ async def main_void(
         processed += 1
         logger.info(f"[VOID-MAIN] Processed {processed}/{total} VOID endpoints")
 
-    # 3) Build DataFrame and save JSON
     df = pd.DataFrame(results, columns=["id", "sbj", "dsc", "category"])
     output_path = "../data/raw/remote/remote_void_feature_set_sparqlwrapper.json"
     df.to_json(output_path, orient="records")
@@ -919,6 +948,6 @@ async def main_void(
 
 
 if __name__ == "__main__":
-    # By default, both filters are enabled. To disable, change to False.
+    # Run both normal and void processing with filters enabled by default
     asyncio.run(main_normal(filter_curi=True, filter_voc=True))
     asyncio.run(main_void(filter_curi=True, filter_voc=True))

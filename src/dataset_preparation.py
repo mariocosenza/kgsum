@@ -8,8 +8,7 @@ import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
 from typing import Any
-from src.util import match_file_lod, CATEGORIES
-from util import is_voc_allowed, is_curi_allowed
+from src.util import match_file_lod, CATEGORIES, is_voc_allowed, is_curi_allowed
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation")

@@ -5,10 +5,11 @@ import urllib.parse
 import aiohttp
 import pandas as pd
 
-from predict_category import CategoryPredictor
+
 from src.dataset_preparation import process_file_full_inplace, logger
 from src.dataset_preparation_remote import process_endpoint_full_inplace
 from src.lov_data_preparation import IS_URI
+from src.predict_category import CategoryPredictor
 from src.preprocessing import process_all_from_input
 
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']

@@ -3,11 +3,11 @@ import os
 
 import psutil
 from flasgger import Swagger
-from flask import Flask, request, flash, jsonify
+from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
-from service.file_upload_service import allowed_file, UPLOAD_FOLDER
-from service.generate_profile_service import generate_profile_service_store, generate_profile_service
+from src.service.file_upload_service import UPLOAD_FOLDER, allowed_file
+from src.service.generate_profile_service import generate_profile_service_store, generate_profile_service
 
 app = Flask(__name__)
 app.secret_key = "secret"
