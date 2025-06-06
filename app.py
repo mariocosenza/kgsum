@@ -93,7 +93,13 @@ async def sparql_profile():
     if not endpoint:
         return jsonify({"error": "Missing 'endpoint' parameter"}), 400
 
-    store_flag = bool(data.get('store', False))
+    store_value = data.get('store', False)
+    if isinstance(store_value, bool):
+        store_flag = store_value
+    elif isinstance(store_value, str) and store_value.lower() in ['true', 'false']:
+        store_flag = store_value.lower() == 'true'
+    else:
+        store_flag = False
     try:
         if store_flag:
             result = await generate_profile_service_store(endpoint, sparql=True)
