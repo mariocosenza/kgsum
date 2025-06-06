@@ -118,20 +118,17 @@ class OllamaGemmaPredictor:
         y_true = frame[category_column].astype(str).str.strip().str.lower()
         y_pred = frame[output_column].astype(str).str.strip().str.lower()
 
-        acc = accuracy_score(y_true, y_pred)
-        precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
-        recall    = recall_score(   y_true, y_pred, average="weighted", zero_division=0)
-        f1        = f1_score(       y_true, y_pred, average="weighted", zero_division=0)
+        metrics = compute_metrics(y_true, y_pred)
 
-        logging.info(f"Ollama final accuracy:  {acc:.4f}")
-        logging.info(f"Ollama final precision: {precision:.4f}")
-        logging.info(f"Ollama final recall:    {recall:.4f}")
-        logging.info(f"Ollama final f1_score:  {f1:.4f}")
+        logging.info(f"Ollama final accuracy:  {metrics['accuracy']:.4f}")
+        logging.info(f"Ollama final precision: {metrics['precision']:.4f}")
+        logging.info(f"Ollama final recall:    {metrics['recall']:.4f}")
+        logging.info(f"Ollama final f1_score:  {metrics['f1']:.4f}")
         print(f"\nOllama final metrics (from predict_frame):")
-        print(f"  Accuracy : {acc:.4f}")
-        print(f"  Precision: {precision:.4f}")
-        print(f"  Recall   : {recall:.4f}")
-        print(f"  F1       : {f1:.4f}\n")
+        print(f"  Accuracy : {metrics['accuracy']:.4f}")
+        print(f"  Precision: {metrics['precision']:.4f}")
+        print(f"  Recall   : {metrics['recall']:.4f}")
+        print(f"  F1       : {metrics['f1']:.4f}\n")
 
         return frame
 
