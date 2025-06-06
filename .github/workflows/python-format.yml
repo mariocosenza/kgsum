@@ -1,28 +1,55 @@
 name: Format Python Code
+
 on:
   pull_request:
     branches:
       - main
-    types: [opened]
+    types: [opened, synchronize, reopened]
+
 jobs:
   python-code-format:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4  # Checking out the repository
+
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: "3.12"
-          architecture: "x64"
-      - name: Display Python version
-        run: python --version
+          miniconda-version: "latest"  # Specify the Conda version
+          python-version: "3.12"  # Python version for Conda environment
+          environment-file: "environment.yml"  # Optional, if you have an environment.yml file
+          auto-activate-base: false  # Don't automatically activate base environment
+
+      - name: Create Conda Environment
+        run: |
+          conda create -n format-env python=3.12 -y  # Create the environment
+          conda activate format-env  # Activate the environment
+
       - name: Install packages
-        run: pip install black autopep8 isort
+        run: |
+          conda activate format-env
+          conda install -c conda-forge black autopep8 isort  # Install formatting tools using Conda
+          conda install pip  # Ensure pip is installed within the Conda environment
+
+      - name: Display Python version
+        run: |
+          conda activate format-env
+          python --version  # Verify Python version inside the environment
+
       - name: Formatter
         run: |
-          black .
-          autopep8 --recursive --in-place --aggressive --aggressive .
-          isort .
+          conda activate format-env
+          black . --line-length 79  # Format code using black
+          autopep8 --recursive --in-place --aggressive .  # Format code using autopep8
+          isort .  # Sort imports using isort
+
+      - name: Check for changes
+        run: |
+          git diff --exit-code  # Check if any files were modified
+
       - name: Create Pull Request
+        if: success() && steps.check-for-changes.outputs.changed == 'true'  # Only create PR if there are changes
         uses: peter-evans/create-pull-request@v3
         with:
           commit-message: Auto code format
