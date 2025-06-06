@@ -472,7 +472,7 @@ class KnowledgeGraphClassifier:
                 "classifier__metric": ["euclidean", "manhattan"],
             }
         elif clf_type == ClassifierType.J48:
-            estimator = DecisionTreeClassifier(class_weight="balanced")
+            estimator = DecisionTreeClassifier(class_weight="balanced", random_state=42)
             param_dist = {
                 "classifier__criterion": ["gini", "entropy"],
                 "classifier__splitter": ["best", "random"],
