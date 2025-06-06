@@ -1,12 +1,12 @@
 # Basic `dependabot.yml` file with
-# minimum configuration for pip (using requirements.txt)
+# minimum configuration for Conda package manager
 
 version: 2
 updates:
-  # Enable version updates for pip
-  - package-ecosystem: "pip"
-    # Look for `requirements.txt` file in the root directory
+  # Enable version updates for Conda
+  - package-ecosystem: "conda"
+    # Look for `environment.yml` files in the `root` directory
     directory: "/"
-    # Check for updates weekly
+    # Check the Conda registry for updates every week
     schedule:
       interval: "weekly"
