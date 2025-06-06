@@ -6,14 +6,15 @@ import os
 import pickle
 import re
 import warnings
+import torch
+import numpy as np
+import pandas as pd
 from collections import Counter
 from enum import Enum, auto
 from typing import Any, Tuple, NewType, TypeAlias
-
-import numpy as np
-import pandas as pd
-import torch
+from joblib import Memory
 from sklearn import svm
+from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.metrics import confusion_matrix, classification_report
@@ -393,7 +394,7 @@ class KnowledgeGraphClassifier:
         frame: pd.DataFrame,
         feature_labels: FeatureLabels,
         target_label: str = "category",
-        max_length: int = 256
+        max_length: int = 8000000
     ) -> dict[str, Any]:
         if self.classifier_type == ClassifierType.MISTRAL:
             return self.train_mistral(frame, feature_labels, target_label=target_label, max_length=max_length)
@@ -483,12 +484,12 @@ class KnowledgeGraphClassifier:
         else:
             raise ValueError("Unsupported classic classifier type.")
 
-        from sklearn.pipeline import Pipeline
 
+        memory = Memory("../data/trained/cache", verbose=0)
         pipeline = Pipeline([
             ("vectorizer", self.vectorizer),
             ("classifier", estimator),
-        ])
+        ], memory=memory)
 
         if len(X_val) > 0:
             X_combined = pd.concat([pd.Series(X_train), pd.Series(X_val)], ignore_index=True)

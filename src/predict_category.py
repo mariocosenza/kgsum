@@ -1,6 +1,6 @@
 import logging
 import os
-
+import shutil
 import pandas as pd
 
 import src.pipeline_build
@@ -49,5 +49,6 @@ class CategoryPredictor:
 
 
 if __name__ == "__main__":
-    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns=['puri'], oversample=True)
+    shutil.rmtree('../data/trained/cache/')
+    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns=['lpn'], oversample=True)
     
