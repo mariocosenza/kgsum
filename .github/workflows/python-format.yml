@@ -16,45 +16,31 @@ jobs:
       - name: Set up Conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: "latest"  # Specify the Conda version
-          python-version: "3.12"  # Python version for Conda environment
-          environment-file: "environment.yml"  # Optional, if you have an environment.yml file
-          auto-activate-base: false  # Don't automatically activate base environment
+          miniconda-version: "latest"
+          python-version: "3.12"
+          auto-activate-base: false
 
       - name: Create Conda Environment
         run: |
-          conda create -n format-env python=3.12 -y  # Create the environment
-          conda activate format-env  # Activate the environment
+          eval "$(conda shell.bash hook)"
+          conda create -n format-env python=3.12 -y
+          conda activate format-env
 
       - name: Install packages
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate format-env
-          conda install -c conda-forge black autopep8 isort  # Install formatting tools using Conda
-          conda install pip  # Ensure pip is installed within the Conda environment
+          conda install -c conda-forge black autopep8 isort -y
+          conda install pip -y
 
-      - name: Display Python version
-        run: |
-          conda activate format-env
-          python --version  # Verify Python version inside the environment
+      - name: Check for null bytes in files
+        run: grep -rl $'\x00' . || echo "No null bytes found"
 
       - name: Formatter
         run: |
+          eval "$(conda shell.bash hook)"
           conda activate format-env
-          black . --line-length 79  # Format code using black
-          autopep8 --recursive --in-place --aggressive .  # Format code using autopep8
-          isort .  # Sort imports using isort
-
-      - name: Check for changes
-        run: |
-          git diff --exit-code  # Check if any files were modified
-
-      - name: Create Pull Request
-        if: success() && steps.check-for-changes.outputs.changed == 'true'  # Only create PR if there are changes
-        uses: peter-evans/create-pull-request@v3
-        with:
-          commit-message: Auto code format
-          title: Fixes by format action
-          body: This is an auto-generated PR with fixes.
-          labels: automated pr
-          branch: python-code-format-patches
-          base: main
+          find . -type f -name "*.py" -exec echo "Processing file: {}" \;
+          black . --line-length 79
+          autopep8 --recursive --in-place --aggressive .
+          isort .
