@@ -1,12 +1,12 @@
 # Basic `dependabot.yml` file with
-# minimum configuration for two package managers
+# minimum configuration for pip (using requirements.txt)
 
 version: 2
 updates:
-  # Enable version updates for npm
+  # Enable version updates for pip
   - package-ecosystem: "pip"
-    # Look for `package.json` and `lock` files in the `root` directory
+    # Look for `requirements.txt` file in the root directory
     directory: "/"
-    # Check the npm registry for updates every day (weekdays)
+    # Check for updates weekly
     schedule:
       interval: "weekly"
