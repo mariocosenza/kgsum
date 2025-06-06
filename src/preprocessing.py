@@ -31,7 +31,10 @@ SPACY_LANGS = {
     "pt": "pt_core_news_lg",
 }
 
-def setup_spacy_pipelines(use_gpu: bool = False):
+# --- LOAD SPACY PIPELINES ON MODULE IMPORT ---
+USE_GPU_ON_IMPORT = False  # Set True to always use GPU at import
+
+def _load_spacy_pipelines(use_gpu: bool = False):
     if use_gpu:
         try:
             spacy.require_gpu()
@@ -56,22 +59,30 @@ def setup_spacy_pipelines(use_gpu: bool = False):
         fallback_pipeline = pipeline_dict.get("en") or spacy.blank("en")
     return pipeline_dict, fallback_pipeline
 
-def get_spacy_lang_code(detected: str, pipeline_dict) -> str:
+pipeline_dict, fallback_pipeline = _load_spacy_pipelines(use_gpu=USE_GPU_ON_IMPORT)
+
+def setup_spacy_pipelines(use_gpu: bool = False):
+    global pipeline_dict, fallback_pipeline
+    return pipeline_dict, fallback_pipeline
+
+def get_spacy_lang_code(detected: str, pipeline_dict_local=None) -> str:
     """Return spaCy-supported language code if available, else 'xx'."""
-    return detected if detected in pipeline_dict else "xx"
+    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
+    return detected if detected in use_dict else "xx"
 
 # --- 2) Language Detection via langdetect ---
 
-def find_language(text: Any, pipeline_dict) -> str:
+def find_language(text: Any, pipeline_dict_local=None) -> str:
     """
     Return the detected language code of `text` using langdetect.
     If detection fails, default to "xx".
     """
+    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
     if not isinstance(text, str) or not text:
         return "xx"
     try:
         code = detect(text)
-        return get_spacy_lang_code(code, pipeline_dict)
+        return get_spacy_lang_code(code, use_dict)
     except LangDetectException:
         return "xx"
     except Exception as exc:
@@ -80,15 +91,17 @@ def find_language(text: Any, pipeline_dict) -> str:
 
 # --- 3) spaCy batch normalization for selected features ---
 
-def spacy_clean_normalize_batch(texts, pipeline_dict, fallback_pipeline, batch_size=32, n_process=1):
+def spacy_clean_normalize_batch(texts, pipeline_dict_local=None, fallback_pipeline_local=None, batch_size=32, n_process=1):
     """
     Processes a list of texts using spaCy's full pipeline in batches, with multiprocessing.
     Returns a list of normalized strings.
     """
+    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
+    use_fallback = fallback_pipeline_local if fallback_pipeline_local is not None else fallback_pipeline
     if not isinstance(texts, list) or not texts:
         return []
     # Detect languages for each text
-    langs = [find_language(text, pipeline_dict) if isinstance(text, str) and text else "xx" for text in texts]
+    langs = [find_language(text, use_dict) if isinstance(text, str) and text else "xx" for text in texts]
     # Group texts by language for efficient batching
     from collections import defaultdict
     lang2idxs = defaultdict(list)
@@ -96,7 +109,7 @@ def spacy_clean_normalize_batch(texts, pipeline_dict, fallback_pipeline, batch_s
         lang2idxs[lang].append(idx)
     result = ["" for _ in texts]
     for lang, idxs in lang2idxs.items():
-        nlp = pipeline_dict.get(lang, fallback_pipeline)
+        nlp = use_dict.get(lang, use_fallback)
         sub_texts = [texts[i] for i in idxs]
         for doc, i in zip(nlp.pipe(sub_texts, batch_size=batch_size, n_process=n_process), idxs):
             tokens = [
@@ -107,11 +120,11 @@ def spacy_clean_normalize_batch(texts, pipeline_dict, fallback_pipeline, batch_s
             result[i] = " ".join(tokens)
     return result
 
-def spacy_clean_normalize(text, pipeline_dict, fallback_pipeline, batch_size=32, n_process=1):
+def spacy_clean_normalize(text, pipeline_dict_local=None, fallback_pipeline_local=None, batch_size=32, n_process=1):
     """Single string normalize (for string fields), using batch for uniformity."""
     if not isinstance(text, str) or not text:
         return ""
-    return spacy_clean_normalize_batch([text], pipeline_dict, fallback_pipeline, batch_size, n_process)[0]
+    return spacy_clean_normalize_batch([text], pipeline_dict_local, fallback_pipeline_local, batch_size, n_process)[0]
 
 # --- 4) Utility functions ---
 
@@ -176,7 +189,7 @@ def remove_empty_list_values(df: pd.DataFrame) -> pd.DataFrame:
 
 # --- 5) NER extraction for lab (optional) ---
 
-def extract_named_entities(lab_list: Any, pipeline_dict, fallback_pipeline, use_ner: bool = True) -> list[str]:
+def extract_named_entities(lab_list: Any, pipeline_dict_local=None, fallback_pipeline_local=None, use_ner: bool = True) -> list[str]:
     """
     For each string in lab_list, detect its language, use the appropriate spaCy pipeline
     (falling back to xx if language is not supported), and collect unique entity labels.
@@ -184,12 +197,14 @@ def extract_named_entities(lab_list: Any, pipeline_dict, fallback_pipeline, use_
     """
     if not use_ner or not isinstance(lab_list, list):
         return []
+    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
+    use_fallback = fallback_pipeline_local if fallback_pipeline_local is not None else fallback_pipeline
     entity_types: set[str] = set()
     for text in lab_list:
         if not isinstance(text, str) or not text:
             continue
-        lang_code = find_language(text, pipeline_dict)
-        chosen_nlp = pipeline_dict.get(lang_code, fallback_pipeline)
+        lang_code = find_language(text, use_dict)
+        chosen_nlp = use_dict.get(lang_code, use_fallback)
         try:
             doc = chosen_nlp(text)
             for ent in doc.ents:
@@ -391,7 +406,17 @@ def preprocess_lov_data(input_frame: pd.DataFrame, pipeline_dict=None, fallback_
 
 # --- 9) End‐to‐end helpers ---
 
-def process_all_from_input(input_data: Any, pipeline_dict, fallback_pipeline, use_ner: bool = True, batch_size=32, n_process=1) -> dict[str, list[Any]]:
+def process_all_from_input(
+    input_data: Any,
+    use_ner: bool = True,
+    batch_size: int = 32,
+    n_process: int = 1,
+    use_gpu: bool = False,
+) -> dict[str, list[Any]]:
+    """
+    Self-contained: sets up spaCy pipelines internally and processes the input.
+    """
+    # NOTE: now uses globally loaded pipeline_dict and fallback_pipeline
     if isinstance(input_data, dict):
         converted: dict[str, list[Any]] = {}
         for k, v in input_data.items():
@@ -406,8 +431,13 @@ def process_all_from_input(input_data: Any, pipeline_dict, fallback_pipeline, us
     else:
         raise ValueError("Input must be a dict or a pandas DataFrame")
     logger.info("Converted input data to DataFrame (%d rows).", len(df))
-    combined_df = preprocess_combined(df, pipeline_dict, fallback_pipeline, use_ner=use_ner, batch_size=batch_size, n_process=n_process)
-    void_df = preprocess_void(df, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
+    combined_df = preprocess_combined(
+        df, pipeline_dict, fallback_pipeline,
+        use_ner=use_ner, batch_size=batch_size, n_process=n_process
+    )
+    void_df = preprocess_void(
+        df, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process
+    )
     return {
         "id": remove_duplicates(combined_df["id"].tolist()),
         "title": remove_duplicates(combined_df["title"].tolist()),
@@ -430,7 +460,7 @@ def process_all_from_input(input_data: Any, pipeline_dict, fallback_pipeline, us
 
 def main(use_ner: bool = True, use_gpu: bool = False, batch_size: int = 32, n_process: int = 1) -> None:
     logger.info("Starting preprocessing workflow. NER enabled: %s, GPU enabled: %s, n_process: %d", use_ner, use_gpu, n_process)
-    pipeline_dict, fallback_pipeline = setup_spacy_pipelines(use_gpu=use_gpu)
+    # NOTE: uses globally loaded pipeline_dict and fallback_pipeline
     df = merge_dataset()
     logger.info("Merged dataset contains %d rows.", len(df))
     combined_df = preprocess_combined(df, pipeline_dict, fallback_pipeline, use_ner=use_ner, batch_size=batch_size, n_process=n_process)

@@ -105,7 +105,7 @@ async def async_select_remote_class(
             bindings = root.findall('.//sparql:binding[@name="class"]/sparql:uri', ns)
 
             if not bindings:
-                logger.debug(f"[CLS] No class bindings found at endpoint {endpoint}.")
+                logger.debug(f"[CURI] No class bindings found at endpoint {endpoint}.")
             for binding in bindings:
                 class_uri = binding.text or ""
                 if not class_uri:
@@ -118,10 +118,10 @@ async def async_select_remote_class(
                     classes.append(class_uri)
 
         except Exception as e:
-            logger.warning(f"[CLS] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[CURI] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
-    logger.info(f"[CLS] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
+    logger.info(f"[CURI] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
     return classes
 
 
@@ -270,7 +270,7 @@ async def async_select_remote_title(endpoint: str, timeout: int = 300) -> str:
     return title
 
 
-async def async_select_remote_tld(endpoint: str, limit: int = 1000, timeout: int = 300) -> list[str]:
+async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: int = 300) -> list[str]:
     """
     Retrieves distinct IRIs (?o) from the dataset and extracts their TLD.
     """
@@ -343,7 +343,7 @@ async def async_select_remote_property(
             bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
 
             if not bindings:
-                logger.debug(f"[PROP] No property bindings found at endpoint {endpoint}.")
+                logger.debug(f"[PURI] No property bindings found at endpoint {endpoint}.")
             for binding in bindings:
                 prop_uri = binding.text or ""
                 if not prop_uri:
@@ -356,10 +356,10 @@ async def async_select_remote_property(
                     properties.append(prop_uri)
 
         except Exception as e:
-            logger.warning(f"[PROP] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[PURI] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
-    logger.info(f"[PROP] Finished property query for endpoint: {endpoint} (found {len(properties)} properties)")
+    logger.info(f"[PURI] Finished property query for endpoint: {endpoint} (found {len(properties)} properties)")
     return properties
 
 
@@ -372,7 +372,7 @@ async def async_select_remote_property_names(
     Retrieves local names (after '#' or '/') of the most used properties.
     If filter_voc=False, skips is_voc_allowed() filtering.
     """
-    logger.info(f"[PNAME] Starting property name query for endpoint: {endpoint}")
+    logger.info(f"[LPN] Starting property name query for endpoint: {endpoint}")
     local_property_names: list[str] = []
     processed: set[str] = set()
 
@@ -394,7 +394,7 @@ async def async_select_remote_property_names(
             bindings = root.findall('.//sparql:binding[@name="property"]/sparql:uri', ns)
 
             if not bindings:
-                logger.debug(f"[PNAME] No property name bindings found at endpoint {endpoint}.")
+                logger.debug(f"[LPN] No property name bindings found at endpoint {endpoint}.")
             for binding in bindings:
                 prop_uri = binding.text or ""
                 if not prop_uri:
@@ -415,10 +415,10 @@ async def async_select_remote_property_names(
                     processed.add(local_name)
 
         except Exception as e:
-            logger.warning(f"[PNAME] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[LPN] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
-    logger.info(f"[PNAME] Finished property name query for endpoint: {endpoint} (found {len(local_property_names)} names)")
+    logger.info(f"[LPN] Finished property name query for endpoint: {endpoint} (found {len(local_property_names)} names)")
     return local_property_names
 
 
@@ -471,10 +471,10 @@ async def async_select_remote_class_name(
                     local_names.append(local_name)
 
         except Exception as e:
-            logger.warning(f"[CNAME] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[LCN] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
-    logger.info(f"[CNAME] Finished class name query for endpoint: {endpoint} (found {len(local_names)} names)")
+    logger.info(f"[LCN] Finished class name query for endpoint: {endpoint} (found {len(local_names)} names)")
     return local_names
 
 
@@ -550,10 +550,10 @@ async def async_select_void_description(
                     return await async_select_void_description(void_uri, timeout, True)
 
         except Exception as e:
-            logger.warning(f"[VDESC] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[DSC] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
-    logger.info(f"[VDESC] Finished VOID description query for endpoint: {endpoint}")
+    logger.info(f"[DSC] Finished VOID description query for endpoint: {endpoint}")
     return list(descriptions)
 
 
@@ -655,7 +655,7 @@ async def async_select_void_subject_remote(
     """
     Retrieves subjects of type void:Dataset, then fetches dcterms:subject for each.
     """
-    logger.info(f"[VSUBJ] Starting VOID subject query for endpoint: {endpoint}")
+    logger.info(f"[SVJ] Starting VOID subject query for endpoint: {endpoint}")
     dataset_uris: set[str] = set()
 
     query = """
@@ -685,7 +685,7 @@ async def async_select_void_subject_remote(
                     return await async_select_void_subject_remote(void_uri, timeout, True)
 
         except Exception as e:
-            logger.warning(f"[VSUBJ] Query execution error: {e}. Endpoint: {endpoint}")
+            logger.warning(f"[SBJ] Query execution error: {e}. Endpoint: {endpoint}")
             return []
 
     class_names: set[str] = set()
@@ -711,9 +711,9 @@ async def async_select_void_subject_remote(
                         class_names.add(cn)
 
             except Exception as e:
-                logger.warning(f"[VSUBJ] Error processing VOID subjects for {ds_uri}: {e}")
+                logger.warning(f"[SBJ] Error processing VOID subjects for {ds_uri}: {e}")
 
-    logger.info(f"[VSUBJ] Finished VOID subject query for endpoint: {endpoint}")
+    logger.info(f"[SBJ] Finished VOID subject query for endpoint: {endpoint}")
     return list(class_names)
 
 
@@ -740,7 +740,7 @@ async def process_endpoint(
         "lcn": async_select_remote_class_name(endpoint, filter_curi=filter_curi),
         "lpn": async_select_remote_property_names(endpoint, filter_voc=filter_voc),
         "lab": async_select_remote_label(endpoint),
-        "tlds": async_select_remote_tld(endpoint),
+        "tlds": async_select_remote_tlds(endpoint),
         "creator": async_select_void_creator(endpoint),
         "license": async_select_void_license(endpoint),
         "con": async_select_remote_connection(endpoint),
