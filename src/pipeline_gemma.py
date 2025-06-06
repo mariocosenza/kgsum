@@ -6,7 +6,7 @@ import time
 import ollama
 import pandas as pd
 from google import genai
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from tqdm import tqdm
 
 # Set up logging
@@ -114,12 +114,24 @@ class OllamaGemmaPredictor:
         frame = frame.copy()
         frame[output_column] = preds
 
-        acc = accuracy_score(
-            frame[category_column].astype(str).str.strip().str.lower(),
-            frame[output_column].astype(str).str.strip().str.lower()
-        )
-        logging.info(f"Ollama final accuracy (from predict_frame): {acc:.4f}")
-        print(f"\nOllama final accuracy (from predict_frame): {acc:.4f}")
+        # --- Compute overall metrics after predictions ---
+        y_true = frame[category_column].astype(str).str.strip().str.lower()
+        y_pred = frame[output_column].astype(str).str.strip().str.lower()
+
+        acc = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+        recall    = recall_score(   y_true, y_pred, average="weighted", zero_division=0)
+        f1        = f1_score(       y_true, y_pred, average="weighted", zero_division=0)
+
+        logging.info(f"Ollama final accuracy:  {acc:.4f}")
+        logging.info(f"Ollama final precision: {precision:.4f}")
+        logging.info(f"Ollama final recall:    {recall:.4f}")
+        logging.info(f"Ollama final f1_score:  {f1:.4f}")
+        print(f"\nOllama final metrics (from predict_frame):")
+        print(f"  Accuracy : {acc:.4f}")
+        print(f"  Precision: {precision:.4f}")
+        print(f"  Recall   : {recall:.4f}")
+        print(f"  F1       : {f1:.4f}\n")
 
         return frame
 
@@ -127,7 +139,7 @@ class OllamaGemmaPredictor:
 class GeminiPredictor:
     def __init__(self, temperature=0.0, model="models/gemini-2.0-flash", max_retries=5, initial_wait=10):
         self.temperature = temperature
-        self.model = model  # "models/gemini-2.0-flash" is the correct model name for Gemini 2 Flash as of google-generativeai>=0.6.0
+        self.model = model
         self.key = os.environ.get("GEMINI_API_KEY")
         if not self.key:
             raise ValueError("GEMINI_KEY or GEMINI_API_KEY not set in environment variables.")
@@ -247,12 +259,24 @@ class GeminiPredictor:
         frame = frame.copy()
         frame[output_column] = preds
 
-        acc = accuracy_score(
-            frame[category_column].astype(str).str.strip().str.lower(),
-            frame[output_column].astype(str).str.strip().str.lower()
-        )
-        logging.info(f"Gemini final accuracy (from predict_frame): {acc:.4f}")
-        print(f"\nGemini final accuracy (from predict_frame): {acc:.4f}")
+        # --- Compute overall metrics after predictions ---
+        y_true = frame[category_column].astype(str).str.strip().str.lower()
+        y_pred = frame[output_column].astype(str).str.strip().str.lower()
+
+        acc = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+        recall    = recall_score(   y_true, y_pred, average="weighted", zero_division=0)
+        f1        = f1_score(       y_true, y_pred, average="weighted", zero_division=0)
+
+        logging.info(f"Gemini final accuracy:  {acc:.4f}")
+        logging.info(f"Gemini final precision: {precision:.4f}")
+        logging.info(f"Gemini final recall:    {recall:.4f}")
+        logging.info(f"Gemini final f1_score:  {f1:.4f}")
+        print(f"\nGemini final metrics (from predict_frame):")
+        print(f"  Accuracy : {acc:.4f}")
+        print(f"  Precision: {precision:.4f}")
+        print(f"  Recall   : {recall:.4f}")
+        print(f"  F1       : {f1:.4f}\n")
 
         return frame
 
