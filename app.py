@@ -10,7 +10,11 @@ from src.service.file_upload_service import UPLOAD_FOLDER, allowed_file
 from src.service.generate_profile_service import generate_profile_service_store, generate_profile_service
 
 app = Flask(__name__)
-app.secret_key = "secret"
+
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable must be set.")
+
 Swagger(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
