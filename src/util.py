@@ -136,7 +136,7 @@ def _merge(df1, df2, output_csv_path) -> pd.DataFrame:
     # Merge the two dataframes vertically.
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
-    merged_df.drop_duplicates(subset=['id'], inplace=True)
+    merged_df = merged_df.drop_duplicates(subset=['id'])
     # Write the merged DataFrame to CSV including the index column.
     merged_df.to_csv(output_csv_path, index=True)
 
@@ -177,7 +177,7 @@ def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
     # Save the CSV with the index included (only one index column will be added)
-    merged_df.drop_duplicates(subset=['id'], inplace=True)
+    merged_df = merged_df.drop_duplicates(subset=['id'])
     merged_df.to_csv(csv1_path, index=True)
 
     return merged_df

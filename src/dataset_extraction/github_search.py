@@ -161,7 +161,7 @@ def save_to_csv(results, output_file="../../data/raw/github_unique_repos_with_tt
         logger.info("No results to save.")
         return None
     df = pd.DataFrame(results)
-    df.sort_values("repository", inplace=True)
+    df = df.sort_values("repository")
     df.to_csv(output_file, index=False)
     logger.info(f"Saved {len(results)} unique repositories (sorted by title) to {output_file}")
     return df
@@ -220,7 +220,7 @@ def download_and_predict(g_client, download_folder, output_file="../../data/raw/
         except Exception as e:
             logger.error(f"An error occurred while processing repository {repo}. Check the final output! Error: {e}")
 
-    df.sort_values("repository", inplace=True)
+    df = df.sort_values("repository")
     df.to_csv(output_file, index=False)
 
 

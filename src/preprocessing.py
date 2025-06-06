@@ -338,7 +338,7 @@ def combine_with_void(combined_df: pd.DataFrame, void_df: pd.DataFrame) -> pd.Da
     )
     dup_cols = [col for col in merged_final.columns if col.endswith("_dup")]
     if dup_cols:
-        merged_final.drop(columns=dup_cols, inplace=True)
+       merged_final = merged_final.drop(columns=dup_cols)
     if "id" in merged_final.columns:
         merged_final = merged_final.drop_duplicates(subset="id")
     if "category" in merged_final.columns:
