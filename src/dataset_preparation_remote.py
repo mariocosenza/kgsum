@@ -272,7 +272,8 @@ async def async_select_remote_title(endpoint: str, timeout: int = 300) -> str:
 
 async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: int = 300) -> list[str]:
     """
-    Retrieves distinct IRIs (?o) from the dataset and extracts their TLD.
+    Retrieves distinct IRIs (?o) from the dataset and extracts their TLD,
+    using a nested if/else structure instead of 'continue'.
     """
     logger.info(f"[TLDS] Starting TLD query for endpoint: {endpoint}")
     tlds: set[str] = set()
@@ -285,8 +286,8 @@ async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: in
         }}
         LIMIT {limit}
     """
-    async with aiohttp.ClientSession() as session:
-        try:
+    try:
+        async with aiohttp.ClientSession() as session:
             result_text = await _fetch_query(session, endpoint, query, timeout)
             root = eT.fromstring(result_text)
             ns = {"sparql": "http://www.w3.org/2005/sparql-results#"}
@@ -295,23 +296,29 @@ async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: in
             if not bindings:
                 logger.debug(f"[TLDS] No TLD bindings found at endpoint {endpoint}.")
             for binding in bindings:
-                url = binding.text or ""
-                if url.lower().startswith(("http://", "https://")):
-                    try:
-                        host = url.split("/")[2]
-                        tld = host.split(".")[-1]
-                        if 1 < len(tld) <= 10:
-                            tlds.add(tld)
-                    except Exception as e:
-                        logger.debug(f"[TLDS] Error parsing TLD for URL {url}: {e}")
+                url = binding.text
+                # Check if the URL is valid and starts with http/https.
+                if url and url.lower().startswith(("http://", "https://")):
+                    url_parts = url.split('/')
+                    if len(url_parts) >= 3:
+                        host = url_parts[2]
+                        host_parts = host.split('.')
+                        # If the host has a TLD part...
+                        if len(host_parts) >= 2:
+                            tld = host_parts[-1]
+                            if 1 < len(tld) <= 10:
+                                tlds.add(tld)
+                        else:
+                            logger.debug(f"[TLDS] Cannot parse TLD from host: {host}")
+                    else:
+                        logger.debug(f"[TLDS] Cannot parse host from URL: {url}")
 
-        except Exception as e:
-            logger.warning(f"[TLDS] Query execution error: {e}. Endpoint: {endpoint}")
-            return []
+    except Exception as e:
+        logger.warning(f"[TLDS] Query execution error: {e}. Endpoint: {endpoint}")
+        return []
 
     logger.info(f"[TLDS] Finished TLD query for endpoint: {endpoint} (found {len(tlds)} TLDs)")
     return list(tlds)
-
 
 async def async_select_remote_property(
     endpoint: str,

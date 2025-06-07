@@ -68,7 +68,7 @@ def select_local_vocabularies(parsed_graph, filter_voc: bool = True):
     return vocabularies
 
 
-def select_local_class(parsed_graph, filter_curi: bool = True):
+def select_local_class(parsed_graph, filter_curi: bool = True) -> list[str]:
     """
     Retrieve distinct RDF classes ordered by instance count.
     If filter_curi=False, skip is_curi_allowed filtering.
@@ -92,13 +92,11 @@ def select_local_class(parsed_graph, filter_curi: bool = True):
     classes = set()
     for row in qres:
         class_uri = str(row.classUri)
-        if not class_uri:
-            continue
-        if filter_curi:
-            if is_curi_allowed(class_uri):
+        if class_uri:
+            if filter_curi and is_curi_allowed(class_uri):
                 classes.add(class_uri)
-        else:
-            classes.add(class_uri)
+            else:
+                classes.add(class_uri)
     return list(classes)
 
 
