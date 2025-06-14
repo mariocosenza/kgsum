@@ -394,7 +394,7 @@ class KnowledgeGraphClassifier:
         frame: pd.DataFrame,
         feature_labels: FeatureLabels,
         target_label: str = "category",
-        max_length: int = 8000000
+        max_length: int = 256
     ) -> dict[str, Any]:
         if self.classifier_type == ClassifierType.MISTRAL:
             return self.train_mistral(frame, feature_labels, target_label=target_label, max_length=max_length)
@@ -583,7 +583,7 @@ class KnowledgeGraphClassifier:
         target_label: str = "category",
         max_length: int = 512,
         qlora_r: int = 32,
-        qlora_alpha: int = 64,
+        qlora_alpha: int = 16,
         batch_size: int = 8,
         epochs: int = 15
     ) -> dict[str, Any] | None:
