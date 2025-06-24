@@ -21,6 +21,25 @@ def normalize_label(label):
     label = re.sub(r"[^\w\s-]", "", label)
     return label.lower()
 
+def compute_metrics(y_true, y_pred):
+    """
+    Calcola le metriche di classificazione standard tra due serie/array:
+    - accuracy
+    - precision (weighted)
+    - recall (weighted)
+    - f1 (weighted)
+    """
+    acc = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+    recall    = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1        = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+    return {
+        "accuracy": acc,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+    }
+
 
 class OllamaGemmaPredictor:
     def __init__(
@@ -284,7 +303,7 @@ if __name__ == "__main__":
 
     # Ollama/Gemma
     predictor = OllamaGemmaPredictor(
-        model_name="gemma3:12b",
+        model_name="mistral", #gemma3:12b
         temperature=0.2,
         num_predict=4
     )
@@ -295,15 +314,15 @@ if __name__ == "__main__":
         system_message=system_message
     )
 
-    # Gemini 2 Flash
-    gemini_predictor = GeminiPredictor(
-        temperature=0.2,
-        model="models/gemini-2.0-flash"
-    )
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="comments",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
+    # # Gemini 2 Flash
+    # gemini_predictor = GeminiPredictor(
+    #     temperature=0.2,
+    #     model="models/gemini-2.0-flash"
+    # )
+    # df_with_gemini_preds = gemini_predictor.predict_frame(
+    #     df,
+    #     content_column="comments",
+    #     category_column="category",
+    #     system_message=system_message
+    # )
+    # print(df_with_gemini_preds)
