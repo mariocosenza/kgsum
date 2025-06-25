@@ -53,7 +53,7 @@ export const NavBar = (): ReactNode => {
                                 </div>
                                 <div className="basis-3/4 pl-2">
                                     <NavigationMenuLink
-                                        href="#"
+                                        href="/esplora"
                                         className={menuLinkBoldClass}
                                     >
                                         Esplora Profili
@@ -71,7 +71,7 @@ export const NavBar = (): ReactNode => {
                                         </p>
                                     </NavigationMenuLink>
                                     <NavigationMenuLink
-                                        href="#"
+                                        href="/documentazione/latest"
                                         className={menuLinkBoldClass}
                                     >
                                         Documentazione API
