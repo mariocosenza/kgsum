@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export const Footer = () => {
     return (
-        <footer className="w-full mt-12">
+        <footer className="w-full mt-2">
             <div className="mx-5 lg:mx-20 border-t-2 border-dotted flex flex-row justify-between items-center h-12">
                 <div>
                     <p className="text-gray-600 text-sm ml-2">
