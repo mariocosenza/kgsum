@@ -62,7 +62,7 @@ export const NavBar = (): ReactNode => {
                                         </p>
                                     </NavigationMenuLink>
                                     <NavigationMenuLink
-                                        href="#"
+                                        href="/classifica"
                                         className={menuLinkBoldClass}
                                     >
                                         Classifica Online
