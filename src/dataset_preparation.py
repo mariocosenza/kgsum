@@ -584,7 +584,7 @@ def init_worker(lod_frame_path: str):
     """
     global lod_frame_global
     df = pd.read_csv(lod_frame_path)
-    lod_frame_global = df[~df["category"].str.strip().eq("user_generated")].reset_index(drop=True)
+    lod_frame_global = df[~df["category"].fillna("").str.strip().eq("user_generated")].reset_index(drop=True)
 
 
 def process_local_dataset_file(args):
@@ -714,10 +714,10 @@ def create_local_dataset(
 
     ctx = get_context("spawn")
     with ctx.Pool(
-        processes=8,
-        maxtasksperchild=10,
-        initializer=init_worker,
-        initargs=(lod_frame_path,),
+            processes=min(4, os.cpu_count() or 4),  # Limit worker count
+            maxtasksperchild=4,  # Recycle processes after 4 tasks
+            initializer=init_worker,
+            initargs=(lod_frame_path,),
     ) as pool:
         results = robust_pool_map(pool, process_local_dataset_file, tasks)
 
@@ -774,12 +774,12 @@ def create_local_void_dataset(offset: int = 0, limit: int = 10000):
 
     ctx = get_context("spawn")
     with ctx.Pool(
-        processes=6,
-        maxtasksperchild=10,
-        initializer=init_worker,
-        initargs=(lod_frame_path,),
+            processes=min(4, os.cpu_count() or 4),
+            maxtasksperchild=4,
+            initializer=init_worker,
+            initargs=(lod_frame_path,),
     ) as pool:
-        results = robust_pool_map(pool, process_local_void_dataset_file, tasks)
+        results = robust_pool_map(pool, process_local_dataset_file, tasks)
 
     if results:
         df = pd.DataFrame(results, columns=["id", "title", "sbj", "dsc", "category"])

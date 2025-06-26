@@ -1,8 +1,9 @@
 from __future__ import annotations
-import os
-import pickle
+
 import logging
+import os
 import shutil
+
 import pandas as pd
 
 from autoencoder_pipeline import AutoencoderType, load_models, train_autoencoder_models, save_models, \
@@ -16,8 +17,8 @@ project_root = os.path.dirname(script_dir)
 data_folder_path = os.path.join(project_root, "data", "trained")
 file_path = os.path.join(data_folder_path, "multiple_models_autoencoder.pkl")
 
-FEATURES: list[str] = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'tlds']
-AE_MODEL: AutoencoderType = AutoencoderType.DEEP
+FEATURES: list[str] = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments', 'tlds']
+AE_MODEL: AutoencoderType = AutoencoderType.BATCHNORM
 LATENT_DIM: int = 32
 TARGET_LABEL: str = "category"
 USE_TFIDF: bool = True  # Set to False if you want only OneHot
@@ -37,7 +38,7 @@ def main() -> None:
     else:
         logger.info("[TRAIN] Training autoencoder models from scratch.")
         models, training_results = train_autoencoder_models(
-            combined_df, FEATURES, TARGET_LABEL, AE_MODEL, LATENT_DIM, use_tfidf=USE_TFIDF, oversample=False
+            combined_df, FEATURES, TARGET_LABEL, AE_MODEL, LATENT_DIM, use_tfidf=USE_TFIDF, oversample=True
         )
         save_models(models, training_results, file_path)
 

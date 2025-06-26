@@ -27,7 +27,7 @@ def check_system_load(func):
         global active_requests
         cpu = psutil.cpu_percent(interval=0.1)
         ram = psutil.virtual_memory().percent
-        if cpu > 90 or ram > 80:
+        if cpu > 90 or ram > 90:
             return jsonify({
                 "error": "Server overloaded",
                 "cpu_usage": cpu,

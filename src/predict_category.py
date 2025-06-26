@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
-data_folder_path = os.path.join(project_root, 'data\\trained')
+data_folder_path = os.path.join(project_root, 'data', 'trained')
 file_path = os.path.join(data_folder_path, 'multiple_models.pkl')
 
 
@@ -26,7 +26,8 @@ class CategoryPredictor:
 
     @staticmethod
     def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample = True):
-        combined_df = pd.read_json(f'{project_root}/data/processed/combined.json')
+        combined_df_path = os.path.join(project_root, 'data', 'processed', 'combined.json')
+        combined_df = pd.read_json(combined_df_path)
         if feature_columns is None:
             feature_columns = ["curi"]
         try:
@@ -49,8 +50,7 @@ class CategoryPredictor:
 
 
 if __name__ == "__main__":
-    directory_path = os.path.join('../data/trained/cache/')
+    directory_path = os.path.join(project_root, 'data', 'trained', 'cache')
     if os.path.exists(directory_path):
         shutil.rmtree(directory_path)
     PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'], oversample=True)
-    

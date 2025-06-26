@@ -852,7 +852,7 @@ async def main_normal(
 
     try:
         lod_frame = pd.read_csv("../data/raw/sparql_full_download.csv")
-        lod_frame = lod_frame[~lod_frame["category"].str.strip().isin(["user_generated"])]
+        lod_frame = lod_frame[~lod_frame["category"].fillna("").str.strip().isin(["user_generated"])]
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
@@ -918,7 +918,7 @@ async def main_void(
 
     try:
         lod_frame = pd.read_csv("../data/raw/sparql_full_download.csv")
-        lod_frame = lod_frame[~lod_frame["category"].str.strip().isin(["user_generated"])]
+        lod_frame = lod_frame[~lod_frame["category"].fillna("").str.strip().isin(["user_generated"])]
     except Exception as e:
         logger.error(f"Error reading CSV file: {e}")
         sys.exit(1)
