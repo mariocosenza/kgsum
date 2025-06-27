@@ -52,7 +52,7 @@ VOC_FILTER = {
 def is_curi_allowed(uri: str) -> bool:
     for url in CURI_PURI_FILTER:
         if url in uri:
-            print(uri)
+            logging.debug(uri)
             return False
     return True
 
