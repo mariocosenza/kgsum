@@ -5,6 +5,9 @@ import {NavBar} from "@/components/navbar";
 import {Footer} from "@/components/footer";
 import type { Viewport } from 'next'
 import {ThemeProvider} from "next-themes";
+import {ClerkProvider} from "@clerk/nextjs";
+import React from "react";
+import {itIT} from "@clerk/localizations";
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -36,6 +39,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+       <ClerkProvider localization={itIT}
+      appearance={{
+        cssLayerName: 'clerk',
+      }}>
     <html lang="it" suppressHydrationWarning>
       <body
         className={`
@@ -58,5 +65,6 @@ export default function RootLayout({
       </ThemeProvider>
       </body>
     </html>
+       </ClerkProvider>
   );
 }
