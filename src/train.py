@@ -66,15 +66,26 @@ def main():
 
     user_in = input('Would you like to extract data from dump and sparql endpoint? S | N')
     if user_in.lower() == 's':
-        limit = int(input('Number of file to process: '))
+        limit = int(input('Number of file to process least 10: '))
         offset = int(input('Offset from begin: '))
+        limit = offset + limit
         import multiprocessing
         multiprocessing.freeze_support()
-        create_local_dataset(offset=offset, limit=limit)
+        division = limit - offset % 10
+        if (limit - offset) == 10:
+            logger.exception('Value out of range')
+            return
+        for i in range(offset, limit - division, 10):
+            create_local_dataset(offset=offset, limit=limit)
+        if division != 0:
+            create_local_dataset(offset=limit - division, limit=limit)
         create_local_void_dataset(offset=offset, limit=limit)
         asyncio.run(dataset_preparation_remote.main_void())
         asyncio.run(dataset_preparation_remote.main_normal())
-        lov_data_preparation.main()
+        try:
+            lov_data_preparation.main()
+        except Exception:
+            logger.exception('Check your GraphDB instance is running')
 
     if not os.path.isfile(f'{base_folder}/data/processed/combined.json'):
         preprocessing.main()

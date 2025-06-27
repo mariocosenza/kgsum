@@ -694,6 +694,9 @@ def create_local_dataset(
     """
     lod_frame_path = "../data/raw/sparql_full_download.csv"
     tasks = []
+    out_path = f"../data/raw/local/local_feature_set_{offset}_{limit}.json"
+    if os.path.exists(out_path):
+        return
 
     # Exclude 'user_generated' category
     valid_categories = [cat for cat in CATEGORIES if cat != "user_generated"]
@@ -740,7 +743,7 @@ def create_local_dataset(
                 "category",
             ],
         )
-        out_path = f"../data/raw/local/local_feature_set_{offset}_{limit}.json"
+
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         df.to_json(out_path, orient="records", index=False)
         logger.info(f"Saved local feature set to {out_path}")
