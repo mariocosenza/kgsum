@@ -93,8 +93,9 @@ def select_local_class(parsed_graph, filter_curi: bool = True) -> list[str]:
     for row in qres:
         class_uri = str(row.classUri)
         if class_uri:
-            if filter_curi and is_curi_allowed(class_uri):
-                classes.add(class_uri)
+            if filter_curi:
+                if is_curi_allowed(class_uri):
+                    classes.add(class_uri)
             else:
                 classes.add(class_uri)
     return list(classes)
