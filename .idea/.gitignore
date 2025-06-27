@@ -6,8 +6,3 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
-/csv-editor.xml
-/misc.xml
-/KgSum.iml
-/inspectionProfiles/profiles_settings.xml
-/inspectionProfiles/Project_Default.xml

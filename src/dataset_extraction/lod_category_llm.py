@@ -7,6 +7,8 @@ import ollama
 import pandas as pd
 from google import genai
 
+from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
+
 from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN
 
 logging.basicConfig(level=logging.INFO)
@@ -24,8 +26,7 @@ CATEGORIES_COLOR: dict[str, str] = {
     '#d84d8c': 'user_generated'
 }
 
-
-def safe_generate_content_ollama(description, keywords):
+def safe_generate_content_ollama(description, keywords) -> str:
     prompt = (
         f"""Given the following description and keywords, find a category given this data. 
         Only respond with the category and no other words. 
@@ -38,14 +39,13 @@ def safe_generate_content_ollama(description, keywords):
 
     try:
         response = ollama.generate(model="gemma3:12b", prompt=prompt)
-        output = response['response'].strip()
+        output = response['response'].strip().lower()
         logger.info(f'Categories: {output}')
     except Exception as e:
         logger.error(f"Error calling Ollama model: {e}")
         return ""
 
     return output
-
 
 def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.DataFrame:
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -85,7 +85,7 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                                f"""Given the following description and keywords, find a category given this data. 
+                                f"""Given the following description and keywords, find a category for the given data. 
                                 Only respond with the category and no other words. 
                                 Be precise and use your reasoning. 
                                 Use the same category format. 
@@ -114,12 +114,12 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
                             logger.warning(f"Non-rate limit error. Skipping ID {col}.")
                             break
 
-                    # Skip this item if we couldn't get a result after retries
-                    if result is None:
-                        logger.warning(f"Skipping item {col} due to API errors")
-                        continue
-                    else:
-                        result = result.text.strip()
+                # Skip this item if we couldn't get a result after retries
+                if result is None:
+                    logger.warning(f"Skipping item {col} due to API errors")
+                    continue
+                else:
+                    result = result.text.strip().lower()
             else:
                 result = safe_generate_content_ollama(description=df[col]['description'],
                                                       keywords=df[col]['keywords']).strip()
@@ -150,7 +150,6 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
     logger.info(f'Category hit: {hit}')
     logger.info(f'Category miss: {miss}')
     return df
-
 
 def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
     doc = minidom.parse('../../data/raw/lod-cloud.svg')
@@ -206,7 +205,7 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                         result = client.models.generate_content(
                             model="gemini-2.0-flash-thinking-exp-01-21",
                             contents=(
-                                f"""Given the following description and keywords, find a category given this data. 
+                                f"""Given the following description and keywords, find a category for the given data. 
                                 Only respond with the category and no other words. 
                                 Be precise and use your reasoning. 
                                 Use the same category format. 
@@ -235,12 +234,12 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
                             logger.warning(f"Non-rate limit error. Skipping ID {col}.")
                             break
 
-                    # Skip this item if we couldn't get a result after retries
-                    if result is None:
-                        logger.warning(f"Skipping item {col} due to API errors")
-                        continue
-                    else:
-                        result = result.text.strip()
+                # Skip this item if we couldn't get a result after retries
+                if result is None:
+                    logger.warning(f"Skipping item {col} due to API errors")
+                    continue
+                else:
+                    result = result.text.strip().lower()
             else:
                 result = safe_generate_content_ollama(description=df[col]['description'],
                                                       keywords=df[col]['keywords']).strip()
@@ -271,7 +270,35 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
     logger.info(f'Category miss: {miss}')
     return df
 
+def calculate_metrics_sklearn(df: pd.DataFrame, average: str = "macro"):
+    """
+    Calculates precision, recall, and F1 score for multi-class classification using scikit-learn.
+    df: DataFrame with columns ['lod_category', 'predicted_category']
+    average: "macro", "micro", or "weighted"
+    Returns: dict with precision, recall, f1, and classification_report
+    """
+    y_true = df['lod_category']
+    y_pred = df['predicted_category']
+
+    precision = precision_score(y_true, y_pred, average=average, zero_division=0)
+    recall = recall_score(y_true, y_pred, average=average, zero_division=0)
+    f1 = f1_score(y_true, y_pred, average=average, zero_division=0)
+    report = classification_report(y_true, y_pred, zero_division=0)
+
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "classification_report": report
+    }
 
 if __name__ == '__main__':
-    # predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
-    predict_category_from_lod_description(use_ollama=True).to_csv('../../data/raw/lod-gemini.csv')
+    # df = predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')
+    df = predict_category_from_lod_description(use_ollama=False)
+    df.to_csv('../../data/raw/lod-gemini.csv')
+
+    metrics = calculate_metrics_sklearn(df)
+    print("Precision:", metrics["precision"])
+    print("Recall:", metrics["recall"])
+    print("F1:", metrics["f1"])
+    print("Classification report:\n", metrics["classification_report"])

@@ -1,6 +1,6 @@
 import logging
 import os
-
+import shutil
 import pandas as pd
 
 import src.pipeline_build
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
-data_folder_path = os.path.join(project_root, 'data\\trained')
+data_folder_path = os.path.join(project_root, 'data', 'trained')
 file_path = os.path.join(data_folder_path, 'multiple_models.pkl')
 
 
@@ -25,8 +25,9 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None):
-        combined_df = pd.read_json(f'{project_root}/data/processed/combined.json')
+    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample = True):
+        combined_df_path = os.path.join(project_root, 'data', 'processed', 'combined.json')
+        combined_df = pd.read_json(combined_df_path)
         if feature_columns is None:
             feature_columns = ["curi"]
         try:
@@ -36,7 +37,8 @@ class CategoryPredictor:
                 combined_df,
                 feature_columns,
                 target_label="category",
-                classifier_type=classifier
+                classifier_type=classifier,
+                oversample=oversample
             )
             save_multiple_models(models, training_results)
 
@@ -48,11 +50,7 @@ class CategoryPredictor:
 
 
 if __name__ == "__main__":
-    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES,
-                                                feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
-                                                                 'comments'])
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.KNN, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
-    #                                                                  'comments'])
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.SVM, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab',
-    #                                                                      'comments'])
-    # PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.MISTRAL, feature_columns=['voc'])
+    directory_path = os.path.join(project_root, 'data', 'trained', 'cache')
+    if os.path.exists(directory_path):
+        shutil.rmtree(directory_path)
+    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'], oversample=True)

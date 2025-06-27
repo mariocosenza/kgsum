@@ -1,12 +1,12 @@
 # Basic `dependabot.yml` file with
-# minimum configuration for two package managers
+# minimum configuration for Conda package manager
 
 version: 2
 updates:
-  # Enable version updates for npm
-  - package-ecosystem: "pip"
-    # Look for `package.json` and `lock` files in the `root` directory
+  # Enable version updates for Conda
+  - package-ecosystem: "conda"
+    # Look for `environment.yml` files in the `root` directory
     directory: "/"
-    # Check the npm registry for updates every day (weekdays)
+    # Check the Conda registry for updates every week
     schedule:
       interval: "weekly"

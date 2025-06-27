@@ -6,7 +6,7 @@ import time
 import ollama
 import pandas as pd
 from google import genai
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from tqdm import tqdm
 
 # Set up logging
@@ -20,6 +20,25 @@ def normalize_label(label):
     label = label.strip().strip('"').strip("'")
     label = re.sub(r"[^\w\s-]", "", label)
     return label.lower()
+
+def compute_metrics(y_true, y_pred):
+    """
+    Calcola le metriche di classificazione standard tra due serie/array:
+    - accuracy
+    - precision (weighted)
+    - recall (weighted)
+    - f1 (weighted)
+    """
+    acc = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+    recall    = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1        = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+    return {
+        "accuracy": acc,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+    }
 
 
 class OllamaGemmaPredictor:
@@ -114,12 +133,21 @@ class OllamaGemmaPredictor:
         frame = frame.copy()
         frame[output_column] = preds
 
-        acc = accuracy_score(
-            frame[category_column].astype(str).str.strip().str.lower(),
-            frame[output_column].astype(str).str.strip().str.lower()
-        )
-        logging.info(f"Ollama final accuracy (from predict_frame): {acc:.4f}")
-        print(f"\nOllama final accuracy (from predict_frame): {acc:.4f}")
+        # --- Compute overall metrics after predictions ---
+        y_true = frame[category_column].astype(str).str.strip().str.lower()
+        y_pred = frame[output_column].astype(str).str.strip().str.lower()
+
+        metrics = compute_metrics(y_true, y_pred)
+
+        logging.info(f"Ollama final accuracy:  {metrics['accuracy']:.4f}")
+        logging.info(f"Ollama final precision: {metrics['precision']:.4f}")
+        logging.info(f"Ollama final recall:    {metrics['recall']:.4f}")
+        logging.info(f"Ollama final f1_score:  {metrics['f1']:.4f}")
+        print(f"\nOllama final metrics (from predict_frame):")
+        print(f"  Accuracy : {metrics['accuracy']:.4f}")
+        print(f"  Precision: {metrics['precision']:.4f}")
+        print(f"  Recall   : {metrics['recall']:.4f}")
+        print(f"  F1       : {metrics['f1']:.4f}\n")
 
         return frame
 
@@ -127,7 +155,7 @@ class OllamaGemmaPredictor:
 class GeminiPredictor:
     def __init__(self, temperature=0.0, model="models/gemini-2.0-flash", max_retries=5, initial_wait=10):
         self.temperature = temperature
-        self.model = model  # "models/gemini-2.0-flash" is the correct model name for Gemini 2 Flash as of google-generativeai>=0.6.0
+        self.model = model
         self.key = os.environ.get("GEMINI_API_KEY")
         if not self.key:
             raise ValueError("GEMINI_KEY or GEMINI_API_KEY not set in environment variables.")
@@ -247,12 +275,24 @@ class GeminiPredictor:
         frame = frame.copy()
         frame[output_column] = preds
 
-        acc = accuracy_score(
-            frame[category_column].astype(str).str.strip().str.lower(),
-            frame[output_column].astype(str).str.strip().str.lower()
-        )
-        logging.info(f"Gemini final accuracy (from predict_frame): {acc:.4f}")
-        print(f"\nGemini final accuracy (from predict_frame): {acc:.4f}")
+        # --- Compute overall metrics after predictions ---
+        y_true = frame[category_column].astype(str).str.strip().str.lower()
+        y_pred = frame[output_column].astype(str).str.strip().str.lower()
+
+        acc = accuracy_score(y_true, y_pred)
+        precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+        recall    = recall_score(   y_true, y_pred, average="weighted", zero_division=0)
+        f1        = f1_score(       y_true, y_pred, average="weighted", zero_division=0)
+
+        logging.info(f"Gemini final accuracy:  {acc:.4f}")
+        logging.info(f"Gemini final precision: {precision:.4f}")
+        logging.info(f"Gemini final recall:    {recall:.4f}")
+        logging.info(f"Gemini final f1_score:  {f1:.4f}")
+        print(f"\nGemini final metrics (from predict_frame):")
+        print(f"  Accuracy : {acc:.4f}")
+        print(f"  Precision: {precision:.4f}")
+        print(f"  Recall   : {recall:.4f}")
+        print(f"  F1       : {f1:.4f}\n")
 
         return frame
 
@@ -263,7 +303,7 @@ if __name__ == "__main__":
 
     # Ollama/Gemma
     predictor = OllamaGemmaPredictor(
-        model_name="gemma3:12b",
+        model_name="mistral", #gemma3:12b
         temperature=0.2,
         num_predict=4
     )
@@ -274,15 +314,15 @@ if __name__ == "__main__":
         system_message=system_message
     )
 
-    # Gemini 2 Flash
-    gemini_predictor = GeminiPredictor(
-        temperature=0.2,
-        model="models/gemini-2.0-flash"
-    )
-    df_with_gemini_preds = gemini_predictor.predict_frame(
-        df,
-        content_column="comments",
-        category_column="category",
-        system_message=system_message
-    )
-    print(df_with_gemini_preds)
+    # # Gemini 2 Flash
+    # gemini_predictor = GeminiPredictor(
+    #     temperature=0.2,
+    #     model="models/gemini-2.0-flash"
+    # )
+    # df_with_gemini_preds = gemini_predictor.predict_frame(
+    #     df,
+    #     content_column="comments",
+    #     category_column="category",
+    #     system_message=system_message
+    # )
+    # print(df_with_gemini_preds)

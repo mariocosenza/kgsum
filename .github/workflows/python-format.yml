@@ -1,33 +1,46 @@
 name: Format Python Code
+
 on:
   pull_request:
     branches:
       - main
-    types: [opened]
+    types: [opened, synchronize, reopened]
+
 jobs:
   python-code-format:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4  # Checking out the repository
+
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: "latest"
           python-version: "3.12"
-          architecture: "x64"
-      - name: Display Python version
-        run: python --version
+          auto-activate-base: false
+
+      - name: Create Conda Environment
+        run: |
+          eval "$(conda shell.bash hook)"
+          conda create -n format-env python=3.12 -y
+          conda activate format-env
+
       - name: Install packages
-        run: pip install black autopep8 isort
+        run: |
+          eval "$(conda shell.bash hook)"
+          conda activate format-env
+          conda install -c conda-forge black autopep8 isort -y
+          conda install pip -y
+
+      - name: Check for null bytes in files
+        run: grep -rl $'\x00' . || echo "No null bytes found"
+
       - name: Formatter
         run: |
-          black .
-          autopep8 --recursive --in-place --aggressive --aggressive .
+          eval "$(conda shell.bash hook)"
+          conda activate format-env
+          find . -type f -name "*.py" -exec echo "Processing file: {}" \;
+          black . --line-length 79
+          autopep8 --recursive --in-place --aggressive .
           isort .
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3
-        with:
-          commit-message: Auto code format
-          title: Fixes by format action
-          body: This is an auto-generated PR with fixes.
-          labels: automated pr
-          branch: python-code-format-patches
-          base: main

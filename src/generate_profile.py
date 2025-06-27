@@ -5,10 +5,11 @@ import urllib.parse
 import aiohttp
 import pandas as pd
 
-from predict_category import CategoryPredictor
+
 from src.dataset_preparation import process_file_full_inplace, logger
 from src.dataset_preparation_remote import process_endpoint_full_inplace
 from src.lov_data_preparation import IS_URI
+from src.predict_category import CategoryPredictor
 from src.preprocessing import process_all_from_input
 
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
@@ -39,7 +40,7 @@ async def generate_profile(endpoint: None | str = None, file: None | str = None)
 
 async def generate_and_store_profile(endpoint=None, file=None):
     row = await generate_profile(endpoint=endpoint, file=file)
-    await store_profile(profile=row['profile'], category=row['category'])
+    await store_profile(profile=row, category=row['category'])
     return row
 
 
@@ -52,8 +53,8 @@ async def generate_profile_from_store():
 
 def create_profile(data: dict | pd.DataFrame | pd.Series) -> dict:
     if isinstance(data, pd.DataFrame):
-        data.dropna(inplace=True)
-        data.drop_duplicates(inplace=True)
+        data = data.dropna()
+        data = data.drop_duplicates()
         data = data.to_dict('records')
     return data
 

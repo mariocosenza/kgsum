@@ -28,7 +28,6 @@ CURI_PURI_FILTER = {
     'http://www.w3.org/2004/02/skos/core',
     'http://www.w3.org/2000/01/rdf-schema',
     'http://www.w3.org/1999/02/22-rdf-syntax-ns',
-    'http://www.w3.org/2000/01/rdf-schema',
     'http://www.w3.org/ns/shacl',
     'http://www.w3.org/ns/prov',
     'http://rdfs.org/ns/void#Dataset'
@@ -51,11 +50,18 @@ VOC_FILTER = {
 
 
 def is_curi_allowed(uri: str) -> bool:
-    return not any(url in uri for url in CURI_PURI_FILTER)
+    for url in CURI_PURI_FILTER:
+        if url in uri:
+            logging.debug(uri)
+            return False
+    return True
 
 
 def is_voc_allowed(uri: str) -> bool:
-    return not any(url in uri for url in VOC_FILTER)
+    for url in VOC_FILTER:
+        if url in uri:
+            return False
+    return True
 
 
 def is_endpoint_working(endpoint) -> bool:
@@ -130,7 +136,7 @@ def _merge(df1, df2, output_csv_path) -> pd.DataFrame:
     # Merge the two dataframes vertically.
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
-    merged_df.drop_duplicates(subset=['id'], inplace=True)
+    merged_df = merged_df.drop_duplicates(subset=['id'])
     # Write the merged DataFrame to CSV including the index column.
     merged_df.to_csv(output_csv_path, index=True)
 
@@ -171,7 +177,7 @@ def merge_github_sparql(csv1_path='../data/raw/sparql_full_download.csv',
     merged_df = pd.concat([df1, df2_transformed], ignore_index=True)
 
     # Save the CSV with the index included (only one index column will be added)
-    merged_df.drop_duplicates(subset=['id'], inplace=True)
+    merged_df = merged_df.drop_duplicates(subset=['id'])
     merged_df.to_csv(csv1_path, index=True)
 
     return merged_df
@@ -197,4 +203,5 @@ def merge_dump_sparql(csv1_path='../data/raw/graphs.csv',
 
 
 if __name__ == '__main__':
-    merge_dump_sparql()
+    merge_zenodo_sparql()
+    merge_github_sparql()
