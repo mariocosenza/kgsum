@@ -1,11 +1,26 @@
 from __future__ import annotations
-import pickle
 import os
 import numpy as np
 import pandas as pd
 from enum import Enum, auto
 from typing import Any, NamedTuple, Self
 from collections.abc import Sequence
+
+# --- Ensure reproducibility across all libraries ---
+def set_seed(seed: int = 42):
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    import torch
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+set_seed(42)
+# ---------------------------------------------------
 
 import torch
 import torch.nn as nn
@@ -238,13 +253,13 @@ def build_pipeline(
     logger.info("[PIPELINE] Building model pipeline. TF-IDF: %s | Oversample: %s", use_tfidf, oversample)
     steps: list[tuple[str, Any]] = []
     if oversample:
-        steps.append(("oversampler", RandomOverSampler()))
+        steps.append(("oversampler", RandomOverSampler(random_state=42)))
     if use_tfidf:
         steps.append(("tfidf", FeatureTfidfEncoder(max_features=10000)))
     else:
         steps.append(("onehot", CategoryOneHotEncoder()))
     steps.append(("autoencoder", AutoencoderEncoder(latent_dim=latent_dim, arch=arch)))
-    steps.append(("classifier", RandomForestClassifier()))
+    steps.append(("classifier", RandomForestClassifier(random_state=42)))
     return Pipeline(steps)
 
 def random_search_params() -> dict[str, Sequence[Any]]:
@@ -285,6 +300,7 @@ def save_models(
 ) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
+        import pickle
         pickle.dump({
             "models": models,
             "training_results": training_results,
@@ -293,6 +309,7 @@ def save_models(
 
 def load_models(path: str) -> tuple[dict[str, Pipeline], dict[str, TrainingResult]]:
     with open(path, "rb") as f:
+        import pickle
         data = pickle.load(f)
     logger.info("[LOAD] Models loaded from: %s", path)
     return data["models"], data["training_results"]
