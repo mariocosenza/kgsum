@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
 
 function FileIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -419,7 +420,7 @@ export const Form = () => {
                       Salva profilo
                     </Label>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Salva le impostazioni per utilizzi futuri
+                      Rendi pubblico il profilo generato
                     </p>
                   </div>
                 </div>
@@ -437,7 +438,7 @@ export const Form = () => {
                   />
                   <div className="flex-1">
                     <Label htmlFor="privacy-consent" className="text-sm font-medium cursor-pointer">
-                      Accetto termini e condizioni *
+                      Accetto<Link href="/privacy" className="underline ml-0">termini e condizioni</Link>*
                     </Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       Obbligatorio per procedere con la classificazione
