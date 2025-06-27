@@ -11,6 +11,9 @@ import {
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 import Image from "next/image";
 import {ModeToggle} from "@/components/theme-toggle";
+import {SignedIn, UserButton} from "@clerk/nextjs";
+
+import CustomSignIn from "@/components/sign-in";
 
 // Consistent styling for all main navigation links
 const menuLinkClass = "font-normal px-3 py-2 transition-colors hover:bg-accent rounded-md";
@@ -32,7 +35,7 @@ export const NavBar = (): ReactNode => {
                 <NavigationMenuList>
                     <NavigationMenuItem>
                         <NavigationMenuLink asChild>
-                            <Link href="/" className={menuLinkClass}>Progetto</Link>
+                            <Link href="/" className={menuLinkClass}>Home</Link>
                         </NavigationMenuLink>
                     </NavigationMenuItem>
                     <NavigationMenuItem>
@@ -93,7 +96,7 @@ export const NavBar = (): ReactNode => {
                 </NavigationMenuList>
             </NavigationMenu>
             <ModeToggle/>
-            <Avatar className="ml-2" aria-label="GitHub KgSum">
+            <Avatar className="ml-3 mr-3" aria-label="GitHub KgSum">
                 <Link
                     aria-label="https://github.com/mariocosenza/kgsum/"
                     href={"https://github.com/mariocosenza/kgsum/"}
@@ -102,6 +105,10 @@ export const NavBar = (): ReactNode => {
                     <AvatarFallback>GH</AvatarFallback>
                 </Link>
             </Avatar>
+            <SignedIn>
+                <UserButton/>
+            </SignedIn>
+            <CustomSignIn/>
         </nav>
     );
 };
