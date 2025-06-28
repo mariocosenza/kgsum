@@ -3,7 +3,7 @@ version: '3.8'
 services:
   ml:
     build:
-      context: ../  # project root
+      context: ../
       dockerfile: docker/ml/Dockerfile
     container_name: ml-service
     ports:
@@ -13,11 +13,14 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_API_KEY_2=${GEMINI_API_KEY_2}
       - LOCAL_ENDPOINT_LOV=${LOCAL_ENDPOINT_LOV}
+      - SECRET_KEY=${SECRET_KEY}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
     restart: unless-stopped
+    command: ["bash", "boot.sh"]
 
   kgsum-frontend:
     build:
-      context: ../  # project root
+      context: ../
       dockerfile: docker/web/Dockerfile
       args:
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
