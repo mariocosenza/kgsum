@@ -1,11 +1,8 @@
-// src/app/documentazione/[versione]/page.tsx
-
 import {redirect} from "next/navigation";
 import {DocumentTemplate} from "@/components/document-template";
 import fs from 'fs/promises';
 import path from 'path';
 import {VERSIONS} from "@/components/VERSIONS";
-
 
 export async function generateStaticParams() {
     return VERSIONS.map((versione) => ({
@@ -17,14 +14,17 @@ function checkVersion(version: string): boolean {
     return VERSIONS.includes(version);
 }
 
-export default async function SelectedVersionPage({ params }: { params: { versione: string } }) {
+export default async function SelectedVersionPage({ params }: { params: Promise<{ versione: string }> }) {
+    // Await the params Promise
+    const resolvedParams = await params;
+
     // 1. Basic version check and redirect
-    if (params.versione !== 'latest') {
-        if (!checkVersion(params.versione)) {
+    if (resolvedParams.versione !== 'latest') {
+        if (!checkVersion(resolvedParams.versione)) {
             redirect("/documentazione/latest");
         }
-    }  else {
-        params.versione = VERSIONS[VERSIONS.length - 1]
+    } else {
+        resolvedParams.versione = VERSIONS[VERSIONS.length - 1];
     }
 
     let content: string;
@@ -33,7 +33,7 @@ export default async function SelectedVersionPage({ params }: { params: { versio
         // process.cwd() is your project root.
         // Assuming your markdown files are in `src/docs/`
         const markdownDocsDirectory = path.join(process.cwd(), 'src', 'app', 'documentazione', '[versione]');
-        const filePath = path.join(markdownDocsDirectory, `${params.versione}.md`);
+        const filePath = path.join(markdownDocsDirectory, `${resolvedParams.versione}.md`);
 
         // Add a console.log to debug the exact path being attempted
         console.log(`Attempting to read file: ${filePath}`);
