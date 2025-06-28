@@ -1,5 +1,5 @@
 ALLOWED_EXTENSIONS = {'xml', 'trig', 'ttl', 'nq', 'nt', 'rdf'}
-UPLOAD_FOLDER = 'C:/Users/proge/Downloads'
+UPLOAD_FOLDER = './'
 
 def allowed_file(filename):
     return '.' in filename and \
