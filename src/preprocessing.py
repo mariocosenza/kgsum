@@ -31,35 +31,45 @@ SPACY_LANGS = {
     "pt": "pt_core_news_lg",
 }
 
-# --- LOAD SPACY PIPELINES ON MODULE IMPORT ---
 USE_GPU_ON_IMPORT = False  # Set True to always use GPU at import
 
-def _load_spacy_pipelines(use_gpu: bool = False):
+def _load_spacy_pipelines_on_demand(use_gpu: bool = False):
+    """Returns an empty dict, pipelines will be loaded on demand."""
     if use_gpu:
         try:
             spacy.require_gpu()
             logger.info("spaCy using GPU for pipeline(s)")
         except Exception as e:
             logger.warning("Could not enable spaCy GPU mode: %s", e)
+    return {}, None  # Pipelines will be loaded only when needed
 
-    pipeline_dict: dict[str, spacy.language.Language] = {}
-    for lang_code, model_name in SPACY_LANGS.items():
+pipeline_dict, fallback_pipeline = _load_spacy_pipelines_on_demand(use_gpu=USE_GPU_ON_IMPORT)
+
+def get_or_load_pipeline(lang_code: str, pipeline_dict_local=None, fallback_pipeline_local=None):
+    """Loads and returns the spacy pipeline for a given lang_code, loading on demand."""
+    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
+    use_fallback = fallback_pipeline_local if fallback_pipeline_local is not None else fallback_pipeline
+
+    if lang_code in use_dict:
+        return use_dict[lang_code]
+    if lang_code in SPACY_LANGS:
+        model_name = SPACY_LANGS[lang_code]
         try:
-            pipeline_dict[lang_code] = spacy.load(model_name)
+            nlp = spacy.load(model_name)
+            use_dict[lang_code] = nlp
             logger.info("Loaded spaCy pipeline for '%s': %s", lang_code, model_name)
+            return nlp
         except Exception as e:
             logger.warning("SpaCy pipeline missing for '%s' (%s): %s", lang_code, model_name, e)
-
-    # Fallback: a lightweight multilingual UD model, or English
-    try:
-        fallback_pipeline: spacy.language.Language = spacy.load("xx_sent_ud_sm")
-        logger.info("Loaded fallback multilingual pipeline: xx_sent_ud_sm")
-    except Exception as e:
-        logger.warning("Error loading multilingual fallback pipeline: %s", e)
-        fallback_pipeline = pipeline_dict.get("en") or spacy.blank("en")
-    return pipeline_dict, fallback_pipeline
-
-pipeline_dict, fallback_pipeline = _load_spacy_pipelines(use_gpu=USE_GPU_ON_IMPORT)
+    # Fallback: try to load multilingual, or fallback to English blank
+    if "xx" not in use_dict:
+        try:
+            use_dict["xx"] = spacy.load("xx_sent_ud_sm")
+            logger.info("Loaded fallback multilingual pipeline: xx_sent_ud_sm")
+        except Exception as e:
+            logger.warning("Error loading multilingual fallback pipeline: %s", e)
+            use_dict["xx"] = spacy.blank("en")
+    return use_dict["xx"]
 
 def setup_spacy_pipelines(use_gpu: bool = False):
     global pipeline_dict, fallback_pipeline
@@ -67,8 +77,8 @@ def setup_spacy_pipelines(use_gpu: bool = False):
 
 def get_spacy_lang_code(detected: str, pipeline_dict_local=None) -> str:
     """Return spaCy-supported language code if available, else 'xx'."""
-    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
-    return detected if detected in use_dict else "xx"
+    # We now only load on demand, so just check if supported
+    return detected if detected in SPACY_LANGS else "xx"
 
 # --- 2) Language Detection via langdetect ---
 
@@ -77,12 +87,11 @@ def find_language(text: Any, pipeline_dict_local=None) -> str:
     Return the detected language code of `text` using langdetect.
     If detection fails, default to "xx".
     """
-    use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
     if not isinstance(text, str) or not text:
         return "xx"
     try:
         code = detect(text)
-        return get_spacy_lang_code(code, use_dict)
+        return get_spacy_lang_code(code)
     except LangDetectException:
         return "xx"
     except Exception as exc:
@@ -109,7 +118,7 @@ def spacy_clean_normalize_batch(texts, pipeline_dict_local=None, fallback_pipeli
         lang2idxs[lang].append(idx)
     result = ["" for _ in texts]
     for lang, idxs in lang2idxs.items():
-        nlp = use_dict.get(lang, use_fallback)
+        nlp = get_or_load_pipeline(lang, use_dict, use_fallback)
         sub_texts = [texts[i] for i in idxs]
         for doc, i in zip(nlp.pipe(sub_texts, batch_size=batch_size, n_process=n_process), idxs):
             tokens = [
@@ -204,7 +213,7 @@ def extract_named_entities(lab_list: Any, pipeline_dict_local=None, fallback_pip
         if not isinstance(text, str) or not text:
             continue
         lang_code = find_language(text, use_dict)
-        chosen_nlp = use_dict.get(lang_code, use_fallback)
+        chosen_nlp = get_or_load_pipeline(lang_code, use_dict, use_fallback)
         try:
             doc = chosen_nlp(text)
             for ent in doc.ents:
@@ -460,7 +469,7 @@ def process_all_from_input(
 
 def main(use_ner: bool = True, use_gpu: bool = False, batch_size: int = 32, n_process: int = 1) -> None:
     logger.info("Starting preprocessing workflow. NER enabled: %s, GPU enabled: %s, n_process: %d", use_ner, use_gpu, n_process)
-    # NOTE: uses globally loaded pipeline_dict and fallback_pipeline
+    # NOTE: uses globally loaded pipeline_dict and fallback_pipeline, pipelines are loaded on demand
     df = merge_dataset()
     logger.info("Merged dataset contains %d rows.", len(df))
     combined_df = preprocess_combined(df, pipeline_dict, fallback_pipeline, use_ner=use_ner, batch_size=batch_size, n_process=n_process)

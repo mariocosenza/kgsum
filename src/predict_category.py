@@ -33,7 +33,10 @@ class CategoryPredictor:
     @staticmethod
     def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample = True):
         combined_df_path = os.path.join(get_project_root(), 'data', 'processed', 'combined.json')
-        combined_df = pd.read_json(combined_df_path)
+        if os.path.exists(combined_df_path):
+            combined_df = pd.read_json(combined_df_path)
+        else:
+            combined_df = pd.DataFrame()
         if feature_columns is None:
             feature_columns = ["curi"]
         file_path = get_model_file_path()
