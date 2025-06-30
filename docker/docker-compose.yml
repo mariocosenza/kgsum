@@ -13,6 +13,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_API_KEY_2=${GEMINI_API_KEY_2}
       - LOCAL_ENDPOINT_LOV=${LOCAL_ENDPOINT_LOV}
+      - LOCAL_ENDPOINT=${LOCAL_ENDPOINT}
       - SECRET_KEY=${SECRET_KEY}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
     restart: unless-stopped
@@ -46,3 +47,20 @@ services:
       - "project=kgsum-frontend"
     depends_on:
       - ml
+
+  graphdb:
+    build:
+      context: ../
+      dockerfile: docker/graphdb/Dockerfile
+    container_name: graphdb
+    ports:
+      - "7200:7200"
+    environment:
+      - TZ=UTC
+    restart: unless-stopped
+    volumes:
+      # Optional: persist GraphDB data
+      - graphdb_data:/opt/graphdb/home
+
+volumes:
+  graphdb_data:
