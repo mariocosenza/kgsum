@@ -1,0 +1,39 @@
+name: Run Docker Compose
+
+on:
+  push:
+    paths:
+      - 'docker/docker-compose.yml'
+      - '.github/workflows/docker-compose.yml'
+  pull_request:
+    paths:
+      - 'docker/docker-compose.yml'
+      - '.github/workflows/docker-compose.yml'
+
+jobs:
+  docker-compose:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v3
+
+      - name: Run docker-compose up
+        working-directory: ./docker
+        run: docker-compose up -d
+
+      - name: Show running containers
+        run: docker ps -a
+
+      # Optionally, add your own test/health checks here
+
+      - name: Tear down docker-compose
+        if: always()
+        working-directory: ./docker
+        run: docker-compose down
