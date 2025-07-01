@@ -226,6 +226,42 @@ def find_voc_local_combined(voc_list: list) -> list:
     return list(all_tags)
 
 
+def find_voc_tags_from_list(voc_list: list) -> list:
+    sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
+    sparql.setReturnFormat(JSON)
+    count = 0
+    tags = list(str)
+    for voc in set(voc_list):
+        if count == 10000:
+            time.sleep(60)
+            count = 0
+        count += 1
+        logger.info(f'Processing voc {voc}')
+        if IS_URI.match(voc):
+            try:
+                sparql.setQuery(f"""
+                       PREFIX dcat: <http://www.w3.org/ns/dcat#>
+                       SELECT ?o WHERE {{
+                            <{voc}> dcat:keyword ?o .
+                       }} LIMIT 10
+                       """)
+                res = sparql.query().convert()
+                voc_tags = {term['o']['value'] for term in res['results']['bindings']}
+                if voc_tags:
+                    tags = tags.union(voc_tags)
+            except Exception as e:
+                logger.error(f'Error processing voc {voc}: {e}')
+                time.sleep(2)
+                continue
+
+    return tags
+
+def find_comments_from_lists(curi_list: list, puri_list: list) -> list:
+    comments = _process_row(set(curi_list))
+    comments.extend(_process_row(set(puri_list)))
+    return list(comments)
+
+
 def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
     logger.info('Started processing LOV data')
     voc_tags_df = find_voc_local(data_frame)
