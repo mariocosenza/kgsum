@@ -17,7 +17,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
     restart: unless-stopped
-    command: ["bash", "boot.sh"]
+#     command: ["bash", "boot.sh"]
 
   kgsum-frontend:
     build:
