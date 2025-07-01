@@ -1,7 +1,7 @@
 import hashlib
 import os
 import re
-
+import logging
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper
 
@@ -48,6 +48,8 @@ VOC_FILTER = {
     'http://xmls.com/foaf/0.1'
 }
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def is_curi_allowed(uri: str) -> bool:
     for url in CURI_PURI_FILTER:
@@ -84,7 +86,7 @@ def is_endpoint_working(endpoint) -> bool:
             return False
         result.convert()
         return True
-    except Exception as e:
+    except Exception as _:
         return False
 
 
