@@ -7,16 +7,16 @@ from typing import Any
 
 import pandas as pd
 import spacy
+from pandas import Series
 
-# --- language detection: use langdetect ---
+from src.util import is_curi_allowed, is_voc_allowed  # <-- import your filter logic
+
 from langdetect import detect, DetectorFactory, LangDetectException
 
 DetectorFactory.seed = 42
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# --- 1) SpaCy setup (full pipeline) with GPU option ---
 
 SPACY_LANGS = {
     "en": "en_core_web_trf",
@@ -31,22 +31,20 @@ SPACY_LANGS = {
     "pt": "pt_core_news_lg",
 }
 
-USE_GPU_ON_IMPORT = False  # Set True to always use GPU at import
+USE_GPU_ON_IMPORT = False
 
-def _load_spacy_pipelines_on_demand(use_gpu: bool = False):
-    """Returns an empty dict, pipelines will be loaded on demand."""
-    if use_gpu:
+def _load_spacy_pipelines_on_demand(enable_gpu: bool = False):
+    if enable_gpu:
         try:
             spacy.require_gpu()
             logger.info("spaCy using GPU for pipeline(s)")
-        except Exception as e:
-            logger.warning("Could not enable spaCy GPU mode: %s", e)
-    return {}, None  # Pipelines will be loaded only when needed
+        except Exception as exc:
+            logger.warning("Could not enable spaCy GPU mode: %s", exc)
+    return {}, None
 
-pipeline_dict, fallback_pipeline = _load_spacy_pipelines_on_demand(use_gpu=USE_GPU_ON_IMPORT)
+pipeline_dict, fallback_pipeline = _load_spacy_pipelines_on_demand(enable_gpu=USE_GPU_ON_IMPORT)
 
 def get_or_load_pipeline(lang_code: str, pipeline_dict_local=None, fallback_pipeline_local=None):
-    """Loads and returns the spacy pipeline for a given lang_code, loading on demand."""
     use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
     use_fallback = fallback_pipeline_local if fallback_pipeline_local is not None else fallback_pipeline
 
@@ -59,34 +57,30 @@ def get_or_load_pipeline(lang_code: str, pipeline_dict_local=None, fallback_pipe
             use_dict[lang_code] = nlp
             logger.info("Loaded spaCy pipeline for '%s': %s", lang_code, model_name)
             return nlp
-        except Exception as e:
-            logger.warning("SpaCy pipeline missing for '%s' (%s): %s", lang_code, model_name, e)
-    # Fallback: try to load multilingual, or fallback to English blank
+        except Exception as exc:
+            logger.warning("SpaCy pipeline missing for '%s' (%s): %s", lang_code, model_name, exc)
+    # Use fallback if available, otherwise set to blank
     if "xx" not in use_dict:
-        try:
-            use_dict["xx"] = spacy.load("xx_sent_ud_sm")
-            logger.info("Loaded fallback multilingual pipeline: xx_sent_ud_sm")
-        except Exception as e:
-            logger.warning("Error loading multilingual fallback pipeline: %s", e)
-            use_dict["xx"] = spacy.blank("en")
+        if use_fallback is not None:
+            use_dict["xx"] = use_fallback
+            logger.info("Loaded fallback pipeline from provided fallback_pipeline.")
+        else:
+            try:
+                use_dict["xx"] = spacy.load("xx_sent_ud_sm")
+                logger.info("Loaded fallback multilingual pipeline: xx_sent_ud_sm")
+            except Exception as exc:
+                logger.warning("Error loading multilingual fallback pipeline: %s", exc)
+                use_dict["xx"] = spacy.blank("en")
     return use_dict["xx"]
 
-def setup_spacy_pipelines(use_gpu: bool = False):
+def setup_spacy_pipelines(enable_gpu: bool = False):
     global pipeline_dict, fallback_pipeline
     return pipeline_dict, fallback_pipeline
 
-def get_spacy_lang_code(detected: str, pipeline_dict_local=None) -> str:
-    """Return spaCy-supported language code if available, else 'xx'."""
-    # We now only load on demand, so just check if supported
+def get_spacy_lang_code(detected: str) -> str:
     return detected if detected in SPACY_LANGS else "xx"
 
-# --- 2) Language Detection via langdetect ---
-
 def find_language(text: Any, pipeline_dict_local=None) -> str:
-    """
-    Return the detected language code of `text` using langdetect.
-    If detection fails, default to "xx".
-    """
     if not isinstance(text, str) or not text:
         return "xx"
     try:
@@ -98,20 +92,12 @@ def find_language(text: Any, pipeline_dict_local=None) -> str:
         logger.error("Error in find_language(\"%s\"): %s", str(text)[:50], exc)
         return "xx"
 
-# --- 3) spaCy batch normalization for selected features ---
-
 def spacy_clean_normalize_batch(texts, pipeline_dict_local=None, fallback_pipeline_local=None, batch_size=32, n_process=1):
-    """
-    Processes a list of texts using spaCy's full pipeline in batches, with multiprocessing.
-    Returns a list of normalized strings.
-    """
     use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
     use_fallback = fallback_pipeline_local if fallback_pipeline_local is not None else fallback_pipeline
     if not isinstance(texts, list) or not texts:
         return []
-    # Detect languages for each text
     langs = [find_language(text, use_dict) if isinstance(text, str) and text else "xx" for text in texts]
-    # Group texts by language for efficient batching
     from collections import defaultdict
     lang2idxs = defaultdict(list)
     for idx, lang in enumerate(langs):
@@ -130,12 +116,9 @@ def spacy_clean_normalize_batch(texts, pipeline_dict_local=None, fallback_pipeli
     return result
 
 def spacy_clean_normalize(text, pipeline_dict_local=None, fallback_pipeline_local=None, batch_size=32, n_process=1):
-    """Single string normalize (for string fields), using batch for uniformity."""
     if not isinstance(text, str) or not text:
         return ""
     return spacy_clean_normalize_batch([text], pipeline_dict_local, fallback_pipeline_local, batch_size, n_process)[0]
-
-# --- 4) Utility functions ---
 
 def sanitize_field(value: Any) -> Any:
     if isinstance(value, list) and not value:
@@ -196,14 +179,7 @@ def remove_empty_list_values(df: pd.DataFrame) -> pd.DataFrame:
         return x
     return df.map(_replacer)
 
-# --- 5) NER extraction for lab (optional) ---
-
 def extract_named_entities(lab_list: Any, pipeline_dict_local=None, fallback_pipeline_local=None, use_ner: bool = True) -> list[str]:
-    """
-    For each string in lab_list, detect its language, use the appropriate spaCy pipeline
-    (falling back to xx if language is not supported), and collect unique entity labels.
-    If use_ner is False, return [].
-    """
     if not use_ner or not isinstance(lab_list, list):
         return []
     use_dict = pipeline_dict_local if pipeline_dict_local is not None else pipeline_dict
@@ -219,11 +195,9 @@ def extract_named_entities(lab_list: Any, pipeline_dict_local=None, fallback_pip
             for ent in doc.ents:
                 if ent.label_:
                     entity_types.add(ent.label_)
-        except Exception as e:
-            logger.error("NER failure on \"%s\": %s", text[:50], e)
+        except Exception as exc:
+            logger.error("NER failure on \"%s\": %s", text[:50], exc)
     return sorted(entity_types)
-
-# --- 6) I/O / merging functions ---
 
 DATA_DIR = "../data"
 RAW_DIR = os.path.join(DATA_DIR, "raw")
@@ -283,28 +257,77 @@ def merge_void_dataset() -> pd.DataFrame:
         merged = merged.drop_duplicates(subset="id", keep="last")
     return merged
 
-# --- 7) Row‐level processing ---
+def filter_uri_list(uri_list, filter_func=None):
+    """Filter a list of URIs by a provided filter function."""
+    if not isinstance(uri_list, list):
+        uri_list = [uri_list] if isinstance(uri_list, str) and uri_list else []
+    if filter_func is not None:
+        return [uri for uri in uri_list if filter_func(uri)]
+    return uri_list
 
-def process_row(row: dict[str, Any], idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> tuple[str, str, str]:
+def extract_local_names(uri_list):
+    """Extract local names (after # or /) from a list of URIs."""
+    local_names = set()
+    for uri in uri_list:
+        if not uri or not isinstance(uri, str):
+            continue
+        if "#" in uri:
+            local_name = uri.split("#")[-1]
+        elif "/" in uri:
+            local_name = uri.rstrip("/").split("/")[-1]
+        else:
+            local_name = uri
+        if local_name:
+            local_names.add(local_name)
+    return sorted(local_names)
+
+def process_row(
+    row: dict[str, Any] | Series,
+    idx: int,
+    total: int,
+    pipeline_dict=None,
+    fallback_pipeline=None,
+    batch_size=32,
+    n_process=1,
+    enable_filter: bool = True  # <-- new parameter
+) -> tuple[str, list[str], list[str], list[str], list[str], list[str]]:
     logger.info(" Processing row %d/%d …", idx, total)
-    # Normalize lab (list), lcn (string), lpn (string)
+    # Normalize lab (list)
     lab_batch_normalized = spacy_clean_normalize_batch(row.get("lab", []), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
     lab_text = " ".join(lab_batch_normalized)
-    lcn_text = spacy_clean_normalize(normalize_text_list(row.get("lcn", [])), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
-    lpn_text = spacy_clean_normalize(normalize_text_list(row.get("lpn", [])), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
+    # --- Filter and extract lcn/lpn here ---
+    # Filter curi/puri/voc at preprocessing time if enabled
+    if enable_filter:
+        curi = filter_uri_list(sanitize_field(row.get("curi", [])), is_curi_allowed)
+        puri = filter_uri_list(sanitize_field(row.get("puri", [])), is_voc_allowed)
+        voc = filter_uri_list(sanitize_field(row.get("voc", [])), is_voc_allowed)
+    else:
+        curi = sanitize_field(row.get("curi", []))
+        puri = sanitize_field(row.get("puri", []))
+        voc = sanitize_field(row.get("voc", []))
+    # Local names
+    lcn = extract_local_names(curi)
+    lpn = extract_local_names(puri)
     logger.info(" Completed row %d/%d.", idx, total)
-    return lab_text, lcn_text, lpn_text
+    return lab_text, lcn, lpn, curi, puri, voc
 
-def preprocess_combined(input_frame: pd.DataFrame, pipeline_dict, fallback_pipeline, use_ner: bool = True, batch_size=32, n_process=1) -> pd.DataFrame:
+def preprocess_combined(
+    input_frame: pd.DataFrame,
+    pipeline_dict,
+    fallback_pipeline,
+    use_ner: bool = True,
+    batch_size=32,
+    n_process=1,
+    enable_filter: bool = True
+) -> pd.DataFrame:
     total = len(input_frame)
     combined_rows: list[dict[str, Any]] = []
     for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
-        lab_text, lcn_text, lpn_text = process_row(row, i, total, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
+        lab_text, lcn, lpn, curi, puri, voc = process_row(
+            row, i, total, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process, enable_filter=enable_filter
+        )
         title_raw = sanitize_field(row.get("title", ""))
-        title = title_raw  # No normalization for title
-        curi = sanitize_field(row.get("curi", ""))
-        puri = sanitize_field(row.get("puri", ""))
-        voc = sanitize_field(row.get("voc", ""))
+        title = title_raw
         tlds = sanitize_field(row.get("tlds", ""))
         sparql = sanitize_field(row.get("sparql", ""))
         creator = row.get("creator", "")
@@ -319,8 +342,8 @@ def preprocess_combined(input_frame: pd.DataFrame, pipeline_dict, fallback_pipel
             "category": row.get("category", ""),
             "title": title,
             "lab": lab_text,
-            "lcn": lcn_text,
-            "lpn": lpn_text,
+            "lcn": lcn,
+            "lpn": lpn,
             "curi": curi,
             "puri": puri,
             "voc": voc,
@@ -336,7 +359,7 @@ def preprocess_combined(input_frame: pd.DataFrame, pipeline_dict, fallback_pipel
     logger.info("Combined processing complete: %d/%d.", len(combined_df), total)
     return combined_df
 
-def process_void_row(row: dict[str, Any], idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> dict[str, str]:
+def process_void_row(row: dict[str, Any] | Series, idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> dict[str, str]:
     logger.info(" Processing void row %d/%d …", idx, total)
     dsc_text = spacy_clean_normalize(normalize_text_list(row.get("dsc", [])), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
     sbj_text = spacy_clean_normalize(normalize_text_list(row.get("sbj", [])), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
@@ -378,12 +401,9 @@ def combine_with_void_and_lov_data(
     final = combine_with_void(temp, lov_df)
     return final
 
-# --- 8) LOV data processing ---
-
-def process_lov_data_row(row: dict[str, Any], idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> dict[str, Any]:
+def process_lov_data_row(row: dict[str, Any] | Series, idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> dict[str, Any]:
     logger.info(" Processing LOV row %d/%d …", idx, total)
     tags = sanitize_field(row.get("tags", []))
-    # Flatten comments field before batch processing
     def _flatten(l):
         for el in l:
             if isinstance(el, list):
@@ -413,19 +433,13 @@ def preprocess_lov_data(input_frame: pd.DataFrame, pipeline_dict=None, fallback_
     logger.info("LOV processing complete: %d/%d.", len(out_df), total)
     return out_df
 
-# --- 9) End‐to‐end helpers ---
-
 def process_all_from_input(
     input_data: Any,
     use_ner: bool = True,
     batch_size: int = 32,
     n_process: int = 1,
-    use_gpu: bool = False,
+    enable_filter: bool = True
 ) -> dict[str, list[Any]]:
-    """
-    Self-contained: sets up spaCy pipelines internally and processes the input.
-    """
-    # NOTE: now uses globally loaded pipeline_dict and fallback_pipeline
     if isinstance(input_data, dict):
         converted: dict[str, list[Any]] = {}
         for k, v in input_data.items():
@@ -442,7 +456,7 @@ def process_all_from_input(
     logger.info("Converted input data to DataFrame (%d rows).", len(df))
     combined_df = preprocess_combined(
         df, pipeline_dict, fallback_pipeline,
-        use_ner=use_ner, batch_size=batch_size, n_process=n_process
+        use_ner=use_ner, batch_size=batch_size, n_process=n_process, enable_filter=enable_filter
     )
     void_df = preprocess_void(
         df, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process
@@ -451,11 +465,11 @@ def process_all_from_input(
         "id": remove_duplicates(combined_df["id"].tolist()),
         "title": remove_duplicates(combined_df["title"].tolist()),
         "lab": remove_duplicates(combined_df["lab"].tolist()),
-        "lcn": remove_duplicates(combined_df["lcn"].tolist()),
-        "lpn": remove_duplicates(combined_df["lpn"].tolist()),
-        "curi": remove_duplicates(combined_df["curi"].tolist()),
-        "puri": remove_duplicates(combined_df["puri"].tolist()),
-        "voc": remove_duplicates(combined_df["voc"].tolist()),
+        "lcn": remove_duplicates(sum(combined_df["lcn"].tolist(), [])),
+        "lpn": remove_duplicates(sum(combined_df["lpn"].tolist(), [])),
+        "curi": remove_duplicates(sum(combined_df["curi"].tolist(), [])),
+        "puri": remove_duplicates(sum(combined_df["puri"].tolist(), [])),
+        "voc": remove_duplicates(sum(combined_df["voc"].tolist(), [])),
         "tlds": remove_duplicates(combined_df["tlds"].tolist()),
         "sparql": remove_duplicates(combined_df["sparql"].tolist()),
         "creator": remove_duplicates(combined_df["creator"].tolist()),
@@ -467,12 +481,11 @@ def process_all_from_input(
         "con": remove_duplicates(combined_df["con"].tolist()),
     }
 
-def main(use_ner: bool = True, use_gpu: bool = False, batch_size: int = 32, n_process: int = 1) -> None:
-    logger.info("Starting preprocessing workflow. NER enabled: %s, GPU enabled: %s, n_process: %d", use_ner, use_gpu, n_process)
-    # NOTE: uses globally loaded pipeline_dict and fallback_pipeline, pipelines are loaded on demand
+def main(use_ner: bool = True, use_gpu: bool = False, batch_size: int = 32, n_process: int = 1, enable_filter: bool = True) -> None:
+    logger.info("Starting preprocessing workflow. NER enabled: %s, GPU enabled: %s, n_process: %d, filter enabled: %s", use_ner, use_gpu, n_process, enable_filter)
     df = merge_dataset()
     logger.info("Merged dataset contains %d rows.", len(df))
-    combined_df = preprocess_combined(df, pipeline_dict, fallback_pipeline, use_ner=use_ner, batch_size=batch_size, n_process=n_process)
+    combined_df = preprocess_combined(df, pipeline_dict, fallback_pipeline, use_ner=use_ner, batch_size=batch_size, n_process=n_process, enable_filter=enable_filter)
     logger.info("After combined preprocessing: %d rows.", len(combined_df))
     void_df = preprocess_void(merge_void_dataset(), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
     logger.info("After void preprocessing: %d rows.", len(void_df))
@@ -488,10 +501,17 @@ def main(use_ner: bool = True, use_gpu: bool = False, batch_size: int = 32, n_pr
     logger.info("Preprocessing complete. Saved to %s", output_path)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Preprocess dataset with optional NER, GPU, and parallelism.")
-    parser.add_argument("--no-ner", type=bool, default=False, help="Disable NER and set ner field to [].")
-    parser.add_argument("--gpu", type=bool, default=False, help="Enable GPU for spaCy pipelines if available.")
+    parser = argparse.ArgumentParser(description="Preprocess dataset with optional NER, GPU, filter and parallelism.")
+    parser.add_argument("--no-ner", action="store_true", help="Disable NER and set ner field to [].")
+    parser.add_argument("--gpu", action="store_true", help="Enable GPU for spaCy pipelines if available.")
     parser.add_argument("--batch-size", type=int, default=32, help="spaCy batch size.")
     parser.add_argument("--n-process", type=int, default=1, help="Number of processes for spaCy batching (CPU only).")
+    parser.add_argument("--no-filter", action="store_true", help="Disable the filter checks for is_*_allowed.")
     args = parser.parse_args()
-    main(use_ner=not args.no_ner, use_gpu=args.gpu, batch_size=args.batch_size, n_process=args.n_process)
+    main(
+        use_ner=not args.no_ner,
+        use_gpu=args.gpu,
+        batch_size=args.batch_size,
+        n_process=args.n_process,
+        enable_filter=not args.no_filter
+    )
