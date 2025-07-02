@@ -1,13 +1,19 @@
 import functools
 import os
 
+import jwt
 import psutil
 from flasgger import Swagger
-from flask import Flask, request, jsonify
+from flask import Flask
+from flask import request, jsonify, g
 from werkzeug.utils import secure_filename
 
 from src.service.file_upload_service import UPLOAD_FOLDER, allowed_file
 from src.service.generate_profile_service import generate_profile_service_store, generate_profile_service
+
+AUTH = os.getenv("CLERK_MIDDLEWARE_ENABLED", "false").lower()
+# PEM public key as string
+PUBLIC_KEY = ""  #TODO add read from file
 
 app = Flask(__name__)
 
@@ -20,6 +26,29 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 active_requests = 0
 
+
+def clerk_jwt_required(fn):
+    @functools.wraps(fn)
+    async def wrapper(*args, **kwargs):
+        if AUTH == "true":
+            auth_header = request.headers.get("Authorization", None)
+            if not auth_header or not auth_header.startswith("Bearer "):
+                return jsonify({"error": "Missing or invalid Authorization header"}), 401
+            token = auth_header.split(" ", 1)[1]
+            try:
+                payload = jwt.decode(
+                    token,
+                    PUBLIC_KEY,
+                    algorithms=["RS256"],
+                    options={"verify_aud": False}
+                )
+                g.current_user = payload
+            except jwt.PyJWTError as e:
+                return jsonify({"error": f"Token validation error: {str(e)}"}), 401
+
+        return await fn(*args, **kwargs)
+
+    return wrapper
 
 def check_system_load(func):
     @functools.wraps(func)
@@ -46,8 +75,10 @@ def check_system_load(func):
     return wrapper
 
 
+# ----- Endpoints -----
 @app.route('/api/v1/profile/sparql', methods=['POST'])
 @check_system_load
+@clerk_jwt_required
 async def sparql_profile():
     """
     Generate a profile from a SPARQL endpoint.
@@ -113,6 +144,7 @@ async def sparql_profile():
 
 @app.route('/api/v1/profile/file', methods=['POST'])
 @check_system_load
+@clerk_jwt_required
 async def rdf_profile():
     """
     Generate a profile from an uploaded RDF file.

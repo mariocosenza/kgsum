@@ -31,10 +31,6 @@ RUN /opt/conda/envs/myenv/bin/python -m spacy download de_dep_news_trf \
  && /opt/conda/envs/myenv/bin/python -m spacy download zh_core_web_trf
 
 ENV PATH="/opt/conda/envs/myenv/bin:$PATH"
-ENV GEMINI_API_KEY=${GEMINI_API_KEY}
-ENV GEMINI_API_KEY_2=${GEMINI_API_KEY_2}
-ENV LOCAL_ENDPOINT_LOV=${LOCAL_ENDPOINT_LOV}
-ENV LOCAL_ENDPOINT=${LOCAL_ENDPOINT}
 
 EXPOSE 5000
 
