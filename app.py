@@ -13,7 +13,7 @@ from src.service.generate_profile_service import generate_profile_service_store,
 
 AUTH = os.getenv("CLERK_MIDDLEWARE_ENABLED", "false").lower()
 # PEM public key as string
-PUBLIC_KEY = ""  #TODO add read from file
+PUBLIC_KEY = os.getenv("CLERK_MIDDLEWARE_PUBLIC_KEY", "false").lower()
 
 app = Flask(__name__)
 

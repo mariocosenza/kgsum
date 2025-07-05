@@ -192,7 +192,7 @@ def download_and_predict(g_client, download_folder, output_file="../../data/raw/
                 if id_int == 3000 and not use_ollama:
                     res = input('Change your IP to continue with free API or confirm current key (True to change IP):')
                     if bool(res):
-                        g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY_2"))
+                        g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
                 # Predict the category
                 if use_ollama:
