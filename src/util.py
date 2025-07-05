@@ -5,8 +5,21 @@ import logging
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Robust path resolution ---
+def get_project_root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def get_data_folder_path():
+    return os.path.join(get_project_root(), 'data', 'trained')
+
+def get_model_file_path():
+    return os.path.join(get_data_folder_path(), 'multiple_models.pkl')
+
 # Precompile the regex used to extract the file number
-FILE_NUM_REGEX = re.compile(r'(\d+).*\.((?:rdf)|(?:nt)|(?:ttl)|(?:nq))$', re.IGNORECASE)
+FILE_NUM_REGEX    = re.compile(r'(\d+).*\.(?:rdf|nt|ttl|nq)$', re.IGNORECASE)
 FILE_STRING_REGEX = re.compile(r'-(.*)\.')
 
 CATEGORIES = {
@@ -23,33 +36,17 @@ LOD_CATEGORY_NO_USER_DOMAIN = {
     'linguistics', 'media', 'publications', 'social_networking'
 }
 
-CURI_PURI_FILTER = {
-    'http://www.w3.org/2002/07/owl',
-    'http://www.w3.org/2004/02/skos/core',
-    'http://www.w3.org/2000/01/rdf-schema',
-    'http://www.w3.org/1999/02/22-rdf-syntax-ns',
-    'http://www.w3.org/ns/shacl',
-    'http://www.w3.org/ns/prov',
-    'http://rdfs.org/ns/void#Dataset'
-}
 
-VOC_FILTER = {
-    'http://purl.org/dc/terms',
-    'http://purl.org/vocab/vann',
-    'http://purl.org/dc/elements/1.1',
-    'http://schema.org',
-    'https://schema.org',
-    'http://dbpedia.org/property',
-    'http://dbpedia.org/ontology',
-    'http://xmlns.com/foaf/0.1',
-    'http://example.org',
-    'http://yoshimi.sourceforge.net/lv2_plugin',
-    'http://rdfs.org/ns/void',
-    'http://xmls.com/foaf/0.1'
-}
+CURI_PURI_FILTER = set(pd.read_json(
+    os.path.join(get_project_root(), 'src', 'filter', 'filter.json'),
+    typ='series'
+)['CURI_PURI_FILTER'])
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+VOC_FILTER = set(pd.read_json(
+    os.path.join(get_project_root(), 'src', 'filter', 'filter.json'),
+    typ='series'
+)['VOC_FILTER'])
+
 
 def is_curi_allowed(uri: str) -> bool:
     for url in CURI_PURI_FILTER:

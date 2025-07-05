@@ -1,0 +1,37 @@
+{
+  "data_labeling" : {
+    "use_gemma" : "",
+    "use_gemini" : "",
+    "search_github": "",
+    "search_zenodo": "",
+    "search_lod_cloud": "",
+    "stop_before_merging": ""
+  },
+  "data-extraction": {
+    "start-offset": "",
+    "limit": "",
+    "save_range": "",
+    "extract_sparql": ""
+  },
+  "training" : {
+     "classifier": "NB",
+     "feature": "",
+     "oversample": "false",
+     "max_token": "",
+     "use_tfidf_autoencoder": ""
+  },
+  "processing" : {
+    "use_ner": "",
+    "use_filter": "",
+    "query_lov": ""
+  },
+  "profile": {
+    "store_profile_after_training": "",
+    "store_profile_on_run": "",
+    "base_domain": ""
+  },
+  "general_setting": {
+    "info": "",
+    "stop_phase": ""
+  }
+}

@@ -1,19 +1,12 @@
-import asyncio
 import logging
 import os.path
 
 from google import genai
 
 import dataset_extraction.github_search
-import dataset_preparation_remote
-import lov_data_preparation
-import preprocessing
+
 from dataset_extraction.github_search import download_and_predict
 from dataset_extraction.zenodo_records_extraction import process_zenodo_records_with_download, get_zenodo_records
-from dataset_preparation import create_local_dataset, create_local_void_dataset
-from generate_profile import generate_profile_from_store
-from pipeline_build import ClassifierType
-from predict_category import CategoryPredictor
 from service.endpoint_lod_service import extract_sparql_or_full_download_list, download_dataset
 from util import merge_github_sparql, merge_zenodo_sparql
 
@@ -64,42 +57,7 @@ def main():
             return
         merge_zenodo_sparql()
 
-    user_in = input('Would you like to extract data from dump and sparql endpoint? S | N')
-    if user_in.lower() == 's':
-        limit = int(input('Number of file to process least 10: '))
-        offset = int(input('Offset from begin: '))
-        limit = offset + limit
-        import multiprocessing
-        multiprocessing.freeze_support()
-        division = limit - offset % 10
-        if (limit - offset) == 10:
-            logger.exception('Value out of range')
-            return
-        for i in range(offset, limit - division, 10):
-            create_local_dataset(offset=offset, limit=limit)
-        if division != 0:
-            create_local_dataset(offset=limit - division, limit=limit)
-        create_local_void_dataset(offset=offset, limit=limit)
-        asyncio.run(dataset_preparation_remote.main_void())
-        asyncio.run(dataset_preparation_remote.main_normal())
-        try:
-            lov_data_preparation.main()
-        except Exception:
-            logger.exception('Check your GraphDB instance is running')
 
-    if not os.path.isfile(f'{base_folder}/data/processed/combined.json'):
-        preprocessing.main()
-        classi = input('What classifier do you would like to use? Default CNN, SVM, NB')
-        if classi.lower() == 'svm':
-            CategoryPredictor.get_predictor(ClassifierType.SVM)
-        elif classi.lower() == 'nb':
-            CategoryPredictor.get_predictor(ClassifierType.NAIVE_BAYES)
-
-    user_in = input('Would you like to generate a profile from the extracted data? S | N')
-    if user_in.lower() == 's':
-        asyncio.run(generate_profile_from_store())
-
-    return
 
 
 if __name__ == '__main__':

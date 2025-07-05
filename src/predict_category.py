@@ -6,21 +6,11 @@ import pandas as pd
 import src.pipeline_build
 from src.pipeline_build import ClassifierType, majority_vote, predict_category_multi, save_multiple_models, \
     load_multiple_models
+from util import get_project_root, get_model_file_path, get_data_folder_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Robust path resolution ---
-def get_project_root():
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-def get_data_folder_path():
-    return os.path.join(get_project_root(), 'data', 'trained')
-
-def get_model_file_path():
-    return os.path.join(get_data_folder_path(), 'multiple_models.pkl')
-
-# --------------------------------
 
 class CategoryPredictor:
     def __init__(self, models, training_results):

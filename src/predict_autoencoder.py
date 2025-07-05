@@ -8,21 +8,10 @@ import pandas as pd
 
 from autoencoder_pipeline import AutoencoderType, load_models, train_autoencoder_models, save_models, \
     predict_category_majority_vote
+from util import get_data_folder_path, get_project_root, get_model_file_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# --- Robust path resolution ---
-def get_project_root():
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-def get_data_folder_path():
-    return os.path.join(get_project_root(), "data", "trained")
-
-def get_model_file_path():
-    return os.path.join(get_data_folder_path(), "multiple_models_autoencoder.pkl")
-
-# --------------------------------
 
 FEATURES: list[str] = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments', 'tlds']
 AE_MODEL: AutoencoderType = AutoencoderType.BATCHNORM

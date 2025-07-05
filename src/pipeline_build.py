@@ -347,14 +347,16 @@ class KnowledgeGraphClassifier:
             return get_custom_tfidf_vectorizer(**kwargs)
         return get_custom_count_vectorizer(**kwargs)
 
-    def _clean_text(self, text: str) -> str:
+    @staticmethod
+    def _clean_text(text: str) -> str:
         text = re.sub(r"\[\s*\]", "", text)
         text = re.sub(r"\(\s*\)", "", text)
         text = re.sub(r"\{\s*\}", "", text)
         text = re.sub(r"\s+", " ", text)
         return text.strip()
 
-    def _prepare_features(self, frame: pd.DataFrame, feature_labels: FeatureLabels) -> pd.Series:
+    @staticmethod
+    def _prepare_features(frame: pd.DataFrame, feature_labels: FeatureLabels) -> pd.Series:
         import ast
         import json
 

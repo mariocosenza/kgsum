@@ -52,8 +52,9 @@ class OllamaGemmaPredictor:
         self.temperature = temperature
         self.num_predict = num_predict
 
-    def build_prompt(self, content, candidate_labels=None, system_message=None):
-        system = f"{system_message}\n" if system_message else ""
+    @staticmethod
+    def build_prompt(content, candidate_labels=None, system_message_internal=None):
+        system = f"{system_message_internal}\n" if system_message_internal else ""
         labels = f"Possible categories (choose only one, answer only with the category name, nothing else): {', '.join(candidate_labels)}."
         prompt = (
             f"""{system}
@@ -65,8 +66,8 @@ class OllamaGemmaPredictor:
         )
         return prompt
 
-    def predict(self, content, candidate_labels=None, system_message=None):
-        prompt = self.build_prompt(content, candidate_labels, system_message)
+    def predict(self, content, candidate_labels=None, system_message_internal=None):
+        prompt = self.build_prompt(content, candidate_labels, system_message_internal)
         response = ollama.generate(
             model=self.model_name,
             prompt=prompt,
@@ -98,7 +99,7 @@ class OllamaGemmaPredictor:
             frame,
             content_column,
             category_column,
-            system_message=None,
+            system_message_internal=None,
             output_column="predicted_category"
     ):
         candidate_labels = sorted(frame[category_column].dropna().unique())
@@ -113,7 +114,7 @@ class OllamaGemmaPredictor:
                 pred = self.predict(
                     content,
                     candidate_labels=candidate_labels,
-                    system_message=system_message
+                    system_message_internal=system_message_internal
                 )
                 preds.append(pred)
                 correct_so_far = sum(
@@ -167,8 +168,9 @@ class GeminiPredictor:
         # For rate limiting: keep timestamps of last requests
         self.request_times = []
 
-    def build_prompt(self, content, candidate_labels=None, system_message=None):
-        system = f"{system_message}\n" if system_message else ""
+    @staticmethod
+    def build_prompt(content, candidate_labels=None, system_message_internal=None):
+        system = f"{system_message_internal}\n" if system_message_internal else ""
         labels = f"Possible categories (choose only one, answer only with the category name, nothing else): {', '.join(candidate_labels)}."
         prompt = (f"""{system}
             {labels}\n
@@ -216,8 +218,8 @@ class GeminiPredictor:
                 wait_time *= 2  # Exponential backoff
         raise Exception("Max retries exceeded for generate_content (Gemini)")
 
-    def predict(self, content, candidate_labels=None, system_message=None):
-        prompt = self.build_prompt(content, candidate_labels, system_message)
+    def predict(self, content, candidate_labels=None, system_message_internal=None):
+        prompt = self.build_prompt(content, candidate_labels, system_message_internal)
         output = self.safe_generate_content(prompt)
         lines = [line for line in output.split("\n") if line.strip()]
         if not lines:
@@ -240,7 +242,7 @@ class GeminiPredictor:
             frame,
             content_column,
             category_column,
-            system_message=None,
+            system_message_internal=None,
             output_column="gemini_predicted_category"
     ):
         candidate_labels = sorted(frame[category_column].dropna().unique())
@@ -255,7 +257,7 @@ class GeminiPredictor:
                 pred = self.predict(
                     content,
                     candidate_labels=candidate_labels,
-                    system_message=system_message
+                    system_message_internal=system_message_internal
                 )
                 preds.append(pred)
                 correct_so_far = sum(
@@ -311,7 +313,7 @@ if __name__ == "__main__":
         df,
         content_column="voc",
         category_column="category",
-        system_message=system_message
+        system_message_internal=system_message
     )
 
     # # Gemini 2 Flash

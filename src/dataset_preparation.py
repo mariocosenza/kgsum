@@ -2,13 +2,14 @@ import logging
 import os
 from multiprocessing import get_context
 from os import listdir
+from typing import Any
 
 import pandas as pd
 import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
-from typing import Any
-from src.util import match_file_lod, CATEGORIES, is_voc_allowed, is_curi_allowed
+
+from src.util import match_file_lod, CATEGORIES
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation")
@@ -18,7 +19,7 @@ FORMATS = {'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'}
 def log_query(query):
     logger.info(f"SPARQL Query: {query}")
 
-def select_local_vocabularies(parsed_graph, filter_voc: bool = False):
+def select_local_vocabularies(parsed_graph):
     Q_LOCAL_VOCABULARIES = prepareQuery("""
         SELECT DISTINCT ?predicate
         WHERE {
@@ -56,7 +57,7 @@ def select_local_vocabularies(parsed_graph, filter_voc: bool = False):
 
     return vocabularies
 
-def select_local_class(parsed_graph, filter_curi: bool = False) -> list[str]:
+def select_local_class(parsed_graph) -> list[str]:
     Q_LOCAL_CLASS = prepareQuery("""
         SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
         WHERE {
@@ -80,7 +81,7 @@ def select_local_class(parsed_graph, filter_curi: bool = False) -> list[str]:
             classes.add(class_uri)
     return list(classes)
 
-def select_local_label(parsed_graph, en: bool = True):
+def select_local_label(parsed_graph):
     ns = {
         "schema": 'http://schema.org',
         "skos": 'http://www.w3.org/2004/02/skos/core#',
@@ -191,7 +192,7 @@ def select_local_tld(parsed_graph):
                 logger.warning(f"Unable to parse TLD from {url}: {exc}")
     return tlds
 
-def select_local_property(parsed_graph, filter_voc: bool = False):
+def select_local_property(parsed_graph):
     Q_LOCAL_PROPERTY = prepareQuery("""
         SELECT ?property (COUNT(?s) AS ?usageCount)
         WHERE {
@@ -362,8 +363,6 @@ def _guess_format_and_parse(path):
 
 def process_file_full_inplace(
     file_path: str,
-    filter_curi: bool = False,
-    filter_voc: bool = False
 ) -> dict[str, Any] | None:
     if not file_path:
         return None
@@ -375,9 +374,9 @@ def process_file_full_inplace(
         title_list = select_local_void_title(parsed_graph)
         void_subjects = select_local_void_subject(parsed_graph)
         void_descriptions = select_local_void_description(parsed_graph)
-        vocabularies = select_local_vocabularies(parsed_graph, filter_voc)
-        class_list = select_local_class(parsed_graph, filter_curi)
-        property_list = select_local_property(parsed_graph, filter_voc)
+        vocabularies = select_local_vocabularies(parsed_graph)
+        class_list = select_local_class(parsed_graph)
+        property_list = select_local_property(parsed_graph)
         labels = select_local_label(parsed_graph)
         tlds = select_local_tld(parsed_graph)
         endpoints = select_local_endpoint(parsed_graph)
@@ -407,7 +406,7 @@ def process_file_full_inplace(
         logger.warning(f"Error processing file {file_path}: {e}")
         return None
 
-lod_frame_global = None
+lod_frame_global: pd.DataFrame = pd.DataFrame()
 
 def init_worker(lod_frame_path: str):
     global lod_frame_global
@@ -426,9 +425,9 @@ def process_local_dataset_file(args):
     row_id = lod_frame_global.at[file_num, "id"]
     try:
         parsed_graph = _guess_format_and_parse(path)
-        vocab = select_local_vocabularies(parsed_graph, filter_voc)
-        classes = select_local_class(parsed_graph, filter_curi)
-        props = select_local_property(parsed_graph, filter_voc)
+        vocab = select_local_vocabularies(parsed_graph)
+        classes = select_local_class(parsed_graph)
+        props = select_local_property(parsed_graph)
         labels = select_local_label(parsed_graph)
         tlds = select_local_tld(parsed_graph)
         endpoints = select_local_endpoint(parsed_graph)
@@ -590,33 +589,3 @@ def create_local_void_dataset(offset: int = 0, limit: int = 10000):
         logger.info(f"Saved local void feature set to {out_path}")
     else:
         logger.warning("No results produced for local void dataset.")
-
-if __name__ == "__main__":
-    import multiprocessing
-
-    multiprocessing.freeze_support()
-
-    # Example invocations: adjust offset/limit as needed
-    create_local_dataset(offset=0, limit=200)
-    create_local_dataset(offset=1001, limit=1025)
-    create_local_dataset(offset=1026, limit=1050)
-    create_local_dataset(offset=1051, limit=1100)
-    create_local_dataset(offset=1101, limit=1125)
-    create_local_dataset(offset=1126, limit=1150)
-    create_local_dataset(offset=1151, limit=1200)
-    create_local_dataset(offset=1201, limit=1250)
-    create_local_dataset(offset=1251, limit=1300)
-    create_local_dataset(offset=1301, limit=1350)
-    create_local_dataset(offset=2000, limit=4000)
-
-    create_local_void_dataset(offset=0, limit=200)
-    create_local_void_dataset(offset=1001, limit=1025)
-    create_local_void_dataset(offset=1026, limit=1050)
-    create_local_void_dataset(offset=1051, limit=1100)
-    create_local_void_dataset(offset=1101, limit=1125)
-    create_local_void_dataset(offset=1126, limit=1150)
-    create_local_void_dataset(offset=1151, limit=1200)
-    create_local_void_dataset(offset=1201, limit=1250)
-    create_local_void_dataset(offset=1251, limit=1300)
-    create_local_void_dataset(offset=1301, limit=1350)
-    create_local_void_dataset(offset=2000, limit=4000)

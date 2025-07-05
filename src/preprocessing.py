@@ -73,14 +73,14 @@ def get_or_load_pipeline(lang_code: str, pipeline_dict_local=None, fallback_pipe
                 use_dict["xx"] = spacy.blank("en")
     return use_dict["xx"]
 
-def setup_spacy_pipelines(enable_gpu: bool = False):
+def setup_spacy_pipelines():
     global pipeline_dict, fallback_pipeline
     return pipeline_dict, fallback_pipeline
 
 def get_spacy_lang_code(detected: str) -> str:
     return detected if detected in SPACY_LANGS else "xx"
 
-def find_language(text: Any, pipeline_dict_local=None) -> str:
+def find_language(text: Any) -> str:
     if not isinstance(text, str) or not text:
         return "xx"
     try:
@@ -97,7 +97,7 @@ def spacy_clean_normalize_batch(texts, pipeline_dict_local=None, fallback_pipeli
     use_fallback = fallback_pipeline_local if fallback_pipeline_local is not None else fallback_pipeline
     if not isinstance(texts, list) or not texts:
         return []
-    langs = [find_language(text, use_dict) if isinstance(text, str) and text else "xx" for text in texts]
+    langs = [find_language(text) if isinstance(text, str) and text else "xx" for text in texts]
     from collections import defaultdict
     lang2idxs = defaultdict(list)
     for idx, lang in enumerate(langs):
@@ -188,7 +188,7 @@ def extract_named_entities(lab_list: Any, pipeline_dict_local=None, fallback_pip
     for text in lab_list:
         if not isinstance(text, str) or not text:
             continue
-        lang_code = find_language(text, use_dict)
+        lang_code = find_language(text)
         chosen_nlp = get_or_load_pipeline(lang_code, use_dict, use_fallback)
         try:
             doc = chosen_nlp(text)
@@ -285,15 +285,15 @@ def process_row(
     row: dict[str, Any] | Series,
     idx: int,
     total: int,
-    pipeline_dict=None,
-    fallback_pipeline=None,
+    pipeline_dict_int=None,
+    fallback_pipeline_int=None,
     batch_size=32,
     n_process=1,
     enable_filter: bool = True  # <-- new parameter
 ) -> tuple[str, list[str], list[str], list[str], list[str], list[str]]:
     logger.info(" Processing row %d/%d …", idx, total)
     # Normalize lab (list)
-    lab_batch_normalized = spacy_clean_normalize_batch(row.get("lab", []), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
+    lab_batch_normalized = spacy_clean_normalize_batch(row.get("lab", []), pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process)
     lab_text = " ".join(lab_batch_normalized)
     # --- Filter and extract lcn/lpn here ---
     # Filter curi/puri/voc at preprocessing time if enabled
@@ -313,8 +313,8 @@ def process_row(
 
 def preprocess_combined(
     input_frame: pd.DataFrame,
-    pipeline_dict,
-    fallback_pipeline,
+    pipeline_dict_int,
+    fallback_pipeline_int,
     use_ner: bool = True,
     batch_size=32,
     n_process=1,
@@ -324,7 +324,7 @@ def preprocess_combined(
     combined_rows: list[dict[str, Any]] = []
     for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
         lab_text, lcn, lpn, curi, puri, voc = process_row(
-            row, i, total, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process, enable_filter=enable_filter
+            row, i, total, pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process, enable_filter=enable_filter
         )
         title_raw = sanitize_field(row.get("title", ""))
         title = title_raw
@@ -335,8 +335,8 @@ def preprocess_combined(
         lab_list = row.get("lab", [])
         if not isinstance(lab_list, list):
             lab_list = [lab_list] if lab_list else []
-        ner_types = extract_named_entities(lab_list, pipeline_dict, fallback_pipeline, use_ner=use_ner)
-        language = find_language(lab_text[:1000], pipeline_dict)
+        ner_types = extract_named_entities(lab_list, pipeline_dict_int, fallback_pipeline_int, use_ner=use_ner)
+        language = find_language(lab_text[:1000])
         combined_rows.append({
             "id": row.get("id", ""),
             "category": row.get("category", ""),
@@ -359,18 +359,18 @@ def preprocess_combined(
     logger.info("Combined processing complete: %d/%d.", len(combined_df), total)
     return combined_df
 
-def process_void_row(row: dict[str, Any] | Series, idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> dict[str, str]:
+def process_void_row(row: dict[str, Any] | Series, idx: int, total: int, pipeline_dict_int=None, fallback_pipeline_int=None, batch_size=32, n_process=1) -> dict[str, str]:
     logger.info(" Processing void row %d/%d …", idx, total)
-    dsc_text = spacy_clean_normalize(normalize_text_list(row.get("dsc", [])), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
-    sbj_text = spacy_clean_normalize(normalize_text_list(row.get("sbj", [])), pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
+    dsc_text = spacy_clean_normalize(normalize_text_list(row.get("dsc", [])), pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process)
+    sbj_text = spacy_clean_normalize(normalize_text_list(row.get("sbj", [])), pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process)
     logger.info(" Completed void row %d/%d.", idx, total)
     return {"sbj": sbj_text, "dsc": dsc_text}
 
-def preprocess_void(input_frame: pd.DataFrame, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> pd.DataFrame:
+def preprocess_void(input_frame: pd.DataFrame, pipeline_dict_int=None, fallback_pipeline_int=None, batch_size=32, n_process=1) -> pd.DataFrame:
     total = len(input_frame)
     processed_rows: list[dict[str, str]] = []
     for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
-        processed_rows.append(process_void_row(row, i, total, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process))
+        processed_rows.append(process_void_row(row, i, total, pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process))
     out_df = pd.DataFrame({
         "id": input_frame["id"] if "id" in input_frame.columns else list(range(total)),
         "sbj": [r["sbj"] for r in processed_rows],
@@ -401,7 +401,7 @@ def combine_with_void_and_lov_data(
     final = combine_with_void(temp, lov_df)
     return final
 
-def process_lov_data_row(row: dict[str, Any] | Series, idx: int, total: int, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> dict[str, Any]:
+def process_lov_data_row(row: dict[str, Any] | Series, idx: int, total: int, pipeline_dict_int=None, fallback_pipeline_int=None, batch_size=32, n_process=1) -> dict[str, Any]:
     logger.info(" Processing LOV row %d/%d …", idx, total)
     tags = sanitize_field(row.get("tags", []))
     def _flatten(l):
@@ -415,16 +415,16 @@ def process_lov_data_row(row: dict[str, Any] | Series, idx: int, total: int, pip
         comments_list = list(_flatten(comments_value))
     else:
         comments_list = [comments_value]
-    comments_batch_normalized = spacy_clean_normalize_batch(comments_list, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process)
+    comments_batch_normalized = spacy_clean_normalize_batch(comments_list, pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process)
     comments = " ".join(comments_batch_normalized)
     logger.info(" Completed LOV row %d/%d.", idx, total)
     return {"tags": tags, "comments": comments}
 
-def preprocess_lov_data(input_frame: pd.DataFrame, pipeline_dict=None, fallback_pipeline=None, batch_size=32, n_process=1) -> pd.DataFrame:
+def preprocess_lov_data(input_frame: pd.DataFrame, pipeline_dict_int=None, fallback_pipeline_int=None, batch_size=32, n_process=1) -> pd.DataFrame:
     total = len(input_frame)
     processed_rows: list[dict[str, Any]] = []
     for i, (_, row) in enumerate(input_frame.iterrows(), start=1):
-        processed_rows.append(process_lov_data_row(row, i, total, pipeline_dict, fallback_pipeline, batch_size=batch_size, n_process=n_process))
+        processed_rows.append(process_lov_data_row(row, i, total, pipeline_dict_int, fallback_pipeline_int, batch_size=batch_size, n_process=n_process))
     out_df = pd.DataFrame({
         "id": input_frame["id"] if "id" in input_frame.columns else list(range(total)),
         "tags": [r["tags"] for r in processed_rows],
