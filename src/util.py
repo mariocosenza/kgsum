@@ -18,8 +18,7 @@ def get_data_folder_path():
 def get_model_file_path():
     return os.path.join(get_data_folder_path(), 'multiple_models.pkl')
 
-# Precompile the regex used to extract the file number
-FILE_NUM_REGEX    = re.compile(r'(\d+).*\.(?:rdf|nt|ttl|nq)$', re.IGNORECASE)
+FILE_NUM_REGEX = re.compile(r'^(\d+)[^.]*\.(?:rdf|nt|ttl|nq)$', re.IGNORECASE)
 FILE_STRING_REGEX = re.compile(r'-(.*)\.')
 
 CATEGORIES = {
