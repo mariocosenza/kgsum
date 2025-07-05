@@ -7,6 +7,8 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
+from lov_data_preparation import find_tags_from_list, find_comments_from_lists
+
 MAX_OFFSET = 1000
 ENDPOINT_TIMEOUT = 600
 
@@ -502,7 +504,7 @@ async def process_endpoint_void(row: pd.Series) -> list[Any]:
         str(row["category"]),
     ]
 
-async def process_endpoint_full_inplace(endpoint: str) -> dict[str, Any]:
+async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False) -> dict[str, Any]:
     row = pd.Series({"id": "", "sparql_url": endpoint, "category": ""})
     void_uri = await async_has_void_file(endpoint)
     if void_uri:
@@ -513,6 +515,12 @@ async def process_endpoint_full_inplace(endpoint: str) -> dict[str, Any]:
         title = endpoint
     data_list = await process_endpoint(row)
     void_list = await process_endpoint_void(row)
+    voc_tags = []
+    comments = []
+    if ingest_lov:
+        voc_tags = find_tags_from_list(data_list[2])
+        comments = find_comments_from_lists(curi_list= data_list[3], puri_list=data_list[4])
+
     return {
         "id": endpoint,
         "title": title,
@@ -527,6 +535,8 @@ async def process_endpoint_full_inplace(endpoint: str) -> dict[str, Any]:
         "creator": data_list[8],
         "license": data_list[9],
         "con": data_list[10],
+        "tags": voc_tags,
+        "comments": comments
     }
 
 async def main_normal() -> None:

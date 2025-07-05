@@ -9,6 +9,7 @@ import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
 
+from lov_data_preparation import find_tags_from_list, find_comments_from_lists
 from src.util import match_file_lod, CATEGORIES
 
 logging.basicConfig(level=logging.INFO)
@@ -363,6 +364,7 @@ def _guess_format_and_parse(path):
 
 def process_file_full_inplace(
     file_path: str,
+    ingest_lov: bool = False
 ) -> dict[str, Any] | None:
     if not file_path:
         return None
@@ -385,6 +387,14 @@ def process_file_full_inplace(
         connections = select_local_con(parsed_graph)
 
         title = title_list[0] if title_list else (endpoints[0] if endpoints else "")
+        class_list = list(class_list)
+        property_list = list(property_list)
+        vocabularies = list(vocabularies)
+        voc_tags = []
+        comments = []
+        if ingest_lov:
+            voc_tags = find_tags_from_list(vocabularies)
+            comments = find_comments_from_lists(curi_list=class_list, puri_list=property_list)
 
         return {
             "id": title,
@@ -399,7 +409,9 @@ def process_file_full_inplace(
             "tlds": list(tlds),
             "creator": list(creators),
             "license": list(licenses),
-            "con": connections
+            "con": connections,
+            "tags": voc_tags,
+            "comments": comments
         }
 
     except Exception as e:
