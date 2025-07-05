@@ -199,6 +199,64 @@ def merge_dump_sparql(csv1_path='../data/raw/graphs.csv',
     output_df.to_csv('../data/raw/graphs_with_uri.csv', index=True)
     return df2
 
+DATA_DIR = "../data"
+RAW_DIR = os.path.join(DATA_DIR, "raw")
+PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
+
+os.makedirs(PROCESSED_DIR, exist_ok=True)
+
+def merge_dataset() -> pd.DataFrame:
+    local_frames: list[pd.DataFrame] = []
+    remote_frames: list[pd.DataFrame] = []
+    local_path = os.path.join(RAW_DIR, "local")
+    for fname in os.listdir(local_path):
+        if "local_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(local_path, fname)
+            try:
+                local_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read %s: %s", fullpath, exc)
+    remote_path = os.path.join(RAW_DIR, "remote")
+    for fname in os.listdir(remote_path):
+        if "remote_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(remote_path, fname)
+            try:
+                remote_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read %s: %s", fullpath, exc)
+    df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
+    df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
+    merged = pd.concat([df_local, df_remote], ignore_index=True)
+    if "id" in merged.columns:
+        merged = merged.drop_duplicates(subset="id", keep="last")
+    return merged
+
+def merge_void_dataset() -> pd.DataFrame:
+    local_frames: list[pd.DataFrame] = []
+    remote_frames: list[pd.DataFrame] = []
+    local_path = os.path.join(RAW_DIR, "local")
+    for fname in os.listdir(local_path):
+        if "local_void_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(local_path, fname)
+            try:
+                local_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read void file %s: %s", fullpath, exc)
+    remote_path = os.path.join(RAW_DIR, "remote")
+    for fname in os.listdir(remote_path):
+        if "remote_void_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(remote_path, fname)
+            try:
+                remote_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read void file %s: %s", fullpath, exc)
+    df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
+    df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
+    merged = pd.concat([df_local, df_remote], ignore_index=True)
+    if "id" in merged.columns:
+        merged = merged.drop_duplicates(subset="id", keep="last")
+    return merged
+
 
 if __name__ == '__main__':
     merge_zenodo_sparql()

@@ -7,7 +7,7 @@ import pandas as pd
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
 
-from src.preprocessing import merge_dataset
+from src.util import merge_dataset
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vocabulary_extraction")
