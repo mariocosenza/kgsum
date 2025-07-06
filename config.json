@@ -1,37 +1,37 @@
 {
   "data_labeling" : {
-    "use_gemma" : "",
-    "use_gemini" : "",
-    "search_github": "",
-    "search_zenodo": "",
-    "search_lod_cloud": "",
-    "stop_before_merging": ""
+    "use_gemini":  true,
+    "search_github": true,
+    "search_zenodo": true,
+    "search_lod_cloud": true,
+    "stop_before_merging": false
   },
   "data-extraction": {
-    "start-offset": "",
-    "limit": "",
-    "save_range": "",
-    "extract_sparql": ""
+    "start-offset": 0,
+    "limit": 4000,
+    "save_range": 16,
+    "extract_sparql": true,
+    "query_lov": true
+  },
+  "processing" : {
+    "use_ner": true,
+    "use_filter": true
   },
   "training" : {
      "classifier": "NB",
-     "feature": "",
-     "oversample": "false",
-     "max_token": "",
-     "use_tfidf_autoencoder": ""
-  },
-  "processing" : {
-    "use_ner": "",
-    "use_filter": "",
-    "query_lov": ""
+     "feature": ["CURI", "PURI"],
+     "oversample": false,
+     "max_token": 256,
+     "use_tfidf_autoencoder": true
   },
   "profile": {
-    "store_profile_after_training": "",
-    "store_profile_on_run": "",
-    "base_domain": ""
+    "store_profile_after_training": false,
+    "store_profile_on_run": true,
+    "base_domain": "https://exemple.org"
   },
   "general_setting": {
     "info": "",
-    "stop_phase": ""
+    "start_phase": "data_labeling",
+    "stop_phase": "training"
   }
 }
