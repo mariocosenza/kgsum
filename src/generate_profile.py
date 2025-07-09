@@ -38,17 +38,17 @@ async def generate_profile(endpoint: None | str = None, file: None | str = None)
     return profile
 
 
-async def generate_and_store_profile(endpoint=None, file=None):
+async def generate_and_store_profile(endpoint=None, file=None, base_uri="http://localhost:8000/"):
     row = await generate_profile(endpoint=endpoint, file=file)
-    await store_profile(profile=row, category=row['category'])
+    await store_profile(profile=row, category=row['category'], base_iri=base_uri)
     return row
 
 
-async def generate_profile_from_store():
+async def generate_profile_from_store(base_url="https://exemple.org"):
     dataset = pd.read_json('../data/processed/combined.json')
     for index, col in dataset.iterrows():
         print(col['id'])
-        await store_profile(profile=create_profile(data=col), category=str(col['category']))
+        await store_profile(profile=create_profile(data=col), category=str(col['category']), base_iri=base_url)
 
 
 def create_profile(data: dict | pd.DataFrame | pd.Series) -> dict:
@@ -66,7 +66,7 @@ def _to_list(val):
     return val if isinstance(val, list) else [val]
 
 
-async def store_profile(profile: dict, category: str):
+async def store_profile(profile: dict, category: str, base_iri = "http://example.org/resource/"):
     raw_id = profile.get('id')
     if not raw_id:
         logger.warning("Missing profile id. Skipping insertion.")
@@ -74,7 +74,6 @@ async def store_profile(profile: dict, category: str):
 
     # If the raw_id is not a valid IRI, generate one from it.
     if not IS_URI.match(raw_id):
-        base_iri = "http://example.org/resource/"
         encoded_id = urllib.parse.quote(raw_id, safe="")
         iri = base_iri + encoded_id
         logger.info(f"Generated IRI {iri} from raw id {raw_id}")

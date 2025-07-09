@@ -6,20 +6,27 @@ import shutil
 
 import pandas as pd
 
-from autoencoder_pipeline import ClassifierType, load_models, train_autoencoder_models, save_models, \
-    predict_category_majority_vote
+from autoencoder_pipeline import (
+    ClassifierType, load_models, train_autoencoder_models, save_models,
+)
 from util import get_data_folder_path, get_project_root, get_model_file_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-FEATURES: list[str] = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments', 'tlds']
-AE_MODEL: ClassifierType = ClassifierType.BATCHNORM
-LATENT_DIM: int = 32
-TARGET_LABEL: str = "category"
-USE_TFIDF: bool = True  # Set to False if you want only OneHot
+def main(
+    features: list[str] = None,
+    classifier: ClassifierType = None,
+    latent_dim: int = 32,
+    target_label: str = "category",
+    use_tfidf: bool = True,
+    oversample: bool = True,
+) -> None:
+    if features is None:
+        features = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments', 'tlds']
+    if classifier is None:
+        classifier = ClassifierType.BATCHNORM
 
-def main() -> None:
     directory_path = os.path.join(get_data_folder_path(), 'cache')
     if os.path.exists(directory_path):
         shutil.rmtree(directory_path)
@@ -36,7 +43,8 @@ def main() -> None:
     else:
         logger.info("[TRAIN] Training autoencoder models from scratch.")
         models, training_results = train_autoencoder_models(
-            combined_df, FEATURES, TARGET_LABEL, AE_MODEL, LATENT_DIM, use_tfidf=USE_TFIDF, oversample=True
+            combined_df, features, target_label, classifier, latent_dim,
+            use_tfidf=use_tfidf, oversample=oversample
         )
         # Ensure directory exists
         os.makedirs(get_data_folder_path(), exist_ok=True)
@@ -48,11 +56,6 @@ def main() -> None:
             "Feature: %s | F1: %.4f | Acc: %.4f | Best params: %s",
             feature, metrics.f1, metrics.accuracy, metrics.best_params
         )
-
-    # Example: predict with majority vote on the first 10 rows
-    sample = combined_df.iloc[:10]
-    preds = predict_category_majority_vote(models, sample)
-    print("Predictions (first 10 rows):", preds)
 
 if __name__ == "__main__":
     main()

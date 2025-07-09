@@ -1,10 +1,12 @@
 import logging
 import os
 
+from config import Config
 from src.generate_profile import generate_profile, generate_and_store_profile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+Config.init_configuration()
 
 async def generate_profile_service(endpoint: str, sparql: bool = False) -> dict:
     if sparql:
@@ -20,11 +22,11 @@ async def generate_profile_service(endpoint: str, sparql: bool = False) -> dict:
 
 async def generate_profile_service_store(endpoint: str, sparql = False):
     if sparql:
-        result = await generate_and_store_profile(endpoint=endpoint)
+        result = await generate_and_store_profile(endpoint=endpoint, base_uri=Config.BASE_DOMAIN)
         return result
     else:
         try:
-            result = await generate_and_store_profile(file=endpoint)
+            result = await generate_and_store_profile(file=endpoint, base_uri=Config.BASE_DOMAIN)
             os.remove(path=endpoint)
             return result
         except Exception as e:
