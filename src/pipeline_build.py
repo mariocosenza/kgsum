@@ -6,21 +6,21 @@ import os
 import pickle
 import re
 import warnings
-import torch
+from collections import Counter
+from typing import Any, Tuple, NewType, TypeAlias
+
 import numpy as np
 import pandas as pd
-from collections import Counter
-from enum import Enum, auto
-from typing import Any, Tuple, NewType, TypeAlias
+import torch
 from joblib import Memory
 from sklearn import svm
-from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import RandomizedSearchCV, train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import Pipeline
 from sklearn.tree import DecisionTreeClassifier
 from tqdm import tqdm
 from transformers import (
@@ -35,6 +35,8 @@ from transformers import (
     DataCollatorWithPadding,
     BitsAndBytesConfig
 )
+
+from config import ClassifierType
 
 try:
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -61,12 +63,6 @@ FeatureLabels: TypeAlias = str | list[str]
 TextData = NewType("TextData", str)
 
 
-class ClassifierType(Enum):
-    SVM = auto()
-    NAIVE_BAYES = auto()
-    KNN = auto()
-    J48 = auto()  # Decision Tree
-    MISTRAL = auto()
 
 
 def is_uri(token: str) -> bool:
@@ -347,14 +343,16 @@ class KnowledgeGraphClassifier:
             return get_custom_tfidf_vectorizer(**kwargs)
         return get_custom_count_vectorizer(**kwargs)
 
-    def _clean_text(self, text: str) -> str:
+    @staticmethod
+    def _clean_text(text: str) -> str:
         text = re.sub(r"\[\s*\]", "", text)
         text = re.sub(r"\(\s*\)", "", text)
         text = re.sub(r"\{\s*\}", "", text)
         text = re.sub(r"\s+", " ", text)
         return text.strip()
 
-    def _prepare_features(self, frame: pd.DataFrame, feature_labels: FeatureLabels) -> pd.Series:
+    @staticmethod
+    def _prepare_features(frame: pd.DataFrame, feature_labels: FeatureLabels) -> pd.Series:
         import ast
         import json
 

@@ -192,7 +192,7 @@ def download_and_predict(g_client, download_folder, output_file="../../data/raw/
                 if id_int == 3000 and not use_ollama:
                     res = input('Change your IP to continue with free API or confirm current key (True to change IP):')
                     if bool(res):
-                        g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY_2"))
+                        g_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
                 # Predict the category
                 if use_ollama:
@@ -224,21 +224,23 @@ def download_and_predict(g_client, download_folder, output_file="../../data/raw/
     df.to_csv(output_file, index=False)
 
 
-def main():
+def main(use_gemini=True):
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         logger.error("GITHUB_TOKEN is not set in the environment variables.")
         return
-
+    download_folder = "../../data/raw/rdf_dump"
     file_extensions = ["ttl", "nt", "nq"]
     logger.info(f"Searching for files with extensions: {', '.join(file_extensions)}")
-
     results = search_github_files(file_extensions, token, max_pages=10)
     save_to_csv(results)
+    download_and_predict(client, download_folder, use_ollama=not use_gemini)
+
+
+
 
 
 if __name__ == "__main__":
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../../data/raw/rdf_dump"
-    # main()
-    download_and_predict(client, download_folder)
+    main()
+

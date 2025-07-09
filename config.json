@@ -1,0 +1,36 @@
+{
+  "labeling" : {
+    "use_gemini": false,
+    "search_zenodo": true,
+    "search_github": true,
+    "search_lod_cloud": true,
+    "stop_before_merging": false
+  },
+  "extraction": {
+    "start_offset": 0,
+    "step_numbers": 10,
+    "step_range": 16,
+    "extract_sparql": true,
+    "query_lov": true
+  },
+  "processing" : {
+    "use_ner": true,
+    "use_filter": true
+  },
+  "training" : {
+     "classifier": "NAIVE_BAYES",
+     "feature": ["CURI", "PURI"],
+     "oversample": false,
+     "max_token": 256,
+     "use_tfidf_autoencoder": true
+  },
+  "profile": {
+    "store_profile_after_training": false,
+    "base_domain": "https://exemple.org"
+  },
+  "general_setting": {
+    "info": "Possible classifiers: SVM, NAIVE_BAYES, KNN, J48, MISTRAL, MLP, DEEP, BATCHNORM, Phase: LABELING, EXTRACTION, PROCESSING, TRAINING, STORE",
+    "start_phase": "labeling",
+    "stop_phase": "training"
+  }
+}

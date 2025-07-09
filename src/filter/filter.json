@@ -1,0 +1,25 @@
+{
+"CURI_PURI_FILTER" : [
+  "http://www.w3.org/2002/07/owl",
+  "http://www.w3.org/2004/02/skos/core",
+  "http://www.w3.org/2000/01/rdf-schema",
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns",
+  "http://www.w3.org/ns/shacl",
+  "http://www.w3.org/ns/prov",
+  "http://rdfs.org/ns/void#Dataset"
+],
+"VOC_FILTER" : [
+    "http://purl.org/dc/terms",
+    "http://purl.org/vocab/vann",
+    "http://purl.org/dc/elements/1.1",
+    "http://schema.org",
+    "https://schema.org",
+    "http://dbpedia.org/property",
+    "http://dbpedia.org/ontology",
+    "http://xmlns.com/foaf/0.1",
+    "http://example.org",
+    "http://yoshimi.sourceforge.net/lv2_plugin",
+    "http://rdfs.org/ns/void",
+    "http://xmls.com/foaf/0.1"
+  ]
+}

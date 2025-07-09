@@ -6,14 +6,10 @@ import pandas as pd
 import src.pipeline_build
 from src.pipeline_build import ClassifierType, majority_vote, predict_category_multi, save_multiple_models, \
     load_multiple_models
+from util import get_project_root, get_model_file_path, get_data_folder_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)
-data_folder_path = os.path.join(project_root, 'data', 'trained')
-file_path = os.path.join(data_folder_path, 'multiple_models.pkl')
 
 
 class CategoryPredictor:
@@ -26,13 +22,19 @@ class CategoryPredictor:
 
     @staticmethod
     def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample = True):
-        combined_df_path = os.path.join(project_root, 'data', 'processed', 'combined.json')
-        combined_df = pd.read_json(combined_df_path)
+        combined_df_path = os.path.join(get_project_root(), 'data', 'processed', 'combined.json')
+        if os.path.exists(combined_df_path):
+            combined_df = pd.read_json(combined_df_path)
+        else:
+            combined_df = pd.DataFrame()
         if feature_columns is None:
             feature_columns = ["curi"]
+        file_path = get_model_file_path()
+        logger.info(f"Looking for trained model at: {file_path}")
         try:
             models, training_results = load_multiple_models(file_path)
-        except Exception as _:
+        except Exception as e:
+            logger.warning(f"Loading models failed: {e}. Retraining models...")
             models, training_results = src.pipeline_build.train_multiple_models(
                 combined_df,
                 feature_columns,
@@ -40,9 +42,11 @@ class CategoryPredictor:
                 classifier_type=classifier,
                 oversample=oversample
             )
-            save_multiple_models(models, training_results)
+            # Ensure directory exists
+            os.makedirs(get_data_folder_path(), exist_ok=True)
+            save_multiple_models(models, training_results, file_path)
 
-        logger.info("Global models trained. Training results:")
+        logger.info("Global models trained/loaded. Training results:")
         for feature, metrics in training_results.items():
             logger.info(f'Feature: {feature}, Best Params: {metrics}')
 
@@ -50,7 +54,11 @@ class CategoryPredictor:
 
 
 if __name__ == "__main__":
-    directory_path = os.path.join(project_root, 'data', 'trained', 'cache')
+    directory_path = os.path.join(get_data_folder_path(), 'cache')
     if os.path.exists(directory_path):
         shutil.rmtree(directory_path)
-    PREDICTOR = CategoryPredictor.get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'], oversample=True)
+    PREDICTOR = CategoryPredictor.get_predictor(
+        classifier=ClassifierType.NAIVE_BAYES,
+        feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'],
+        oversample=True
+    )

@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  ml:
+    build:
+      context: ../
+      dockerfile: docker/ml/Dockerfile
+    container_name: ml-service
+    ports:
+      - "5000:5000"
+    environment:
+      - TZ=UTC
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LOCAL_ENDPOINT_LOV=${LOCAL_ENDPOINT_LOV}
+      - LOCAL_ENDPOINT=${LOCAL_ENDPOINT}
+      - SECRET_KEY=${SECRET_KEY}
+      - UPLOAD_FOLDER=${UPLOAD_FOLDER}
+      - CLERK_MIDDLEWARE_ENABLED=${CLERK_MIDDLEWARE_ENABLED}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    restart: unless-stopped
+#     command: ["bash", "boot.sh"]
+
+  kgsum-frontend:
+    build:
+      context: ../
+      dockerfile: docker/web/Dockerfile
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+        CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+    container_name: kgsum-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+      - TZ=UTC
+      - BUILD_DATE=2025-06-28 13:53:17
+      - BUILD_USER=mariocosenza
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
+      - CLASSIFICATION_API_URL=${CLASSIFICATION_API_URL}
+    restart: unless-stopped
+    user: "0:0"
+    labels:
+      - "maintainer=mariocosenza"
+      - "build.date=2025-06-28 13:53:17"
+      - "version=latest"
+      - "project=kgsum-frontend"
+    depends_on:
+      - ml
+
+  graphdb:
+    build:
+      context: ../
+      dockerfile: docker/graphdb/Dockerfile
+    container_name: graphdb
+    ports:
+      - "7200:7200"
+    environment:
+      - TZ=UTC
+    restart: unless-stopped
+    volumes:
+      # Optional: persist GraphDB data
+      - graphdb_data:/opt/graphdb/home
+
+volumes:
+  graphdb_data:

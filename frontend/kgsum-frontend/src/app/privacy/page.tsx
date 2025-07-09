@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Mail, Shield, Database, Brain, Users, FileText, Cookie, Lock } from "lucide-react"
@@ -32,7 +32,7 @@ export default function PrivacyPolicyPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p>
-              Benvenuto su <strong>KgSum</strong>, un'applicazione web per la ricerca sui Knowledge Graph
+              Benvenuto su <strong>KgSum</strong>, un&#39;applicazione web per la ricerca sui Knowledge Graph
               sviluppata come progetto di tesi. La presente Privacy Policy descrive come raccogliamo,
               utilizziamo e proteggiamo le tue informazioni personali quando utilizzi il nostro servizio.
             </p>
@@ -57,7 +57,7 @@ export default function PrivacyPolicyPage() {
           <CardContent className="space-y-6">
             <div>
               <h3 className="font-semibold mb-2">2.1 Dati di autenticazione</h3>
-              <p className="mb-3">Tramite il servizio Clerk, raccogliamo i seguenti dati per l'autenticazione:</p>
+              <p className="mb-3">Tramite il servizio Clerk, raccogliamo i seguenti dati per l&#39;autenticazione:</p>
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li><strong>GitHub/GitLab:</strong> Nome utente, email, avatar pubblico</li>
                 <li><strong>Email:</strong> Indirizzo email e password (crittografata)</li>
@@ -79,9 +79,9 @@ export default function PrivacyPolicyPage() {
             <Separator />
 
             <div>
-              <h3 className="font-semibold mb-2">2.3 Contenuti caricati dall'utente</h3>
+              <h3 className="font-semibold mb-2">2.3 Contenuti caricati dall&#39;utente</h3>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li><strong>File caricati:</strong> Documenti e dataset per l'elaborazione</li>
+                <li><strong>File caricati:</strong> Documenti e dataset per l&#39;elaborazione</li>
                 <li><strong>Query SPARQL:</strong> Le query eseguite sui Knowledge Graph</li>
                 <li><strong>Risultati delle elaborazioni:</strong> Output delle analisi e classificazioni</li>
               </ul>
@@ -102,7 +102,7 @@ export default function PrivacyPolicyPage() {
               <h3 className="font-semibold mb-2">3.1 Finalità del trattamento</h3>
               <p className="mb-3">Le tue informazioni vengono utilizzate per:</p>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Fornire l'accesso autenticato alla piattaforma</li>
+                <li>Fornire l&#39;accesso autenticato alla piattaforma</li>
                 <li>Elaborare i file caricati tramite algoritmi di Machine Learning locali</li>
                 <li>Classificare Knowledge Graph tramite endpoint SPARQL</li>
                 <li>Migliorare il servizio e condurre ricerca accademica</li>
@@ -137,7 +137,7 @@ export default function PrivacyPolicyPage() {
           <CardContent>
             <p className="mb-3">Il trattamento dei tuoi dati si basa su:</p>
             <ul className="list-disc list-inside space-y-1 text-sm">
-              <li><strong>Consenso:</strong> Per l'utilizzo di cookie non essenziali e l'elaborazione dei file caricati</li>
+              <li><strong>Consenso:</strong> Per l&#39;utilizzo di cookie non essenziali e l&#39;elaborazione dei file caricati</li>
               <li><strong>Interesse legittimo:</strong> Per la ricerca accademica e il miglioramento del servizio</li>
               <li><strong>Esecuzione del contratto:</strong> Per fornire i servizi richiesti</li>
             </ul>
@@ -156,7 +156,7 @@ export default function PrivacyPolicyPage() {
             <div>
               <h3 className="font-semibold mb-2">Tipi di cookie utilizzati</h3>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li><strong>Cookie essenziali:</strong> Per l'autenticazione e il funzionamento del sito</li>
+                <li><strong>Cookie essenziali:</strong> Per l&#39;autenticazione e il funzionamento del sito</li>
                 <li><strong>Cookie di GraphDB:</strong> Per la gestione del database grafico</li>
                 <li><strong>Cookie di sessione:</strong> Per mantenere la sessione utente attiva</li>
               </ul>

@@ -1,12 +1,24 @@
 import hashlib
 import os
 import re
-
+import logging
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper
 
-# Precompile the regex used to extract the file number
-FILE_NUM_REGEX = re.compile(r'(\d+).*\.((?:rdf)|(?:nt)|(?:ttl)|(?:nq))$', re.IGNORECASE)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- Robust path resolution ---
+def get_project_root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def get_data_folder_path():
+    return os.path.join(get_project_root(), 'data', 'trained')
+
+def get_model_file_path():
+    return os.path.join(get_data_folder_path(), 'multiple_models.pkl')
+
+FILE_NUM_REGEX = re.compile(r'^(\d+)[^.]*\.(?:rdf|nt|ttl|nq)$', re.IGNORECASE)
 FILE_STRING_REGEX = re.compile(r'-(.*)\.')
 
 CATEGORIES = {
@@ -23,30 +35,14 @@ LOD_CATEGORY_NO_USER_DOMAIN = {
     'linguistics', 'media', 'publications', 'social_networking'
 }
 
-CURI_PURI_FILTER = {
-    'http://www.w3.org/2002/07/owl',
-    'http://www.w3.org/2004/02/skos/core',
-    'http://www.w3.org/2000/01/rdf-schema',
-    'http://www.w3.org/1999/02/22-rdf-syntax-ns',
-    'http://www.w3.org/ns/shacl',
-    'http://www.w3.org/ns/prov',
-    'http://rdfs.org/ns/void#Dataset'
-}
 
-VOC_FILTER = {
-    'http://purl.org/dc/terms',
-    'http://purl.org/vocab/vann',
-    'http://purl.org/dc/elements/1.1',
-    'http://schema.org',
-    'https://schema.org',
-    'http://dbpedia.org/property',
-    'http://dbpedia.org/ontology',
-    'http://xmlns.com/foaf/0.1',
-    'http://example.org',
-    'http://yoshimi.sourceforge.net/lv2_plugin',
-    'http://rdfs.org/ns/void',
-    'http://xmls.com/foaf/0.1'
-}
+FILTER_DATA = pd.read_json(
+    os.path.join(get_project_root(), 'src', 'filter', 'filter.json'),
+    typ='series'
+)
+
+CURI_PURI_FILTER = set(FILTER_DATA['CURI_PURI_FILTER'])
+VOC_FILTER = set(FILTER_DATA['VOC_FILTER'])
 
 
 def is_curi_allowed(uri: str) -> bool:
@@ -84,7 +80,7 @@ def is_endpoint_working(endpoint) -> bool:
             return False
         result.convert()
         return True
-    except Exception as e:
+    except Exception as _:
         return False
 
 
@@ -200,6 +196,64 @@ def merge_dump_sparql(csv1_path='../data/raw/graphs.csv',
 
     output_df.to_csv('../data/raw/graphs_with_uri.csv', index=True)
     return df2
+
+DATA_DIR = "../data"
+RAW_DIR = os.path.join(DATA_DIR, "raw")
+PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
+
+os.makedirs(PROCESSED_DIR, exist_ok=True)
+
+def merge_dataset() -> pd.DataFrame:
+    local_frames: list[pd.DataFrame] = []
+    remote_frames: list[pd.DataFrame] = []
+    local_path = os.path.join(RAW_DIR, "local")
+    for fname in os.listdir(local_path):
+        if "local_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(local_path, fname)
+            try:
+                local_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read %s: %s", fullpath, exc)
+    remote_path = os.path.join(RAW_DIR, "remote")
+    for fname in os.listdir(remote_path):
+        if "remote_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(remote_path, fname)
+            try:
+                remote_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read %s: %s", fullpath, exc)
+    df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
+    df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
+    merged = pd.concat([df_local, df_remote], ignore_index=True)
+    if "id" in merged.columns:
+        merged = merged.drop_duplicates(subset="id", keep="last")
+    return merged
+
+def merge_void_dataset() -> pd.DataFrame:
+    local_frames: list[pd.DataFrame] = []
+    remote_frames: list[pd.DataFrame] = []
+    local_path = os.path.join(RAW_DIR, "local")
+    for fname in os.listdir(local_path):
+        if "local_void_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(local_path, fname)
+            try:
+                local_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read void file %s: %s", fullpath, exc)
+    remote_path = os.path.join(RAW_DIR, "remote")
+    for fname in os.listdir(remote_path):
+        if "remote_void_feature_set" in fname and fname.endswith(".json"):
+            fullpath = os.path.join(remote_path, fname)
+            try:
+                remote_frames.append(pd.read_json(fullpath))
+            except Exception as exc:
+                logger.error("Failed to read void file %s: %s", fullpath, exc)
+    df_local = pd.concat(local_frames, ignore_index=True) if local_frames else pd.DataFrame()
+    df_remote = pd.concat(remote_frames, ignore_index=True) if remote_frames else pd.DataFrame()
+    merged = pd.concat([df_local, df_remote], ignore_index=True)
+    if "id" in merged.columns:
+        merged = merged.drop_duplicates(subset="id", keep="last")
+    return merged
 
 
 if __name__ == '__main__':
