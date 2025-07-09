@@ -1,15 +1,15 @@
 {
-  "data_labeling" : {
-    "use_gemini":  true,
-    "search_github": true,
+  "labeling" : {
+    "use_gemini": false,
     "search_zenodo": true,
+    "search_github": true,
     "search_lod_cloud": true,
     "stop_before_merging": false
   },
-  "data-extraction": {
-    "start-offset": 0,
-    "limit": 4000,
-    "save_range": 16,
+  "extraction": {
+    "start_offset": 0,
+    "step_numbers": 10,
+    "step_range": 16,
     "extract_sparql": true,
     "query_lov": true
   },
@@ -18,7 +18,7 @@
     "use_filter": true
   },
   "training" : {
-     "classifier": "NB",
+     "classifier": "NAIVE_BAYES",
      "feature": ["CURI", "PURI"],
      "oversample": false,
      "max_token": 256,
@@ -30,8 +30,8 @@
     "base_domain": "https://exemple.org"
   },
   "general_setting": {
-    "info": "",
-    "start_phase": "data_labeling",
+    "info": "Possible classifiers: SVM, NAIVE_BAYES, KNN, J48, MISTRAL, MLP, DEEP, BATCHNORM, Phase: LABELING, EXTRACTION, PROCESSING, TRAINING, STORE",
+    "start_phase": "labeling",
     "stop_phase": "training"
   }
 }

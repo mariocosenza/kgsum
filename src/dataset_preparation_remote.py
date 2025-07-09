@@ -539,6 +539,8 @@ async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False)
         "comments": comments
     }
 
+import os
+
 async def main_normal() -> None:
     logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
     try:
@@ -586,8 +588,10 @@ async def main_normal() -> None:
         ],
     )
     output_path = "../data/raw/remote/remote_feature_set_sparqlwrapper.json"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_json(output_path, orient="records")
     logger.info(f"[MAIN] Finished processing. Output saved to {output_path}")
+
 
 async def main_void() -> None:
     logger.info("[VOID-MAIN] Starting asynchronous VOID dataset processing.")
@@ -620,8 +624,10 @@ async def main_void() -> None:
         logger.info(f"[VOID-MAIN] Processed {processed}/{total} VOID endpoints")
     df = pd.DataFrame(results, columns=["id", "sbj", "dsc", "category"])
     output_path = "../data/raw/remote/remote_void_feature_set_sparqlwrapper.json"
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df.to_json(output_path, orient="records")
     logger.info(f"[VOID-MAIN] Finished VOID processing. Output saved to {output_path}")
+
 
 if __name__ == "__main__":
     asyncio.run(main_normal())

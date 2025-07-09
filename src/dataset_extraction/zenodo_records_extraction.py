@@ -132,8 +132,7 @@ def safe_generate_content_ollama(description):
     )
 
     try:
-        # Added a 2-minute (120 seconds) timeout parameter
-        response = ollama.generate(model="gemma3:12b", prompt=prompt, timeout=120)
+        response = ollama.generate(model="gemma3:12b", prompt=prompt)
         output = response['response'].strip()
         logger.info(f"Raw output from Ollama: {output}")
         predicted = extract_category(output)
@@ -155,8 +154,36 @@ def get_zenodo_records(g_client, use_ollama=False):
         ("sort", "newest")
     ]
 
-    response = zenodo_get(url, params=params, timeout=600)
-    response.raise_for_status()
+    max_retries = 5
+    delay = 2  # seconds
+
+    response = None
+    last_exception = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = zenodo_get(url, params=params, timeout=600)
+            try:
+                response.raise_for_status()
+                # Se non solleva, la risposta è OK (non 504, non altri errori)
+                break
+            except requests.exceptions.HTTPError as e:
+                if response.status_code == 504:
+                    logger.warning(f"Attempt {attempt}: 504 Gateway Timeout from server. Retrying...")
+                    last_exception = e
+                else:
+                    # Per altri status code, esci subito (o cambia questa logica a piacere)
+                    logger.error(f"HTTP error {response.status_code}: {e}")
+                    raise
+        except Exception as e:
+            last_exception = e
+            logger.warning(f"Attempt {attempt} failed: {e}")
+        if attempt < max_retries:
+            time.sleep(delay)
+        else:
+            logger.error("Error calling Zenodo API after 5 attempts: %s", last_exception)
+            raise ValueError("Max retries exceeded for get_zenodo_records") from last_exception
+
     data = response.json()
 
     records = []
@@ -328,12 +355,12 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
     df.to_csv(output_csv_path, index=False)
     return df
 
-
-if __name__ == "__main__":
+def main(use_gemini=False):
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     download_folder = "../../data/raw/rdf_dump"
     output_csv_path = "../../data/raw/zenodo_with_files.csv"
-    use_ollama = False
-    df_final = process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=use_ollama)
-    # Alternatively:
-    # get_zenodo_records(client, use_ollama=use_ollama).to_csv(output_csv_path, index=False)
+    process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=not use_gemini)
+
+
+if __name__ == "__main__":
+    main(use_gemini=False)

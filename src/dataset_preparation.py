@@ -426,7 +426,7 @@ def init_worker(lod_frame_path: str):
     lod_frame_global = df[~df["category"].fillna("").str.strip().eq("user_generated")].reset_index(drop=True)
 
 def process_local_dataset_file(args):
-    category, filename, offset, limit, filter_curi, filter_voc = args
+    category, filename, offset, limit = args
     global lod_frame_global
 
     path = os.path.join("../data/raw/rdf_dump", category, filename)
@@ -504,14 +504,15 @@ def robust_pool_map(pool, func, tasks):
 def create_local_dataset(
     offset: int = 0,
     limit: int = 10000,
-    filter_curi: bool = False,
-    filter_voc: bool = False
 ):
+    out_path = f"../data/raw/local/local_feature_set_{offset}_{limit}.json"
+    # Check subito, uscita immediata se il file esiste
+    if os.path.exists(out_path):
+        logger.info(f"File already exists: {out_path} -- Skipping creation.")
+        return
+
     lod_frame_path = "../data/raw/sparql_full_download.csv"
     tasks = []
-    out_path = f"../data/raw/local/local_feature_set_{offset}_{limit}.json"
-    if os.path.exists(out_path):
-        return
 
     valid_categories = [cat for cat in CATEGORIES if cat != "user_generated"]
 
@@ -523,7 +524,7 @@ def create_local_dataset(
         for filename in listdir(directory):
             if filename.startswith("."):
                 continue
-            tasks.append((category, filename, offset, limit, filter_curi, filter_voc))
+            tasks.append((category, filename, offset, limit))
 
     if not tasks:
         logger.warning("No tasks scheduled for local dataset.")
@@ -562,7 +563,14 @@ def create_local_dataset(
     else:
         logger.warning("No results produced for local dataset.")
 
+
 def create_local_void_dataset(offset: int = 0, limit: int = 10000):
+    out_path = f"../data/raw/local/local_void_feature_set_{offset}_{limit}.json"
+    # Check subito, uscita immediata se il file esiste
+    if os.path.exists(out_path):
+        logger.info(f"File already exists: {out_path} -- Skipping creation.")
+        return
+
     lod_frame_path = "../data/raw/sparql_full_download.csv"
     tasks = []
 
@@ -595,7 +603,6 @@ def create_local_void_dataset(offset: int = 0, limit: int = 10000):
         df = pd.DataFrame(results, columns=[
             "id", "title", "sbj", "dsc", "category"
         ])
-        out_path = f"../data/raw/local/local_void_feature_set_{offset}_{limit}.json"
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         df.to_json(out_path, orient="records", index=False)
         logger.info(f"Saved local void feature set to {out_path}")

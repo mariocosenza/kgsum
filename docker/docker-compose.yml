@@ -16,6 +16,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - UPLOAD_FOLDER=${UPLOAD_FOLDER}
       - CLERK_MIDDLEWARE_ENABLED=${CLERK_MIDDLEWARE_ENABLED}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
     restart: unless-stopped
 #     command: ["bash", "boot.sh"]
 

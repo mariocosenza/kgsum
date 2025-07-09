@@ -1,10 +1,14 @@
 from __future__ import annotations
+
 import os
+from collections.abc import Sequence
+from typing import Any, NamedTuple, Self
+
 import numpy as np
 import pandas as pd
-from enum import Enum, auto
-from typing import Any, NamedTuple, Self
-from collections.abc import Sequence
+
+from config import ClassifierType
+
 
 # --- Ensure reproducibility across all libraries ---
 def set_seed(seed: int = 42):
@@ -40,11 +44,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class AutoencoderType(Enum):
-    """Supported autoencoder architectures."""
-    MLP = auto()
-    DEEP = auto()
-    BATCHNORM = auto()
+
 
 class TrainingResult(NamedTuple):
     f1: float
@@ -117,12 +117,12 @@ class AEBatchNorm(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
 
-def get_autoencoder(arch: AutoencoderType, input_dim: int, latent_dim: int = 32) -> nn.Module:
-    if arch == AutoencoderType.MLP:
+def get_autoencoder(arch: ClassifierType, input_dim: int, latent_dim: int = 32) -> nn.Module:
+    if arch == ClassifierType.MLP:
         return AEMLP(input_dim, latent_dim)
-    elif arch == AutoencoderType.DEEP:
+    elif arch == ClassifierType.DEEP:
         return AEDeep(input_dim, latent_dim)
-    elif arch == AutoencoderType.BATCHNORM:
+    elif arch == ClassifierType.BATCHNORM:
         return AEBatchNorm(input_dim, latent_dim)
     else:
         raise ValueError(f"Unknown autoencoder architecture: {arch}")
@@ -194,7 +194,7 @@ class FeatureTfidfEncoder(BaseEstimator, TransformerMixin):
 class AutoencoderEncoder(BaseEstimator, TransformerMixin):
     def __init__(
         self, latent_dim: int = 32, epochs: int = 20, batch_size: int = 64,
-        lr: float = 1e-3, arch: AutoencoderType = AutoencoderType.MLP, verbose: bool = False
+        lr: float = 1e-3, arch: ClassifierType = ClassifierType.MLP, verbose: bool = False
     ) -> None:
         self.latent_dim = latent_dim
         self.epochs = epochs
@@ -248,7 +248,7 @@ class AutoencoderEncoder(BaseEstimator, TransformerMixin):
         return self.fit(X, y).transform(X)
 
 def build_pipeline(
-    arch: AutoencoderType, latent_dim: int = 32, use_tfidf: bool = True, oversample: bool = False
+    arch: ClassifierType, latent_dim: int = 32, use_tfidf: bool = True, oversample: bool = False
 ) -> Pipeline:
     logger.info("[PIPELINE] Building model pipeline. TF-IDF: %s | Oversample: %s", use_tfidf, oversample)
     steps: list[tuple[str, Any]] = []
@@ -272,7 +272,7 @@ def random_search_params() -> dict[str, Sequence[Any]]:
 def train_and_validate_model(
     X_train: np.ndarray, y_train: np.ndarray,
     X_test: np.ndarray, y_test: np.ndarray,
-    arch: AutoencoderType, latent_dim: int = 32,
+    arch: ClassifierType, latent_dim: int = 32,
     use_tfidf: bool = True, oversample: bool = False
 ) -> tuple[Pipeline, TrainingResult]:
     logger.info("[TRAIN] Starting random search + validation")
@@ -316,7 +316,7 @@ def load_models(path: str) -> tuple[dict[str, Pipeline], dict[str, TrainingResul
 
 def train_autoencoder_models(
     df: pd.DataFrame, feature_columns: list[str], target_label: str,
-    arch: AutoencoderType, latent_dim: int, use_tfidf: bool = True, oversample: bool = False
+    arch: ClassifierType, latent_dim: int, use_tfidf: bool = True, oversample: bool = False
 ) -> tuple[dict[str, Pipeline], dict[str, TrainingResult]]:
     models: dict[str, Pipeline] = {}
     training_results: dict[str, TrainingResult] = {}

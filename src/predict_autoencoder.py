@@ -6,7 +6,7 @@ import shutil
 
 import pandas as pd
 
-from autoencoder_pipeline import AutoencoderType, load_models, train_autoencoder_models, save_models, \
+from autoencoder_pipeline import ClassifierType, load_models, train_autoencoder_models, save_models, \
     predict_category_majority_vote
 from util import get_data_folder_path, get_project_root, get_model_file_path
 
@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 FEATURES: list[str] = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments', 'tlds']
-AE_MODEL: AutoencoderType = AutoencoderType.BATCHNORM
+AE_MODEL: ClassifierType = ClassifierType.BATCHNORM
 LATENT_DIM: int = 32
 TARGET_LABEL: str = "category"
 USE_TFIDF: bool = True  # Set to False if you want only OneHot
