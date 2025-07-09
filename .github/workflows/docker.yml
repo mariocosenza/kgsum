@@ -3,11 +3,11 @@ name: Run Docker Compose
 on:
   push:
     paths:
-      - 'docker/docker-compose.yml'
+      - 'docker/web/docker-compose.yml'
       - '.github/workflows/docker-compose.yml'
   pull_request:
     paths:
-      - 'docker/docker-compose.yml'
+      - 'docker/web/docker-compose.yml'
       - '.github/workflows/docker-compose.yml'
 
 jobs:
