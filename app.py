@@ -44,7 +44,8 @@ def clerk_jwt_required(fn):
                 )
                 g.current_user = payload
             except jwt.PyJWTError as e:
-                return jsonify({"error": f"Token validation error: {str(e)}"}), 401
+                app.logger.error(f"Token validation error: {str(e)}")
+                return jsonify({"error": "Token validation error"}), 401
 
         return await fn(*args, **kwargs)
 
