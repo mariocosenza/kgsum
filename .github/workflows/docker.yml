@@ -3,11 +3,11 @@ name: Run Docker Compose
 on:
   push:
     paths:
-      - 'docker/docker-compose.yml'
+      - 'docker/web/docker-compose.yml'
       - '.github/workflows/docker-compose.yml'
   pull_request:
     paths:
-      - 'docker/docker-compose.yml'
+      - 'docker/web/docker-compose.yml'
       - '.github/workflows/docker-compose.yml'
 
 jobs:
@@ -32,5 +32,5 @@ jobs:
 
       - name: Tear down docker compose
         if: always()
-        working-directory: ./docker
+        working-directory: ./docker/web
         run: docker compose down
