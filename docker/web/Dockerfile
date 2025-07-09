@@ -11,7 +11,7 @@ WORKDIR /app
 # Copy package files from the correct path
 COPY ../../frontend/kgsum-frontend/package.json ../../frontend/kgsum-frontend/package-lock.json* ./
 # Install dependencies using npm only
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --ignore-scripts && npm cache clean --force
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -44,7 +44,7 @@ RUN echo "Build User: mariocosenza"
 RUN echo "==================================="
 
 # Install all dependencies for build
-RUN npm ci
+RUN npm ci --ignore-scripts
 # Build the application using npm
 RUN npm run build
 
