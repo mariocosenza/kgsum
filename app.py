@@ -1,6 +1,6 @@
 import functools
 import os
-
+import hashlib
 import jwt
 import psutil
 from flasgger import Swagger
@@ -192,7 +192,7 @@ async def rdf_profile():
         return jsonify({"error": "File type not allowed"}), 400
 
     filename = secure_filename(file.filename)
-    save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], hashlib.sha256(str(filename).encode()).hexdigest())
     try:
         file.save(save_path)
     except Exception as e:
