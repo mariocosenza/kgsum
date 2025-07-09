@@ -105,7 +105,7 @@ def _phase_list(phase: Phase, phase_2: Phase) -> list[Phase]:
     phase_order = [Phase.LABELING, Phase.EXTRACTION, Phase.PROCESSING, Phase.TRAINING, Phase.STORE]
     list_phase = [phase]
     for phase_o in phase_order:
-        if phase_order.index(phase_o) >= phase_order.index(phase) <= phase_order.index(phase_2):
+        if phase_order.index(phase_o) >= phase_order.index(phase) and phase_order.index(phase_o) <= phase_order.index(phase_2):
             list_phase.append(phase_o)
     return list_phase
 

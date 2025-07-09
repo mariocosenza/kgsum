@@ -36,15 +36,13 @@ LOD_CATEGORY_NO_USER_DOMAIN = {
 }
 
 
-CURI_PURI_FILTER = set(pd.read_json(
+FILTER_DATA = pd.read_json(
     os.path.join(get_project_root(), 'src', 'filter', 'filter.json'),
     typ='series'
-)['CURI_PURI_FILTER'])
+)
 
-VOC_FILTER = set(pd.read_json(
-    os.path.join(get_project_root(), 'src', 'filter', 'filter.json'),
-    typ='series'
-)['VOC_FILTER'])
+CURI_PURI_FILTER = set(FILTER_DATA['CURI_PURI_FILTER'])
+VOC_FILTER = set(FILTER_DATA['VOC_FILTER'])
 
 
 def is_curi_allowed(uri: str) -> bool:
