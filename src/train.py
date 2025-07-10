@@ -88,6 +88,7 @@ def main():
     _extraction()
     _processing()
     _training()
+    _profile()
 
 if __name__ == '__main__':
     main()

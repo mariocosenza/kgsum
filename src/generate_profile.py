@@ -13,7 +13,11 @@ from src.predict_category import CategoryPredictor
 from src.preprocessing import process_all_from_input
 
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
-PREDICTOR: CategoryPredictor = CategoryPredictor.get_predictor()
+PREDICTOR: CategoryPredictor | None = None
+
+def load_predictor():
+   global PREDICTOR
+   PREDICTOR = CategoryPredictor.get_predictor()
 
 
 async def _update_query(query, timeout=300):

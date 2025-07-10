@@ -167,11 +167,11 @@ def save_to_csv(results, output_file="../../data/raw/github_unique_repos_with_tt
     return df
 
 
-def download_and_predict(g_client, download_folder, output_file="../../data/raw/github_unique_repos_with_ttl_nt.csv",
+def download_and_predict(g_client, download_folder, output_file="../data/raw/github_unique_repos_with_ttl_nt.csv",
                          use_ollama=False):
     id_int = 2000
     token = os.environ.get("GITHUB_TOKEN")
-    df = pd.read_csv("../../data/raw/github_unique_repos_with_ttl_nt.csv")
+    df = pd.read_csv("../data/raw/github_unique_repos_with_ttl_nt.csv")
 
     # Ensure the 'category' column exists
     if 'category' not in df.columns:
@@ -230,7 +230,7 @@ def main(use_gemini=True):
     if not token:
         logger.error("GITHUB_TOKEN is not set in the environment variables.")
         return
-    download_folder = "../../data/raw/rdf_dump"
+    download_folder = "../data/raw/rdf_dump"
     file_extensions = ["ttl", "nt", "nq"]
     logger.info(f"Searching for files with extensions: {', '.join(file_extensions)}")
     results = search_github_files(file_extensions, token, max_pages=10)

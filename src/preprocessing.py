@@ -447,12 +447,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocess dataset with optional NER, GPU, filter and parallelism.")
     parser.add_argument("--no-ner", action="store_true", help="Disable NER and set ner field to [].")
     parser.add_argument("--gpu", action="store_true", help="Enable GPU for spaCy pipelines if available.")
-    parser.add_argument("--batch-size", type=int, default=32, help="spaCy batch size.")
+    parser.add_argument("--batch-size", type=int, default=512, help="spaCy batch size.")
     parser.add_argument("--n-process", type=int, default=1, help="Number of processes for spaCy batching (CPU only).")
     parser.add_argument("--no-filter", action="store_true", help="Disable the filter checks for is_*_allowed.")
     args = parser.parse_args()
     main(
-        use_ner=not args.no_ner,
+        use_ner=args.no_ner,
         use_gpu=args.gpu,
         batch_size=args.batch_size,
         n_process=args.n_process,

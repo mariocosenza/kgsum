@@ -36,7 +36,7 @@ from transformers import (
     BitsAndBytesConfig
 )
 
-from config import ClassifierType
+from config import ClassifierType, Config
 
 try:
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -246,6 +246,8 @@ def train_multiple_models(
 
     for feature in tqdm(feature_columns, desc="Training models"):
         df_feat = remove_empty_rows(training_data, [feature, target_label])
+        class_dist = df_feat[target_label].value_counts()
+        logger.info("Class distribution for feature '%s': %s", feature, class_dist.to_dict())
         if df_feat.empty:
             logger.info("Skipping '%s': no data available.", feature)
             continue
@@ -392,7 +394,7 @@ class KnowledgeGraphClassifier:
         frame: pd.DataFrame,
         feature_labels: FeatureLabels,
         target_label: str = "category",
-        max_length: int = 256
+        max_length: int = Config.MAX_TOKEN
     ) -> dict[str, Any]:
         if self.classifier_type == ClassifierType.MISTRAL:
             return self.train_mistral(frame, feature_labels, target_label=target_label, max_length=max_length)
@@ -459,7 +461,7 @@ class KnowledgeGraphClassifier:
         elif clf_type == ClassifierType.NAIVE_BAYES:
             estimator = MultinomialNB()
             param_dist = {
-                "classifier__alpha": np.linspace(0.1, 2, 7),
+                "classifier__alpha": np.linspace(0.01, 2, 10),
                 "classifier__fit_prior": [True, False],
             }
         elif clf_type == ClassifierType.KNN:
@@ -503,13 +505,13 @@ class KnowledgeGraphClassifier:
             return prod
 
         total_poss = total_combinations(param_dist)
-        n_iter = min(20, total_poss)
+        n_iter = min(50, total_poss)
 
         search = RandomizedSearchCV(
             estimator=pipeline,
             param_distributions=param_dist,
             n_iter=n_iter,
-            cv=2,  # as requested
+            cv=2,
             scoring="f1_weighted",
             verbose=1,
             n_jobs=-1,

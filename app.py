@@ -9,7 +9,7 @@ from flask import request, jsonify, g
 from werkzeug.utils import secure_filename
 
 from src.service.file_upload_service import UPLOAD_FOLDER, allowed_file
-from src.service.generate_profile_service import generate_profile_service_store, generate_profile_service
+from src.service.generate_profile_service import generate_profile_service_store, generate_profile_service, load_predictor
 
 AUTH = os.getenv("CLERK_MIDDLEWARE_ENABLED", "false").lower()
 # PEM public key as string
@@ -23,8 +23,9 @@ if not SECRET_KEY:
 
 Swagger(app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 active_requests = 0
+
+load_predictor()
 
 
 def clerk_jwt_required(fn):

@@ -58,7 +58,7 @@ if __name__ == "__main__":
     if os.path.exists(directory_path):
         shutil.rmtree(directory_path)
     PREDICTOR = CategoryPredictor.get_predictor(
-        classifier=ClassifierType.NAIVE_BAYES,
+        classifier=ClassifierType.SVM,
         feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'],
-        oversample=True
+        oversample=False
     )

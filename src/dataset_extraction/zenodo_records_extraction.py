@@ -357,8 +357,8 @@ def process_zenodo_records_with_download(g_client, download_folder, output_csv_p
 
 def main(use_gemini=False):
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    download_folder = "../../data/raw/rdf_dump"
-    output_csv_path = "../../data/raw/zenodo_with_files.csv"
+    download_folder = "../data/raw/rdf_dump"
+    output_csv_path = "../data/raw/zenodo_with_files.csv"
     process_zenodo_records_with_download(client, download_folder, output_csv_path, use_ollama=not use_gemini)
 
 

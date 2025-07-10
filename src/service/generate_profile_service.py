@@ -3,7 +3,7 @@ import os
 
 from config import Config
 from src.generate_profile import generate_profile, generate_and_store_profile
-
+from src.generate_profile import load_predictor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 Config.init_configuration()
