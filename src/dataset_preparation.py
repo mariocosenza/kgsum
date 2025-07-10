@@ -9,6 +9,7 @@ import rdflib
 from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
 
+from config import Config
 from lov_data_preparation import find_tags_from_list, find_comments_from_lists
 from src.util import match_file_lod, CATEGORIES
 
@@ -392,7 +393,7 @@ def process_file_full_inplace(
         vocabularies = list(vocabularies)
         voc_tags = []
         comments = []
-        if ingest_lov:
+        if ingest_lov or Config.QUERY_LOV:
             voc_tags = find_tags_from_list(vocabularies)
             comments = find_comments_from_lists(curi_list=class_list, puri_list=property_list)
 
@@ -597,7 +598,7 @@ def create_local_void_dataset(offset: int = 0, limit: int = 10000):
             initializer=init_worker,
             initargs=(lod_frame_path,),
     ) as pool:
-        results = robust_pool_map(pool, process_local_dataset_file, tasks)
+        results = robust_pool_map(pool, process_local_void_dataset_file, tasks)
 
     if results:
         df = pd.DataFrame(results, columns=[

@@ -517,7 +517,7 @@ async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False)
     void_list = await process_endpoint_void(row)
     voc_tags = []
     comments = []
-    if ingest_lov:
+    if ingest_lov or Config.QUERY_LOV:
         voc_tags = find_tags_from_list(data_list[2])
         comments = find_comments_from_lists(curi_list= data_list[3], puri_list=data_list[4])
 
