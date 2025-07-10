@@ -1,7 +1,6 @@
-import {ReactNode} from "react";
+import React, {ReactNode} from "react";
 import {ScrollArea} from "@/components/ui/scroll-area";
 import {Separator} from "@/components/ui/separator";
-import React from "react";
 import Link from "next/link";
 import {VERSIONS} from "@/components/VERSIONS";
 
@@ -25,7 +24,7 @@ export const SideTags = (): ReactNode => {
                                     {tag}
                                 </Link>
                                 {index < tags.length - 1 && (
-                                    <Separator className="my-1" />
+                                    <Separator className="my-1"/>
                                 )}
                             </React.Fragment>
                         ))}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
 
 export const Footer = () => {
     return (
@@ -19,7 +19,7 @@ export const Footer = () => {
                         className="flex items-center"
                     >
                         <Avatar className="hidden md:block h-6 w-6 mr-2 ">
-                            <AvatarImage src="https://avatars.githubusercontent.com/u/61911701?v=4" />
+                            <AvatarImage src="https://avatars.githubusercontent.com/u/61911701?v=4"/>
                             <AvatarFallback>MC</AvatarFallback>
                         </Avatar>
                     </Link>

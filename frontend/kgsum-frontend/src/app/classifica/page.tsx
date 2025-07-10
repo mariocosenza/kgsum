@@ -4,7 +4,7 @@ import {Form} from "@/app/classifica/form";
 export default function Classifica(): ReactNode {
     return (
         <div>
-                    <Form/>
+            <Form/>
         </div>
 
     )

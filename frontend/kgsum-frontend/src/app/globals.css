@@ -4,137 +4,138 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+    --radius: 0.625rem;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.129 0.042 264.695);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.129 0.042 264.695);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.129 0.042 264.695);
+    --primary: oklch(0.208 0.042 265.755);
+    --primary-foreground: oklch(0.984 0.003 247.858);
+    --secondary: oklch(0.968 0.007 247.896);
+    --secondary-foreground: oklch(0.208 0.042 265.755);
+    --muted: oklch(0.968 0.007 247.896);
+    --muted-foreground: oklch(0.554 0.046 257.417);
+    --accent: oklch(0.968 0.007 247.896);
+    --accent-foreground: oklch(0.208 0.042 265.755);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.929 0.013 255.508);
+    --input: oklch(0.929 0.013 255.508);
+    --ring: oklch(0.704 0.04 256.788);
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    --sidebar: oklch(0.984 0.003 247.858);
+    --sidebar-foreground: oklch(0.129 0.042 264.695);
+    --sidebar-primary: oklch(0.208 0.042 265.755);
+    --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+    --sidebar-accent: oklch(0.968 0.007 247.896);
+    --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+    --sidebar-border: oklch(0.929 0.013 255.508);
+    --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+    --background: oklch(0.129 0.042 264.695);
+    --foreground: oklch(0.984 0.003 247.858);
+    --card: oklch(0.208 0.042 265.755);
+    --card-foreground: oklch(0.984 0.003 247.858);
+    --popover: oklch(0.208 0.042 265.755);
+    --popover-foreground: oklch(0.984 0.003 247.858);
+    --primary: oklch(0.929 0.013 255.508);
+    --primary-foreground: oklch(0.208 0.042 265.755);
+    --secondary: oklch(0.279 0.041 260.031);
+    --secondary-foreground: oklch(0.984 0.003 247.858);
+    --muted: oklch(0.279 0.041 260.031);
+    --muted-foreground: oklch(0.704 0.04 256.788);
+    --accent: oklch(0.279 0.041 260.031);
+    --accent-foreground: oklch(0.984 0.003 247.858);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.551 0.027 264.364);
+    --chart-1: oklch(0.488 0.243 264.376);
+    --chart-2: oklch(0.696 0.17 162.48);
+    --chart-3: oklch(0.769 0.188 70.08);
+    --chart-4: oklch(0.627 0.265 303.9);
+    --chart-5: oklch(0.645 0.246 16.439);
+    --sidebar: oklch(0.208 0.042 265.755);
+    --sidebar-foreground: oklch(0.984 0.003 247.858);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+    --sidebar-accent: oklch(0.279 0.041 260.031);
+    --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
 @layer theme, base, clerk, components, utilities;
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+    * {
+        @apply border-border outline-ring/50;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
 }
 
 .cl-button,
 .cl-input,
 .cl-menuList {
-  @apply !shadow-none;
+    @apply !shadow-none;
 }
 
 .cl-formButtonPrimary {
-  @apply inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-primary px-3  font-medium text-primary-foreground !shadow-none ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-primary px-3  font-medium text-primary-foreground !shadow-none ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
 }
 
 .cl-formButtonPrimary {
-  @apply inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-primary px-3  font-medium text-primary-foreground !shadow-none ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-primary px-3  font-medium text-primary-foreground !shadow-none ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
 }
 
 .cl-card,
@@ -143,7 +144,7 @@
 .cl-phoneInputBox,
 .cl-userButtonPopoverCard,
 .cl-organizationSwitcherPopoverCard {
-  @apply rounded-lg border border-input bg-background;
+    @apply rounded-lg border border-input bg-background;
 }
 
 .cl-headerTitle,
@@ -165,11 +166,11 @@
 .cl-form p,
 .cl-accordionTriggerButton,
 .cl-organizationSwitcherTrigger {
-  @apply text-foreground;
+    @apply text-foreground;
 }
 
 .cl-formFieldErrorText {
-  @apply !text-destructive;
+    @apply !text-destructive;
 }
 
 .cl-headerSubtitle,
@@ -193,64 +194,64 @@
 .cl-fileDropAreaHint,
 .cl-fileDropAreaFooterHint,
 .cl-form
-  p[data-localization-key="userProfile.emailAddressPage.emailCode.formHint"],
+p[data-localization-key="userProfile.emailAddressPage.emailCode.formHint"],
 p[data-localization-key="userProfile.profilePage.successMessage"] {
-  @apply text-muted-foreground;
+    @apply text-muted-foreground;
 }
 
 .cl-dividerLine {
-  @apply bg-border;
+    @apply bg-border;
 }
 
 .cl-formFieldInput[type="text"],
 .cl-formFieldInput[type="email"],
 .cl-formFieldInput[type="password"] {
-  @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .cl-footerActionLink {
-  @apply text-accent-foreground underline hover:text-accent-foreground/90;
+    @apply text-accent-foreground underline hover:text-accent-foreground/90;
 }
 
 .cl-otpCodeFieldInput {
-  @apply !border !border-input text-foreground;
+    @apply !border !border-input text-foreground;
 }
 
 .cl-formResendCodeLink {
-  @apply text-primary disabled:opacity-90;
+    @apply text-primary disabled:opacity-90;
 }
 
 .cl-selectSearchInput__countryCode {
-  @apply flex h-10 w-full rounded-md border border-b border-input bg-background text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex h-10 w-full rounded-md border border-b border-input bg-background text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .cl-selectOptionsContainer__countryCode {
-  @apply border border-input bg-background;
+    @apply border border-input bg-background;
 }
 
 .cl-internal-icon,
 .cl-userPreviewSecondaryIdentifier__userButton {
-  @apply text-foreground;
+    @apply text-foreground;
 }
 
 button[data-localization-key="userProfile.start.dangerSection.deleteAccountButton"] {
-  @apply bg-destructive text-white  hover:text-white hover:bg-destructive;
+    @apply bg-destructive text-white  hover:text-white hover:bg-destructive;
 }
 
 .cl-fileDropAreaBox {
-  @apply dark:bg-gray-900;
+    @apply dark:bg-gray-900;
 }
 
 .cl-fileDropAreaIconBox {
-  @apply dark:bg-gray-800;
+    @apply dark:bg-gray-800;
 }
 
 .cl-fileDropAreaIcon {
-  @apply dark:text-gray-400;
+    @apply dark:text-gray-400;
 }
 
 .cl-fileDropAreaButtonPrimary {
-  @apply h-10 px-4 py-2 text-foreground transition-colors hover:bg-secondary hover:text-accent-foreground;
+    @apply h-10 px-4 py-2 text-foreground transition-colors hover:bg-secondary hover:text-accent-foreground;
 }
 
 .cl-userButtonPopoverActionButton,
@@ -258,43 +259,44 @@ button[data-localization-key="userProfile.start.dangerSection.deleteAccountButto
 .cl-profileSectionPrimaryButton,
 .cl-accordionTriggerButton,
 .cl-navbarButton {
-  @apply hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
+    @apply hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
 }
 
 .cl-navbarButton[data-active="true"] {
-  @apply bg-sidebar-accent text-sidebar-accent-foreground;
+    @apply bg-sidebar-accent text-sidebar-accent-foreground;
 }
 
 .cl-card {
-  @apply rounded-lg;
+    @apply rounded-lg;
 }
 
 .cl-userButtonPopoverCard {
-  @apply rounded-md;
+    @apply rounded-md;
 }
 
 .cl-userButtonPopoverFooter a {
-  @apply hover:text-muted-foreground;
+    @apply hover:text-muted-foreground;
 }
 
 .cl-badge {
-  @apply rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-foreground !shadow-none;
+    @apply rounded-full border border-input bg-background px-2.5 py-0.5 text-xs text-foreground !shadow-none;
 }
 
 .cl-badge[data-localization-key="badge__unverified"] {
-  @apply border bg-transparent text-destructive dark:text-red-500;
+    @apply border bg-transparent text-destructive dark:text-red-500;
 }
 
 .cl-formButtonReset {
-  @apply text-foreground hover:bg-secondary;
+    @apply text-foreground hover:bg-secondary;
 }
 
 .cl-footer {
-  @apply rounded-b-lg border-x border-b bg-background bg-gradient-to-t from-background to-background  text-muted-foreground;
+    @apply rounded-b-lg border-x border-b bg-background bg-gradient-to-t from-background to-background  text-muted-foreground;
 }
+
 .cl-userButtonPopoverFooter,
 .cl-organizationSwitcherPopoverFooter {
-  @apply rounded-b-lg bg-gradient-to-t from-background to-background;
+    @apply rounded-b-lg bg-gradient-to-t from-background to-background;
 }
 
 .cl-signIn-start,
@@ -302,73 +304,73 @@ button[data-localization-key="userProfile.start.dangerSection.deleteAccountButto
 .cl-signIn-password,
 .cl-signIn-alternativeMethods,
 .cl-signIn-emailCode {
-  @apply rounded-b-none border-b-0;
+    @apply rounded-b-none border-b-0;
 }
 
 .cl-cardBox {
-  @apply rounded-lg shadow-sm;
+    @apply rounded-lg shadow-sm;
 }
 
 .cl-socialButtonsBlockButton {
-  @apply h-10 !border;
+    @apply h-10 !border;
 }
 
 .cl-alternativeMethods .cl-alternativeMethodsBlockButton {
-  @apply h-10 !border border-input text-muted-foreground;
+    @apply h-10 !border border-input text-muted-foreground;
 }
 
 .cl-alternativeMethodsBlockButton {
-  @apply h-10 !shadow-none;
+    @apply h-10 !shadow-none;
 }
 
 .cl-navbar {
-  @apply rounded-lg border-y border-l bg-gradient-to-t from-background to-background;
+    @apply rounded-lg border-y border-l bg-gradient-to-t from-background to-background;
 }
 
 .cl-scrollBox {
-  @apply rounded-lg rounded-l-none border border-input bg-gradient-to-t from-background to-background;
+    @apply rounded-lg rounded-l-none border border-input bg-gradient-to-t from-background to-background;
 }
 
 h1[data-localization-key="userProfile.navbar.title"] {
-  @apply text-foreground;
+    @apply text-foreground;
 }
 
 .cl-profilePage > .cl-header {
-  @apply border-b;
+    @apply border-b;
 }
 
 .cl-profileSection__profile,
 .cl-profileSection__emailAddresses {
-  @apply border-b;
+    @apply border-b;
 }
 
 .cl-menuButton {
-  @apply text-foreground hover:text-foreground;
+    @apply text-foreground hover:text-foreground;
 }
 
 .cl-menuList {
-  @apply border border-input bg-background;
+    @apply border border-input bg-background;
 }
 
 .cl-actionCard {
-  @apply border border-input bg-background !shadow-none;
+    @apply border border-input bg-background !shadow-none;
 }
 
 .cl-menuItem[data-color="neutral"] {
-  @apply text-foreground hover:bg-muted;
+    @apply text-foreground hover:bg-muted;
 }
 
 .cl-avatarImageActionsUpload {
-  @apply !border border-input text-foreground;
+    @apply !border border-input text-foreground;
 }
 
 .cl-userButtonPopoverMain,
 .cl-organizationSwitcherPopoverMain {
-  @apply rounded-lg border-input bg-background;
+    @apply rounded-lg border-input bg-background;
 }
 
 .cl-selectButton {
-  @apply !border !border-input;
+    @apply !border !border-input;
 }
 
 

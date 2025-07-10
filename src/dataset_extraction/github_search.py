@@ -238,9 +238,5 @@ def main(use_gemini=True):
     download_and_predict(client, download_folder, use_ollama=not use_gemini)
 
 
-
-
-
 if __name__ == "__main__":
     main()
-

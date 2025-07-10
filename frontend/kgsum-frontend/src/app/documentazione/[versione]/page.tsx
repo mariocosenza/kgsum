@@ -14,7 +14,7 @@ function checkVersion(version: string): boolean {
     return VERSIONS.includes(version);
 }
 
-export default async function SelectedVersionPage({ params }: { params: Promise<{ versione: string }> }) {
+export default async function SelectedVersionPage({params}: { params: Promise<{ versione: string }> }) {
     // Await the params Promise
     const resolvedParams = await params;
 
@@ -44,6 +44,6 @@ export default async function SelectedVersionPage({ params }: { params: Promise<
     }
 
     return (
-        <DocumentTemplate content={content} />
+        <DocumentTemplate content={content}/>
     );
 }

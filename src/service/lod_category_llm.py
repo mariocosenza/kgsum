@@ -6,7 +6,6 @@ from xml.dom import minidom
 import ollama
 import pandas as pd
 from google import genai
-
 from sklearn.metrics import precision_score, recall_score, f1_score, classification_report
 
 from src.util import LOD_CATEGORY_NO_MULTIPLE_DOMAIN
@@ -26,6 +25,7 @@ CATEGORIES_COLOR: dict[str, str] = {
     '#d84d8c': 'user_generated'
 }
 
+
 def build_prompt(description, keywords):
     return (
         f"""Given the following description and keywords, find a category for the given data. 
@@ -36,6 +36,7 @@ def build_prompt(description, keywords):
         Description: {description}
         Keywords: {keywords}. """
     )
+
 
 def call_gemini_with_retries(client, description, keywords, col, max_calls, calls_in_minute, minute_start):
     # Rate limiting (10 per min)
@@ -82,6 +83,7 @@ def call_gemini_with_retries(client, description, keywords, col, max_calls, call
     calls_in_minute[0] += 1
     return result
 
+
 def safe_generate_content_ollama(description, keywords) -> str:
     prompt = build_prompt(description, keywords)
     try:
@@ -92,6 +94,7 @@ def safe_generate_content_ollama(description, keywords) -> str:
         logger.error(f"Error calling Ollama model: {e}")
         return ""
     return output
+
 
 def _category_prediction_core(records_iter, df, client, use_ollama, lod_category_func=None, limit=500):
     hit, miss = 0, 0
@@ -141,6 +144,7 @@ def _category_prediction_core(records_iter, df, client, use_ollama, lod_category
 
     return pd.DataFrame(records), hit, miss
 
+
 def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.DataFrame:
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     df = pd.read_json('../../data/raw/lod-data.json')
@@ -149,6 +153,7 @@ def predict_category_from_lod_description(limit=500, use_ollama=False) -> pd.Dat
     logger.info(f'Category hit: {hit}')
     logger.info(f'Category miss: {miss}')
     return result_df
+
 
 def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
     doc = minidom.parse('../../data/raw/lod-cloud.svg')
@@ -180,6 +185,7 @@ def predict_category_from_lod_svg(limit=500, use_ollama=False) -> pd.DataFrame:
     logger.info(f'Category miss: {miss}')
     return result_df
 
+
 def calculate_metrics_sklearn(df: pd.DataFrame, average: str = "macro"):
     y_true = df['lod_category']
     y_pred = df['predicted_category']
@@ -195,6 +201,7 @@ def calculate_metrics_sklearn(df: pd.DataFrame, average: str = "macro"):
         "f1": f1,
         "classification_report": report
     }
+
 
 if __name__ == '__main__':
     # df = predict_category_from_lod_svg().to_csv('../../data/raw/lod-gemini-svg.csv')

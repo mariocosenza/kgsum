@@ -264,13 +264,16 @@ def _find_voc_tags_from_list(voc_list: list) -> list:
 
     return tags
 
+
 def find_tags_from_list(voc_list: list) -> list:
     return _find_voc_tags_from_list(voc_list)
+
 
 def find_comments_from_lists(curi_list: list, puri_list: list) -> list:
     comments = _process_row(set(curi_list))
     comments.extend(_process_row(set(puri_list)))
     return list(comments)
+
 
 def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
     logger.info('Started processing LOV data')

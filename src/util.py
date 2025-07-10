@@ -1,22 +1,27 @@
 import hashlib
+import logging
 import os
 import re
-import logging
+
 import pandas as pd
 from SPARQLWrapper import SPARQLWrapper
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # --- Robust path resolution ---
 def get_project_root():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
 def get_data_folder_path():
     return os.path.join(get_project_root(), 'data', 'trained')
 
+
 def get_model_file_path():
     return os.path.join(get_data_folder_path(), 'multiple_models.pkl')
+
 
 FILE_NUM_REGEX = re.compile(r'^(\d+)[^.]*\.(?:rdf|nt|ttl|nq)$', re.IGNORECASE)
 FILE_STRING_REGEX = re.compile(r'-(.*)\.')
@@ -34,7 +39,6 @@ LOD_CATEGORY_NO_USER_DOMAIN = {
     'geography', 'government', 'life_sciences', 'cross_domain',
     'linguistics', 'media', 'publications', 'social_networking'
 }
-
 
 FILTER_DATA = pd.read_json(
     os.path.join(get_project_root(), 'src', 'filter', 'filter.json'),
@@ -197,11 +201,13 @@ def merge_dump_sparql(csv1_path='../data/raw/graphs.csv',
     output_df.to_csv('../data/raw/graphs_with_uri.csv', index=True)
     return df2
 
+
 DATA_DIR = "../data"
 RAW_DIR = os.path.join(DATA_DIR, "raw")
 PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
 
 os.makedirs(PROCESSED_DIR, exist_ok=True)
+
 
 def merge_dataset() -> pd.DataFrame:
     local_frames: list[pd.DataFrame] = []
@@ -228,6 +234,7 @@ def merge_dataset() -> pd.DataFrame:
     if "id" in merged.columns:
         merged = merged.drop_duplicates(subset="id", keep="last")
     return merged
+
 
 def merge_void_dataset() -> pd.DataFrame:
     local_frames: list[pd.DataFrame] = []

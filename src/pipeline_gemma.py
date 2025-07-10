@@ -21,6 +21,7 @@ def normalize_label(label):
     label = re.sub(r"[^\w\s-]", "", label)
     return label.lower()
 
+
 def compute_metrics(y_true, y_pred):
     """
     Calcola le metriche di classificazione standard tra due serie/array:
@@ -31,8 +32,8 @@ def compute_metrics(y_true, y_pred):
     """
     acc = accuracy_score(y_true, y_pred)
     precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
-    recall    = recall_score(y_true, y_pred, average="weighted", zero_division=0)
-    f1        = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+    recall = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
     return {
         "accuracy": acc,
         "precision": precision,
@@ -283,8 +284,8 @@ class GeminiPredictor:
 
         acc = accuracy_score(y_true, y_pred)
         precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
-        recall    = recall_score(   y_true, y_pred, average="weighted", zero_division=0)
-        f1        = f1_score(       y_true, y_pred, average="weighted", zero_division=0)
+        recall = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+        f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
 
         logging.info(f"Gemini final accuracy:  {acc:.4f}")
         logging.info(f"Gemini final precision: {precision:.4f}")
@@ -305,7 +306,7 @@ if __name__ == "__main__":
 
     # Ollama/Gemma
     predictor = OllamaGemmaPredictor(
-        model_name="mistral", #gemma3:12b
+        model_name="mistral",  # gemma3:12b
         temperature=0.2,
         num_predict=4
     )

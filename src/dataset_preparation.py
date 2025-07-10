@@ -18,8 +18,10 @@ logger = logging.getLogger("dataset_preparation")
 
 FORMATS = {'ttl', 'xml', 'nt', 'trig', 'n3', 'nquads'}
 
+
 def log_query(query):
     logger.info(f"SPARQL Query: {query}")
+
 
 def select_local_vocabularies(parsed_graph):
     Q_LOCAL_VOCABULARIES = prepareQuery("""
@@ -59,6 +61,7 @@ def select_local_vocabularies(parsed_graph):
 
     return vocabularies
 
+
 def select_local_class(parsed_graph) -> list[str]:
     Q_LOCAL_CLASS = prepareQuery("""
         SELECT ?classUri (COUNT(?instance) AS ?instanceCount)
@@ -82,6 +85,7 @@ def select_local_class(parsed_graph) -> list[str]:
         if class_uri:
             classes.add(class_uri)
     return list(classes)
+
 
 def select_local_label(parsed_graph):
     ns = {
@@ -165,6 +169,7 @@ def select_local_label(parsed_graph):
 
     return {str(row.o) for row in qres}
 
+
 def select_local_tld(parsed_graph):
     Q_LOCAL_TLD = prepareQuery("""
         SELECT DISTINCT ?o
@@ -194,6 +199,7 @@ def select_local_tld(parsed_graph):
                 logger.warning(f"Unable to parse TLD from {url}: {exc}")
     return tlds
 
+
 def select_local_property(parsed_graph):
     Q_LOCAL_PROPERTY = prepareQuery("""
         SELECT ?property (COUNT(?s) AS ?usageCount)
@@ -220,6 +226,7 @@ def select_local_property(parsed_graph):
         properties.add(property_uri)
     return list(properties)
 
+
 def select_local_endpoint(parsed_graph):
     Q_LOCAL_VOID_SPARQL = prepareQuery("""
         SELECT DISTINCT ?o
@@ -235,6 +242,7 @@ def select_local_endpoint(parsed_graph):
         logger.warning(f"SPARQL error in select_local_endpoint: {e}")
         return []
     return list({str(row.o) for row in qres})
+
 
 def select_local_creator(parsed_graph):
     Q_LOCAL_DCTERMS_CREATOR = prepareQuery("""
@@ -252,6 +260,7 @@ def select_local_creator(parsed_graph):
         return set()
     return {str(row.creator) for row in qres}
 
+
 def select_local_license(parsed_graph):
     Q_LOCAL_DCTERMS_LICENSE = prepareQuery("""
         SELECT ?license
@@ -267,6 +276,7 @@ def select_local_license(parsed_graph):
         logger.warning(f"SPARQL error in select_local_license: {e}")
         return set()
     return {str(row.license) for row in qres}
+
 
 def select_local_void_subject(parsed_graph):
     Q_LOCAL_VOID_SUBJECT = prepareQuery("""
@@ -306,6 +316,7 @@ def select_local_void_subject(parsed_graph):
             logger.warning(f"SPARQL error in select_local_void_subject loop: {e}")
     return subject
 
+
 def select_local_void_description(parsed_graph):
     Q_LOCAL_DCTERMS_DESCRIPTION = prepareQuery("""
         SELECT ?desc
@@ -321,6 +332,7 @@ def select_local_void_description(parsed_graph):
         logger.warning(f"SPARQL error in select_local_void_description: {e}")
         return set()
     return {str(row.desc) for row in qres}
+
 
 def select_local_void_title(parsed_graph):
     Q_LOCAL_DCTERMS_TITLE = prepareQuery("""
@@ -338,6 +350,7 @@ def select_local_void_title(parsed_graph):
         return []
     return [str(row.desc) for row in qres]
 
+
 def select_local_con(parsed_graph):
     Q_LOCAL_CON = prepareQuery("""
         SELECT DISTINCT ?o
@@ -354,6 +367,7 @@ def select_local_con(parsed_graph):
         return []
     return [str(row.o) for row in qres]
 
+
 def _guess_format_and_parse(path):
     g = Graph()
     for f in FORMATS:
@@ -363,9 +377,10 @@ def _guess_format_and_parse(path):
             continue
     raise Exception(f"Format not supported for file: {path}")
 
+
 def process_file_full_inplace(
-    file_path: str,
-    ingest_lov: bool = False
+        file_path: str,
+        ingest_lov: bool = False
 ) -> dict[str, Any] | None:
     if not file_path:
         return None
@@ -419,12 +434,15 @@ def process_file_full_inplace(
         logger.warning(f"Error processing file {file_path}: {e}")
         return None
 
+
 lod_frame_global: pd.DataFrame = pd.DataFrame()
+
 
 def init_worker(lod_frame_path: str):
     global lod_frame_global
     df = pd.read_csv(lod_frame_path)
     lod_frame_global = df[~df["category"].fillna("").str.strip().eq("user_generated")].reset_index(drop=True)
+
 
 def process_local_dataset_file(args):
     category, filename, offset, limit = args
@@ -465,6 +483,7 @@ def process_local_dataset_file(args):
         logger.warning(f"Error processing file {path}: {e}")
         return None
 
+
 def process_local_void_dataset_file(args):
     category, filename, offset, limit = args
     global lod_frame_global
@@ -493,6 +512,7 @@ def process_local_void_dataset_file(args):
         logger.warning(f"Error processing file {path}: {e}")
         return None
 
+
 def robust_pool_map(pool, func, tasks):
     results = []
     total = len(tasks)
@@ -502,9 +522,10 @@ def robust_pool_map(pool, func, tasks):
         logger.info(f"Progress: {i}/{total} tasks completed.")
     return results
 
+
 def create_local_dataset(
-    offset: int = 0,
-    limit: int = 10000,
+        offset: int = 0,
+        limit: int = 10000,
 ):
     out_path = f"../data/raw/local/local_feature_set_{offset}_{limit}.json"
     # Check subito, uscita immediata se il file esiste

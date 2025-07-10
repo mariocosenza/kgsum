@@ -1,14 +1,15 @@
 import asyncio
 import logging
-from os import path, makedirs
 import shutil
+from os import path, makedirs
+
 import dataset_extraction.endpoint_lod_service
 import dataset_extraction.github_search
 import dataset_extraction.zenodo_records_extraction
 import dataset_preparation_remote
+import lov_data_preparation
 import predict_autoencoder
 import preprocessing
-import lov_data_preparation
 from config import Config, Phase, ClassifierType
 from dataset_preparation import create_local_dataset, create_local_void_dataset
 from generate_profile import generate_profile_from_store
@@ -42,11 +43,12 @@ def _labeling():
                 exit(1)
             merge_github_sparql()
         if Config.SEARCH_ZENODO:
-           dataset_extraction.zenodo_records_extraction.main(use_gemini=Config.USE_GEMINI)
-           if Config.STOP_BEFORE_MERGING:
-               logger.info("Stop before merging.")
-               exit(1)
-           merge_zenodo_sparql()
+            dataset_extraction.zenodo_records_extraction.main(use_gemini=Config.USE_GEMINI)
+            if Config.STOP_BEFORE_MERGING:
+                logger.info("Stop before merging.")
+                exit(1)
+            merge_zenodo_sparql()
+
 
 def _extraction():
     if Phase.EXTRACTION in Config.ALLOWED_PHASE:
@@ -60,13 +62,16 @@ def _extraction():
         if Config.QUERY_LOV:
             lov_data_preparation.main()
 
+
 def _processing():
     if Phase.PROCESSING in Config.ALLOWED_PHASE:
         preprocessing.main(use_ner=Config.USE_NER, enable_filter=Config.USE_FILTER)
 
+
 def _training():
     if Phase.TRAINING in Config.ALLOWED_PHASE:
-        if Config.CLASSIFIER in [ClassifierType.SVM, ClassifierType.NAIVE_BAYES, ClassifierType.KNN, ClassifierType.J48, ClassifierType.MISTRAL]:
+        if Config.CLASSIFIER in [ClassifierType.SVM, ClassifierType.NAIVE_BAYES, ClassifierType.KNN, ClassifierType.J48,
+                                 ClassifierType.MISTRAL]:
             directory_path = path.join(get_data_folder_path(), 'cache')
             if path.exists(directory_path):
                 shutil.rmtree(directory_path)
@@ -76,11 +81,14 @@ def _training():
                 oversample=Config.OVERSAMPLE
             )
         else:
-            predict_autoencoder.main(classifier=Config.CLASSIFIER, use_tfidf=Config.USE_TF_IDF_AUTOENCODER, oversample=Config.OVERSAMPLE)
+            predict_autoencoder.main(classifier=Config.CLASSIFIER, use_tfidf=Config.USE_TF_IDF_AUTOENCODER,
+                                     oversample=Config.OVERSAMPLE)
+
 
 def _profile():
     if Phase.STORE in Config.ALLOWED_PHASE:
         asyncio.run(generate_profile_from_store())
+
 
 def main():
     Config.init_configuration()
@@ -89,6 +97,7 @@ def main():
     _processing()
     _training()
     _profile()
+
 
 if __name__ == '__main__':
     main()

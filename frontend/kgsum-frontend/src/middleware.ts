@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import {clerkMiddleware, createRouteMatcher} from '@clerk/nextjs/server';
 
 // Optional protection based on env, default true
 const CLERK_MIDDLEWARE_ENABLED = process.env.CLERK_MIDDLEWARE_ENABLED ?? 'true';
@@ -7,25 +7,25 @@ const isClerkMiddlewareEnabled = CLERK_MIDDLEWARE_ENABLED.toLowerCase() !== 'fal
 const isProtectedRoute = createRouteMatcher(['/classifica(.*)', '/api(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
-  // If disabled, do nothing (always allow)
-  if (!isClerkMiddlewareEnabled) return;
+    // If disabled, do nothing (always allow)
+    if (!isClerkMiddlewareEnabled) return;
 
-  if (isProtectedRoute(req)) {
-    const baseUrl = new URL(req.url).origin;
+    if (isProtectedRoute(req)) {
+        const baseUrl = new URL(req.url).origin;
 
-    await auth.protect({
-      // Use absolute URLs to avoid Clerk errors
-      unauthenticatedUrl: `${baseUrl}/auth/accedi`,
-      unauthorizedUrl: `${baseUrl}/auth/accedi`,
-    });
-  }
+        await auth.protect({
+            // Use absolute URLs to avoid Clerk errors
+            unauthenticatedUrl: `${baseUrl}/auth/accedi`,
+            unauthorizedUrl: `${baseUrl}/auth/accedi`,
+        });
+    }
 });
 
 export const config = {
-  matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
-    '/(api|trpc)(.*)',
-  ],
+    matcher: [
+        // Skip Next.js internals and all static files, unless found in search params
+        '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+        // Always run for API routes
+        '/(api|trpc)(.*)',
+    ],
 };

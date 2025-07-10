@@ -1,18 +1,17 @@
-import logging
 import argparse
+import logging
 import os
 import re
 from typing import Any
 
 import pandas as pd
 import spacy
+from langdetect import detect, DetectorFactory, LangDetectException
 from pandas import Series
 
 from config import Config
 from src.util import is_curi_allowed, is_voc_allowed, merge_dataset, merge_void_dataset, \
     RAW_DIR, PROCESSED_DIR
-
-from langdetect import detect, DetectorFactory, LangDetectException
 
 DetectorFactory.seed = 42
 
