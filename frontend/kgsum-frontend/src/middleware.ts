@@ -4,7 +4,7 @@ import {clerkMiddleware, createRouteMatcher} from '@clerk/nextjs/server';
 const CLERK_MIDDLEWARE_ENABLED = process.env.CLERK_MIDDLEWARE_ENABLED ?? 'true';
 const isClerkMiddlewareEnabled = CLERK_MIDDLEWARE_ENABLED.toLowerCase() !== 'false';
 
-const isProtectedRoute = createRouteMatcher(['/classifica(.*)', '/api(.*)']);
+const isProtectedRoute = createRouteMatcher(['/classify(.*)', '/api(.*)']);
 
 export default clerkMiddleware(async (auth, req) => {
     // If disabled, do nothing (always allow)
@@ -15,8 +15,8 @@ export default clerkMiddleware(async (auth, req) => {
 
         await auth.protect({
             // Use absolute URLs to avoid Clerk errors
-            unauthenticatedUrl: `${baseUrl}/auth/accedi`,
-            unauthorizedUrl: `${baseUrl}/auth/accedi`,
+            unauthenticatedUrl: `${baseUrl}/auth/sign-in`,
+            unauthorizedUrl: `${baseUrl}/auth/sign-in`,
         });
     }
 });

@@ -28,7 +28,7 @@ export async function createPost(
             token = await getToken();
             if (!token) {
                 return {
-                    message: "Errore: Devi essere autenticato per usare questa funzione.",
+                    message: "Error: You need to be authenticated to use this function.",
                 };
             }
         }
@@ -37,7 +37,7 @@ export async function createPost(
         // Check privacy consent requirement
         if (!privacyConsent) {
             return {
-                message: "Errore: Devi accettare i termini e condizioni per procedere.",
+                message: "Error: You need to accept terms and condition to precede.",
             };
         }
 
@@ -47,7 +47,7 @@ export async function createPost(
 
             if (!sparqlUrl || !sparqlUrl.trim()) {
                 return {
-                    message: "Errore: L'URL SPARQL è obbligatorio per questa modalità.",
+                    message: "Error: The SPARQL URL is obligatory for this mode.",
                 };
             }
 
@@ -56,7 +56,7 @@ export async function createPost(
                 new URL(sparqlUrl);
             } catch {
                 return {
-                    message: "Errore: L'URL SPARQL fornito non è valido.",
+                    message: "Error: The SPARQL URL is not valid.",
                 };
             }
 
@@ -89,9 +89,9 @@ export async function createPost(
 
                             // Handle specific Flask API errors
                             if (response.status === 429) {
-                                errorMessage = "Server sovraccarico: troppe richieste attive. Riprova tra qualche minuto.";
+                                errorMessage = "Overloaded Server: too many active request. Retry later.";
                             } else if (response.status === 500 && errorData.cpu_usage) {
-                                errorMessage = `Server sovraccarico: CPU ${errorData.cpu_usage}%, RAM ${errorData.ram_usage}%`;
+                                errorMessage = `Overloaded Server: CPU ${errorData.cpu_usage}%, RAM ${errorData.ram_usage}%`;
                             }
                         }
                     } catch {
@@ -106,7 +106,7 @@ export async function createPost(
                 const apiResult = await response.json();
 
                 return {
-                    message: "SPARQL endpoint classificato con successo!",
+                    message: "SPARQL endpoint profiled successfully!",
                     data: {
                         source: 'SPARQL',
                         endpoint: sparqlUrl,
@@ -120,14 +120,14 @@ export async function createPost(
                 if (error instanceof Error) {
                     if (error.message.includes('fetch') || error.message.includes('network')) {
                         return {
-                            message: "Errore: Impossibile raggiungere l'API di classificazione. Verifica che il server sia attivo su porta 5000.",
+                            message: "Error: Can not reach classification API. Verify that the server is active on port 5000.",
                         };
                     }
                 }
 
                 console.error('SPARQL classification error:', error);
                 return {
-                    message: "Errore: Si è verificato un errore durante la classificazione dell'endpoint SPARQL.",
+                    message: "Error: An error occurred during SPARQL classification.",
                 };
             }
 
@@ -136,7 +136,7 @@ export async function createPost(
 
             if (!file || file.size === 0) {
                 return {
-                    message: "Errore: Devi selezionare un file RDF valido.",
+                    message: "Error: Select a valid RDF file.",
                 };
             }
 
@@ -144,7 +144,7 @@ export async function createPost(
             if (file.size > MAX_FILE_SIZE) {
                 const sizeMB = Math.round(file.size / (1024 * 1024));
                 return {
-                    message: `Errore: Il file (${sizeMB}MB) supera il limite di 500MB. Seleziona un file più piccolo.`,
+                    message: `Error: The file (${sizeMB}MB) is over the 500MB size threshold. Upload a smaller file.`,
                 };
             }
 
@@ -155,7 +155,7 @@ export async function createPost(
 
             if (!allowedExtensions.includes(fileExtension)) {
                 return {
-                    message: `Errore: Formato file "${fileExtension}" non supportato. Formati accettati: ${allowedExtensions.join(', ')}`,
+                    message: `Error: File format "${fileExtension}" not support. Accepted format: ${allowedExtensions.join(', ')}`,
                 };
             }
 
@@ -188,7 +188,7 @@ export async function createPost(
                         const fileSizeMB = Math.round(file.size / (1024 * 1024) * 100) / 100;
 
                         return {
-                            message: "File RDF classificato con successo!",
+                            message: "RDF file profiled successfully!",
                             data: {
                                 source: 'FILE',
                                 file: {
@@ -206,7 +206,7 @@ export async function createPost(
                     } catch (jsonError) {
                         console.error('Error parsing successful API response:', jsonError);
                         return {
-                            message: "Errore: Risposta API non valida nonostante il successo.",
+                            message: "Error parsing successful API response.",
                         };
                     }
                 } else {
@@ -221,17 +221,17 @@ export async function createPost(
                             // Handle specific Flask API errors
                             if (response.status === 400) {
                                 if (errorData.error.includes("No file part")) {
-                                    errorMessage = "Errore: File non ricevuto dall'API.";
+                                    errorMessage = "Error: File non received from API.";
                                 } else if (errorData.error.includes("File type not allowed")) {
-                                    errorMessage = "Errore: Tipo di file non supportato dall'API.";
+                                    errorMessage = "Error: File format not supported by the API.";
                                 }
                             } else if (response.status === 429) {
-                                errorMessage = "Server sovraccarico: troppe richieste attive. Riprova tra qualche minuto.";
+                                errorMessage = "Overloaded Server: too many active request. Retry later.";
                             } else if (response.status === 500) {
                                 if (errorData.cpu_usage) {
-                                    errorMessage = `Server sovraccarico: CPU ${errorData.cpu_usage}%, RAM ${errorData.ram_usage}%`;
+                                    errorMessage = `Overloaded Server: CPU ${errorData.cpu_usage}%, RAM ${errorData.ram_usage}%`;
                                 } else if (errorData.error.includes("Profile generation failed")) {
-                                    errorMessage = "Errore durante la generazione del profilo RDF.";
+                                    errorMessage = "Error during RDF profile generation.";
                                 }
                             }
                         }
@@ -250,19 +250,19 @@ export async function createPost(
                 if (error instanceof Error) {
                     if (error.message.includes('fetch') || error.message.includes('network')) {
                         return {
-                            message: "Errore: Impossibile raggiungere l'API di classificazione. Verifica che il server sia attivo su porta 5000.",
+                            message: "Error: Can not reach classification API. Verify that the server is active on port 5000.",
                         };
                     }
                 }
 
                 return {
-                    message: "Errore: Si è verificato un errore durante la classificazione del file RDF.",
+                    message: "Error: An error occurred during RDF classification process.",
                 };
             }
         }
 
         return {
-            message: "Errore: Modalità di elaborazione non riconosciuta.",
+            message: "Error: Elaboration mode not supported.",
         };
 
     } catch (error) {
@@ -272,18 +272,18 @@ export async function createPost(
         if (error instanceof Error) {
             if (error.name === 'PayloadTooLargeError' || error.message.includes('PayloadTooLarge')) {
                 return {
-                    message: "Errore: File troppo grande. Il limite massimo è di 500MB.",
+                    message: "Error: File too large. Size limit is 500MB.",
                 };
             }
             if (error.message.includes('network') || error.message.includes('fetch')) {
                 return {
-                    message: "Errore: Problema di connessione con l'API di classificazione su porta 5000.",
+                    message: "Error: Can not reach classification API. Verify that the server is active on port 5000.",
                 };
             }
         }
 
         return {
-            message: "Errore: Si è verificato un errore imprevisto durante l'elaborazione. Riprova più tardi.",
+            message: "Error: An unknown error occurred during the profiling. Retry later.",
         };
     }
 }

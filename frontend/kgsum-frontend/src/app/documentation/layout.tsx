@@ -2,8 +2,8 @@ import type {Metadata} from "next";
 import {SideTags} from "@/components/side-tags";
 
 export const metadata: Metadata = {
-    title: "Documentazione",
-    description: "Progetto di tesi sulla summarization di Knowledge Graph"
+    title: "Documentation",
+    description: "Thesis project on knowledge graph summarization"
 };
 
 export default function RootLayout({

@@ -7,7 +7,7 @@ export const Footer = () => {
             <div className="mx-5 lg:mx-20 border-t-2 border-dotted flex flex-row justify-between items-center h-12">
                 <div>
                     <p className="text-gray-600 text-sm ml-2">
-                        KgSum 2025 - <Link href="/privacy" className="underline">Politica privacy</Link>
+                        KgSum 2025 - <Link href="/privacy" className="underline">Privacy Policy</Link>
                     </p>
                 </div>
                 <div className="flex items-center gap-2 mr-5">
@@ -24,7 +24,7 @@ export const Footer = () => {
                         </Avatar>
                     </Link>
                     <span className="text-sm text-gray-600">
-                        Un progetto di{" "}
+                        A project by{" "}
                         <Link
                             href="https://github.com/mariocosenza"
                             className="underline"

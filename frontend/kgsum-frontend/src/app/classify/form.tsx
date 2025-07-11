@@ -1,6 +1,6 @@
 "use client";
 import React, {useActionState, useMemo, useRef, useState} from "react";
-import {createPost} from "@/app/classifica/action";
+import {createPost} from "@/app/classify/action";
 import {Tabs, TabsContent, TabsList, TabsTrigger,} from "@/components/ui/tabs";
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
@@ -178,7 +178,7 @@ export const Form = () => {
             // Check file size (500MB limit)
             if (file.size > MAX_FILE_SIZE) {
                 const sizeMB = Math.round(file.size / (1024 * 1024));
-                setFileSizeWarning(`Il file selezionato (${sizeMB}MB) supera il limite di 500MB. Seleziona un file più piccolo.`);
+                setFileSizeWarning(`Error: The file (${sizeMB}MB) is over the 500MB size threshold. Upload a smaller file.`);
                 e.target.value = ''; // Clear the input
                 setHasFile(false);
                 setSelectedFile(null);
@@ -188,7 +188,7 @@ export const Form = () => {
             // Warn for large files
             if (file.size > LARGE_FILE_THRESHOLD) {
                 const sizeMB = Math.round(file.size / (1024 * 1024));
-                setFileSizeWarning(`File di grandi dimensioni (${sizeMB}MB) - l'elaborazione potrebbe richiedere alcuni minuti.`);
+                setFileSizeWarning(`Large file (${sizeMB}MB) - the processing could take a few minutes.`);
             }
 
             // Validate file extension
@@ -197,7 +197,7 @@ export const Form = () => {
             const fileExtension = '.' + fileName.split('.').pop();
 
             if (!allowedExtensions.includes(fileExtension)) {
-                setFileSizeWarning(`Formato file "${fileExtension}" non supportato. Formati accettati: ${allowedExtensions.join(', ')}`);
+                setFileSizeWarning(`Error: File format "${fileExtension}" not support. Accepted format: ${allowedExtensions.join(', ')}`);
                 e.target.value = ''; // Clear the input
                 setHasFile(false);
                 setSelectedFile(null);
@@ -259,7 +259,7 @@ export const Form = () => {
                     {/* Form Section */}
                     <div className="bg-card border rounded-xl shadow-xl p-8 min-h-[50rem]">
                         <h2 className="text-xl font-bold text-foreground mb-6 text-center">
-                            Classificazione Dati RDF
+                            Classify RDF data
                         </h2>
 
                         <form
@@ -299,7 +299,7 @@ export const Form = () => {
                                                     type="url"
                                                     id="sparql-url"
                                                     name="sparqlUrl"
-                                                    placeholder="https://esempio.com/sparql"
+                                                    placeholder="https://example.com/sparql"
                                                     autoComplete="off"
                                                     value={sparqlUrl}
                                                     onChange={(e) => setSparqlUrl(e.target.value)}
@@ -308,7 +308,7 @@ export const Form = () => {
                                                     className="w-full h-10 text-sm"
                                                 />
                                                 <p className="text-xs text-muted-foreground">
-                                                    Inserisci l&#39;URL completo dell&#39;endpoint SPARQL da analizzare
+                                                    Input the full URL of the SPARQL endpoint to analyze
                                                 </p>
                                             </div>
                                         </TabsContent>
@@ -324,20 +324,20 @@ export const Form = () => {
                                                         </div>
                                                         <div className="space-y-1">
                                                             <p className="text-sm font-medium text-foreground">
-                                                                Trascina un file RDF o clicca per selezionare
+                                                                Drag an RDF file or click here to select
                                                             </p>
                                                             <p className="text-xs text-muted-foreground">
-                                                                Formati supportati: RDF, TTL, NQ, NT, XML, JSON
+                                                                Supported format: RDF, TTL, NQ, NT, XML, JSON
                                                             </p>
                                                             <p className="text-xs text-muted-foreground font-medium dark:text-blue-400">
-                                                                Dimensione massima: 500MB
+                                                                Max size: 500MB
                                                             </p>
                                                         </div>
                                                     </div>
 
                                                     <div className="space-y-2">
                                                         <Label htmlFor="file-upload" className="text-sm font-medium">
-                                                            Seleziona File RDF
+                                                            Select RDF File
                                                         </Label>
                                                         <Input
                                                             id="file-upload"
@@ -415,10 +415,10 @@ export const Form = () => {
                                     />
                                     <div className="flex-1">
                                         <Label htmlFor="save-profile" className="text-sm font-medium cursor-pointer">
-                                            Salva profilo
+                                            Save profile
                                         </Label>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            Rendi pubblico il profilo generato
+                                            Make the generated profile public
                                         </p>
                                     </div>
                                 </div>
@@ -436,11 +436,11 @@ export const Form = () => {
                                     />
                                     <div className="flex-1">
                                         <Label htmlFor="privacy-consent" className="text-sm font-medium cursor-pointer">
-                                            Accetto<Link href="/privacy" className="underline ml-0">termini e
-                                            condizioni</Link>*
+                                            Accept<Link href="/privacy" className="underline ml-0">terms and
+                                            condition</Link>*
                                         </Label>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            Obbligatorio per procedere con la classificazione
+                                            Obligatory to proceed
                                         </p>
                                     </div>
                                 </div>
@@ -463,13 +463,13 @@ export const Form = () => {
                                                 className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
                                             <span>
                         {selectedFile && selectedFile.size > LARGE_FILE_THRESHOLD
-                            ? 'Elaborando file di grandi dimensioni...'
-                            : 'Elaborando...'
+                            ? 'Computing large file..'
+                            : 'Computing...'
                         }
                       </span>
                                         </div>
                                     ) : (
-                                        "Classifica"
+                                        "Classify"
                                     )}
                                 </Button>
                             </div>
@@ -489,14 +489,14 @@ export const Form = () => {
                     {/* Response Section */}
                     <div className="bg-card border rounded-xl shadow-xl p-8 min-h-[50rem]">
                         <h2 className="text-xl font-bold text-foreground mb-6 text-center">
-                            Risultato JSON
+                            Result JSON
                         </h2>
 
                         <div className="space-y-4">
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="message" className="text-sm font-medium">
-                                        Risposta del Sistema
+                                        System response
                                     </Label>
                                     {displayResponse && (
                                         <Button
@@ -515,7 +515,7 @@ export const Form = () => {
                                             ) : (
                                                 <>
                                                     <CopyIcon className="w-3 h-3"/>
-                                                    <span>Copia</span>
+                                                    <span>Copy</span>
                                                 </>
                                             )}
                                         </Button>
@@ -524,7 +524,7 @@ export const Form = () => {
                                 <Textarea
                                     id="message"
                                     value={displayResponse}
-                                    placeholder="La risposta JSON apparirà qui dopo l'elaborazione..."
+                                    placeholder="The JSON response will appear here after processing..."
                                     readOnly
                                     className="w-full h-[35rem] resize-none bg-muted/30 font-mono text-xs leading-relaxed focus:ring-2 focus:ring-ring focus:ring-offset-2"
                                 />

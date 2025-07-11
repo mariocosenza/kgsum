@@ -18,7 +18,7 @@ export const SideTags = (): ReactNode => {
                         {tags.map((tag, index) => (
                             <React.Fragment key={tag}>
                                 <Link
-                                    href={`/documentazione/${tag}`}
+                                    href={`/documentation/${tag}`}
                                     className="block text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 py-2 px-2 rounded-md hover:bg-muted/50"
                                 >
                                     {tag}

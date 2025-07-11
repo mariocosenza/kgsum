@@ -7,29 +7,29 @@ export default function Home() {
         <main className="flex h-[78vh] lg:h-[85vh] px-10 w-full items-center justify-evenly">
             <div className="w-full lg:w-1/2 h-[90%] flex flex-col justify-center">
                 <h1 className="scroll-m-20 text-center text-5xl font-extrabold tracking-tight text-balance mb-8">
-                    Classificazione e Profilazione Automatica di Knowledge Graph
+                    Automatic Classification and Profiling of Knowledge Graphs
                 </h1>
                 <p className="leading-7 text-center mb-10 max-w-3xl mx-auto">
-                    Un sistema che automatizza l’analisi semantica dei Knowledge Graph, ne identifica i domini tematici
-                    e ne genera profili dettagliati per facilitarne l’integrazione e l’uso.
+                    A system that automates the semantic analysis of Knowledge Graphs, identifies their thematic domains
+                    and generates detailed profiles to facilitate their integration and use.
                 </p>
 
                 {/* Button row always matches the width of the h1/p, and buttons fully fill the row */}
                 <div className="max-w-3xl w-full mx-auto flex gap-6 justify-center">
                     <div className="flex-1 cursor-pointer">
-                        <Link href={"/classifica"} className="cursor-pointer">
+                        <Link href={"/classify"} className="cursor-pointer">
                             <Button className="w-full h-14 text-lg font-semibold  cursor-pointer">
-                                Classifica
+                                Classify
                             </Button>
                         </Link>
                     </div>
                     <div className="flex-1">
-                        <Link href={"/esplora"}>
+                        <Link href={"/explore"}>
                             <Button
                                 variant="secondary"
                                 className="w-full h-14 text-lg font-semibold cursor-pointer"
                             >
-                                Esplora
+                                Explore
                             </Button>
                         </Link>
                     </div>

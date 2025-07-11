@@ -16,29 +16,28 @@ export default function PrivacyPolicyPage() {
                     <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
                         <Badge variant="outline">KgSum</Badge>
                         <span>•</span>
-                        <span>Ultima modifica: 27 giugno 2025</span>
+                        <span>Last updated: June 27, 2025</span>
                         <span>•</span>
-                        <span>Versione 1.0</span>
+                        <span>Version 1.0</span>
                     </div>
                 </div>
 
-                {/* Introduzione */}
+                {/* Introduction */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Users className="h-5 w-5"/>
-                            Introduzione
+                            Introduction
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <p>
-                            Benvenuto su <strong>KgSum</strong>, un&#39;applicazione web per la ricerca sui Knowledge
-                            Graph
-                            sviluppata come progetto di tesi. La presente Privacy Policy descrive come raccogliamo,
-                            utilizziamo e proteggiamo le tue informazioni personali quando utilizzi il nostro servizio.
+                            Welcome to <strong>KgSum</strong>, a web application for Knowledge Graph research
+                            developed as a thesis project. This Privacy Policy describes how we collect,
+                            use, and protect your personal information when you use our service.
                         </p>
                         <div className="bg-muted p-4 rounded-lg">
-                            <p className="font-semibold">Responsabile del trattamento:</p>
+                            <p className="font-semibold">Data Controller:</p>
                             <div className="flex items-center gap-2 mt-2">
                                 <Mail className="h-4 w-4"/>
                                 <span>Mario Cosenza - cosenzamario@proton.me</span>
@@ -47,239 +46,222 @@ export default function PrivacyPolicyPage() {
                     </CardContent>
                 </Card>
 
-                {/* Informazioni raccolte */}
+                {/* Information we collect */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Database className="h-5 w-5"/>
-                            Informazioni che raccogliamo
+                            Information we collect
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div>
-                            <h3 className="font-semibold mb-2">2.1 Dati di autenticazione</h3>
-                            <p className="mb-3">Tramite il servizio Clerk, raccogliamo i seguenti dati per
-                                l&#39;autenticazione:</p>
+                            <h3 className="font-semibold mb-2">2.1 Authentication data</h3>
+                            <p className="mb-3">Through the Clerk service, we collect the following data for
+                                authentication:</p>
                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                <li><strong>GitHub/GitLab:</strong> Nome utente, email, avatar pubblico</li>
-                                <li><strong>Email:</strong> Indirizzo email e password (crittografata)</li>
-                                <li><strong>Dati di sessione:</strong> Token di accesso e informazioni di autenticazione
-                                </li>
+                                <li><strong>GitHub/GitLab:</strong> Username, email, public avatar</li>
+                                <li><strong>Email:</strong> Email address and password (encrypted)</li>
+                                <li><strong>Session data:</strong> Access tokens and authentication information</li>
                             </ul>
                         </div>
 
                         <Separator/>
 
                         <div>
-                            <h3 className="font-semibold mb-2">2.2 Dati di utilizzo del sito</h3>
+                            <h3 className="font-semibold mb-2">2.2 Site usage data</h3>
                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                <li><strong>Cookie di GraphDB:</strong> Per il funzionamento del database grafico</li>
-                                <li><strong>Dati di navigazione:</strong> Pagine visitate, tempo di permanenza,
-                                    interazioni
-                                </li>
-                                <li><strong>Informazioni tecniche:</strong> Indirizzo IP, browser, sistema operativo
-                                </li>
+                                <li><strong>GraphDB cookies:</strong> For the operation of the graph database</li>
+                                <li><strong>Navigation data:</strong> Pages visited, time spent, interactions</li>
+                                <li><strong>Technical information:</strong> IP address, browser, operating system</li>
                             </ul>
                         </div>
 
                         <Separator/>
 
                         <div>
-                            <h3 className="font-semibold mb-2">2.3 Contenuti caricati dall&#39;utente</h3>
+                            <h3 className="font-semibold mb-2">2.3 User-uploaded content</h3>
                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                <li><strong>File caricati:</strong> Documenti e dataset per l&#39;elaborazione</li>
-                                <li><strong>Query SPARQL:</strong> Le query eseguite sui Knowledge Graph</li>
-                                <li><strong>Risultati delle elaborazioni:</strong> Output delle analisi e
-                                    classificazioni
-                                </li>
+                                <li><strong>Uploaded files:</strong> Documents and datasets for processing</li>
+                                <li><strong>SPARQL queries:</strong> Queries executed on Knowledge Graphs</li>
+                                <li><strong>Processing results:</strong> Output of analyses and classifications</li>
                             </ul>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Come utilizziamo le informazioni */}
+                {/* How we use your information */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Brain className="h-5 w-5"/>
-                            Come utilizziamo le tue informazioni
+                            How we use your information
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div>
-                            <h3 className="font-semibold mb-2">3.1 Finalità del trattamento</h3>
-                            <p className="mb-3">Le tue informazioni vengono utilizzate per:</p>
+                            <h3 className="font-semibold mb-2">3.1 Purpose of processing</h3>
+                            <p className="mb-3">Your information is used to:</p>
                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                <li>Fornire l&#39;accesso autenticato alla piattaforma</li>
-                                <li>Elaborare i file caricati tramite algoritmi di Machine Learning locali</li>
-                                <li>Classificare Knowledge Graph tramite endpoint SPARQL</li>
-                                <li>Migliorare il servizio e condurre ricerca accademica</li>
-                                <li>Garantire la sicurezza e il corretto funzionamento della piattaforma</li>
+                                <li>Provide authenticated access to the platform</li>
+                                <li>Process uploaded files through local Machine Learning algorithms</li>
+                                <li>Classify Knowledge Graphs through SPARQL endpoints</li>
+                                <li>Improve the service and conduct academic research</li>
+                                <li>Ensure security and proper functioning of the platform</li>
                             </ul>
                         </div>
 
                         <Separator/>
 
                         <div>
-                            <h3 className="font-semibold mb-2">3.2 Elaborazione dei dati</h3>
+                            <h3 className="font-semibold mb-2">3.2 Data processing</h3>
                             <div className="space-y-2">
-                                <p><strong>ML locale:</strong> I file vengono processati principalmente con soluzioni di
-                                    Machine Learning eseguite sui nostri server</p>
-                                <p><strong>Servizi esterni:</strong> In alcuni casi, i dati potrebbero essere inviati a:
-                                </p>
+                                <p><strong>Local ML:</strong> Files are processed primarily with Machine Learning
+                                    solutions executed on our servers</p>
+                                <p><strong>External services:</strong> In some cases, data may be sent to:</p>
                                 <ul className="list-disc list-inside ml-4 space-y-1 text-sm">
-                                    <li><strong>Google Gemini API</strong> per elaborazioni avanzate</li>
-                                    <li><strong>Linked Open Vocabularies API</strong> per arricchimento semantico</li>
+                                    <li><strong>Google Gemini API</strong> for advanced processing</li>
+                                    <li><strong>Linked Open Vocabularies API</strong> for semantic enrichment</li>
                                 </ul>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Base giuridica */}
+                {/* Legal basis */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5"/>
-                            Base giuridica del trattamento
+                            Legal basis for processing
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="mb-3">Il trattamento dei tuoi dati si basa su:</p>
+                        <p className="mb-3">The processing of your data is based on:</p>
                         <ul className="list-disc list-inside space-y-1 text-sm">
-                            <li><strong>Consenso:</strong> Per l&#39;utilizzo di cookie non essenziali e
-                                l&#39;elaborazione dei file caricati
+                            <li><strong>Consent:</strong> For the use of non-essential cookies and processing of
+                                uploaded files
                             </li>
-                            <li><strong>Interesse legittimo:</strong> Per la ricerca accademica e il miglioramento del
-                                servizio
-                            </li>
-                            <li><strong>Esecuzione del contratto:</strong> Per fornire i servizi richiesti</li>
+                            <li><strong>Legitimate interest:</strong> For academic research and service improvement</li>
+                            <li><strong>Contract performance:</strong> To provide the requested services</li>
                         </ul>
                     </CardContent>
                 </Card>
 
-                {/* Cookie */}
+                {/* Cookies */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Cookie className="h-5 w-5"/>
-                            Cookie e tecnologie di tracciamento
+                            Cookies and tracking technologies
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div>
-                            <h3 className="font-semibold mb-2">Tipi di cookie utilizzati</h3>
+                            <h3 className="font-semibold mb-2">Types of cookies used</h3>
                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                <li><strong>Cookie essenziali:</strong> Per l&#39;autenticazione e il funzionamento del
-                                    sito
-                                </li>
-                                <li><strong>Cookie di GraphDB:</strong> Per la gestione del database grafico</li>
-                                <li><strong>Cookie di sessione:</strong> Per mantenere la sessione utente attiva</li>
+                                <li><strong>Essential cookies:</strong> For authentication and site functionality</li>
+                                <li><strong>GraphDB cookies:</strong> For graph database management</li>
+                                <li><strong>Session cookies:</strong> To maintain active user sessions</li>
                             </ul>
                         </div>
                         <div
                             className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
                             <p className="text-sm">
-                                <strong>Gestione dei cookie:</strong> Puoi gestire le preferenze sui cookie tramite le
-                                impostazioni del tuo browser.
-                                La disabilitazione di alcuni cookie potrebbe limitare le funzionalità del sito.
+                                <strong>Cookie management:</strong> You can manage cookie preferences through your
+                                browser settings.
+                                Disabling some cookies may limit site functionality.
                             </p>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* I tuoi diritti */}
+                {/* Your rights */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Shield className="h-5 w-5"/>
-                            I tuoi diritti
+                            Your rights
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="mb-3">Secondo il GDPR, hai diritto a:</p>
+                        <p className="mb-3">Under GDPR, you have the right to:</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-2">
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Accesso</p>
-                                    <p className="text-xs text-muted-foreground">Richiedere una copia dei tuoi dati
-                                        personali</p>
+                                    <p className="font-semibold text-sm">Access</p>
+                                    <p className="text-xs text-muted-foreground">Request a copy of your personal data</p>
                                 </div>
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Rettifica</p>
-                                    <p className="text-xs text-muted-foreground">Correggere dati inesatti o
-                                        incompleti</p>
+                                    <p className="font-semibold text-sm">Rectification</p>
+                                    <p className="text-xs text-muted-foreground">Correct inaccurate or incomplete data</p>
                                 </div>
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Cancellazione</p>
-                                    <p className="text-xs text-muted-foreground">Richiedere la rimozione dei tuoi
-                                        dati</p>
+                                    <p className="font-semibold text-sm">Erasure</p>
+                                    <p className="text-xs text-muted-foreground">Request removal of your data</p>
                                 </div>
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Limitazione</p>
-                                    <p className="text-xs text-muted-foreground">Limitare il trattamento in determinate
-                                        circostanze</p>
+                                    <p className="font-semibold text-sm">Restriction</p>
+                                    <p className="text-xs text-muted-foreground">Limit processing under certain
+                                        circumstances</p>
                                 </div>
                             </div>
                             <div className="space-y-2">
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Portabilità</p>
-                                    <p className="text-xs text-muted-foreground">Ricevere i tuoi dati in formato
-                                        strutturato</p>
+                                    <p className="font-semibold text-sm">Portability</p>
+                                    <p className="text-xs text-muted-foreground">Receive your data in structured format</p>
                                 </div>
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Opposizione</p>
-                                    <p className="text-xs text-muted-foreground">Opporti al trattamento per motivi
-                                        legittimi</p>
+                                    <p className="font-semibold text-sm">Objection</p>
+                                    <p className="text-xs text-muted-foreground">Object to processing for legitimate
+                                        reasons</p>
                                 </div>
                                 <div className="p-3 bg-muted rounded-lg">
-                                    <p className="font-semibold text-sm">Revoca del consenso</p>
-                                    <p className="text-xs text-muted-foreground">Revocare il consenso in qualsiasi
-                                        momento</p>
+                                    <p className="font-semibold text-sm">Withdraw consent</p>
+                                    <p className="text-xs text-muted-foreground">Revoke consent at any time</p>
                                 </div>
                             </div>
                         </div>
                         <div
                             className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                             <p className="text-sm">
-                                <strong>Per esercitare questi diritti:</strong> Contatta cosenzamario@proton.me
+                                <strong>To exercise these rights:</strong> Contact cosenzamario@proton.me
                             </p>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Sicurezza */}
+                {/* Security */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Lock className="h-5 w-5"/>
-                            Sicurezza dei dati
+                            Data security
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="mb-3">Implementiamo misure di sicurezza appropriate per proteggere i tuoi
-                            dati:</p>
+                        <p className="mb-3">We implement appropriate security measures to protect your data:</p>
                         <ul className="list-disc list-inside space-y-1 text-sm">
-                            <li>Crittografia dei dati in transito e a riposo</li>
-                            <li>Accesso limitato ai dati del personale autorizzato</li>
-                            <li>Monitoraggio regolare della sicurezza</li>
-                            <li>Backup sicuri e procedure di ripristino</li>
+                            <li>Encryption of data in transit and at rest</li>
+                            <li>Limited access to data by authorized personnel</li>
+                            <li>Regular security monitoring</li>
+                            <li>Secure backups and recovery procedures</li>
                         </ul>
                     </CardContent>
                 </Card>
 
-                {/* Contatti */}
+                {/* Contact */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Mail className="h-5 w-5"/>
-                            Contatti
+                            Contact
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <p className="mb-4">
-                            Per qualsiasi domanda riguardo questa Privacy Policy o per esercitare i tuoi diritti,
-                            contatta:
+                            For any questions regarding this Privacy Policy or to exercise your rights,
+                            contact:
                         </p>
                         <div className="bg-muted p-4 rounded-lg">
                             <p className="font-semibold">Mario Cosenza</p>
@@ -293,16 +275,16 @@ export default function PrivacyPolicyPage() {
                     </CardContent>
                 </Card>
 
-                {/* Footer della policy */}
+                {/* Policy footer */}
                 <div className="text-center text-sm text-muted-foreground border-t pt-6">
                     <p>
-                        <strong>Ultima modifica:</strong> 27 giugno 2025 | <strong>Versione:</strong> 1.0
+                        <strong>Last updated:</strong> June 27, 2025 | <strong>Version:</strong> 1.0
                     </p>
                     <p className="mt-2">
-                        Hai il diritto di presentare reclamo al{" "}
+                        You have the right to file a complaint with the{" "}
                         <a href="https://www.gpdp.it" target="_blank" rel="noopener noreferrer"
                            className="text-primary hover:underline">
-                            Garante per la protezione dei dati personali
+                            Personal Data Protection Authority
                         </a>
                     </p>
                 </div>

@@ -16,11 +16,11 @@ export default function NotFound() {
                     </div>
                     <div className="space-y-2">
                         <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                            Pagina Non Trovata
+                            Page Not Found
                         </CardTitle>
                         <CardDescription className="text-gray-600 dark:text-gray-400">
-                            Spiacenti, non riusciamo a trovare la pagina che stai cercando. Potrebbe essere stata
-                            spostata, eliminata, o potresti aver inserito un URL errato.
+                            Sorry, we can&#39;t find the page you&#39;re looking for. It might have been moved, deleted, or you
+                            might have entered an incorrect URL.
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -29,20 +29,20 @@ export default function NotFound() {
                         <Button asChild className="flex items-center gap-2">
                             <Link href="/">
                                 <Home className="w-4 h-4"/>
-                                Vai alla Home
+                                Go to Home
                             </Link>
                         </Button>
                         <Button variant="outline" onClick={() => window.history.back()}
                                 className="flex items-center gap-2">
                             <ArrowLeft className="w-4 h-4"/>
-                            Torna Indietro
+                            Go Back
                         </Button>
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                        Se pensi che si tratti di un errore, per favore{' '}
+                        If you think this is an error, please{' '}
                         <Link href="mailto:cosenzamario@proton.me"
                               className="text-blue-600 dark:text-blue-400 hover:underline">
-                            contatta il supporto
+                            contact support
                         </Link>
                     </div>
                 </CardContent>

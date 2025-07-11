@@ -29,7 +29,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
     title: "HomePage KgSum",
-    description: "Progetto di tesi sulla summarization di Knowledge Graph"
+    description: "Thesis project on Knowledge Graph summarization"
 };
 
 export default function RootLayout({

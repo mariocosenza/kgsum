@@ -28,7 +28,7 @@ export const NavBar = (): ReactNode => {
                     className="hidden md:block"
                     width={80}
                     height={80}
-                    alt="Logo KgSum"
+                    alt="KgSum Logo"
                 />
             </Link>
             <NavigationMenu>
@@ -40,14 +40,14 @@ export const NavBar = (): ReactNode => {
                     </NavigationMenuItem>
                     <NavigationMenuItem>
                         <NavigationMenuTrigger className={menuLinkClass}>
-                            Prova KgSum
+                            Try KgSum
                         </NavigationMenuTrigger>
                         <NavigationMenuContent className="font-normal p-2 min-w-[30vw]">
                             <div className="flex flex-row">
                                 <div className="basis-1/4 relative min-h-[200px]">
                                     <Image
                                         src="/banner-menu.png"
-                                        alt="Banner Menu"
+                                        alt="Menu Banner"
                                         fill
                                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 300px"
                                         className="object-cover rounded-md"
@@ -56,31 +56,30 @@ export const NavBar = (): ReactNode => {
                                 </div>
                                 <div className="basis-3/4 pl-2">
                                     <NavigationMenuLink
-                                        href="/esplora"
+                                        href="/explore"
                                         className={menuLinkBoldClass}
                                     >
-                                        Esplora Profili
+                                        Explore Profiles
                                         <p className="text-muted-foreground text-sm font-normal">
-                                            Sfoglia i Knowledge Graph disponibili e scopri i loro metadati.
+                                            Browse available Knowledge Graphs and discover their metadata.
                                         </p>
                                     </NavigationMenuLink>
                                     <NavigationMenuLink
-                                        href="/classifica"
+                                        href="/classify"
                                         className={menuLinkBoldClass}
                                     >
-                                        Classifica Online
+                                        Classify Online
                                         <p className="text-muted-foreground text-sm font-normal">
-                                            Accedi al servizio di classificazione dei Knowledge Graph in tempo reale.
+                                            Access the Knowledge Graph classification service in real-time.
                                         </p>
                                     </NavigationMenuLink>
                                     <NavigationMenuLink
-                                        href="/documentazione/latest"
+                                        href="/kgsum-frontend/src/app/documentation/latest"
                                         className={menuLinkBoldClass}
                                     >
-                                        Documentazione API
+                                        API Documentation
                                         <p className="text-muted-foreground text-sm font-normal">
-                                            Consulta le guide e gli esempi per integrare le nostre API di
-                                            classificazione.
+                                            Consult guides and examples to integrate our classification APIs.
                                         </p>
                                     </NavigationMenuLink>
 
@@ -90,7 +89,7 @@ export const NavBar = (): ReactNode => {
                     </NavigationMenuItem>
                     <NavigationMenuItem>
                         <NavigationMenuLink asChild>
-                            <Link href="/statistiche" className={menuLinkClass}>Statistiche</Link>
+                            <Link href="/statistics" className={menuLinkClass}>Statistics</Link>
                         </NavigationMenuLink>
                     </NavigationMenuItem>
                 </NavigationMenuList>
