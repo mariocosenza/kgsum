@@ -7,6 +7,7 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
+from config import Config
 from lov_data_preparation import find_tags_from_list, find_comments_from_lists
 
 MAX_OFFSET = 1000
