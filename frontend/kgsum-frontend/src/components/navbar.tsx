@@ -74,7 +74,7 @@ export const NavBar = (): ReactNode => {
                                         </p>
                                     </NavigationMenuLink>
                                     <NavigationMenuLink
-                                        href="/kgsum-frontend/src/app/documentation/latest"
+                                        href="/documentation/latest"
                                         className={menuLinkBoldClass}
                                     >
                                         API Documentation
