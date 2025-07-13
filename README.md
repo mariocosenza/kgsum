@@ -44,9 +44,11 @@
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
+        <li><a href="#configuration">Configuration</a></li>
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
+    <li><a href="#docker-deployment">Docker Deployment</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
@@ -72,9 +74,14 @@ Supervisor: Maria Angela Pellegrino
 
 ### Built With
 
-* [Python](https://www.python.org/)
-* [CUDA](https://developer.nvidia.com/cuda-toolkit)
-* NVIDIA GPUs
+* [Python 3.12](https://www.python.org/)
+* [PyTorch](https://pytorch.org/)
+* [Transformers](https://huggingface.co/docs/transformers)
+* [spaCy](https://spacy.io/)
+* [Flask](https://flask.palletsprojects.com/)
+* [Next.js](https://nextjs.org/)
+* [React](https://reactjs.org/)
+* [TailwindCSS](https://tailwindcss.com/)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -85,90 +92,150 @@ Follow these steps to set up KgSum locally.
 
 ### Prerequisites
 
-- Python 3.12
-- CUDA 12.8
-- NVIDIA GPU (recommended: RTX 3070 or higher)
+#### For Local Machine Learning Backend:
+- **Miniconda** (required)
+- **Python 3.12** (suggested)
+- **CUDA 12.8** (for transformer models like Mistral)
+- **NVIDIA GPU** (recommended: RTX 3070 or higher)
 
-Install dependencies:
-```sh
-pip install -r requirements.txt
-```
+#### For Frontend:
+- **Node.js** 
+- **npm**
+
+#### For Docker Deployment:
+- **Docker**
+- **Docker Compose**
 
 ### Installation
 
-1. Set required environment variables:
-    - `GEMINI_API_KEY`: API key for Gemini models, required for data extraction
-    - `LOCAL_ENDPOINT_LOV`: URL of the local SPARQL endpoint for LOV
+#### Local Setup (Machine Learning Backend)
 
-2. Clone the repository:
+1. Clone the repository:
    ```sh
    git clone https://github.com/mariocosenza/kgsum.git
    cd kgsum
    ```
-3. Install dependencies:
+
+2. Create and activate conda environment:
    ```sh
-   pip install -r requirements.txt
+   conda env create -f environment.yml
+   conda activate kgsum
    ```
+
+3. **For GPU/Transformer Models (Mistral):**
+   - Comment out CUDA libraries in `environment.yml`
+   - Change TensorFlow version to GPU-compatible version as suggested in comments
+
+#### Frontend Setup
+
+1. Install dependencies:
+   ```sh
+   npm install
+   ```
+
+2. Run the frontend:
+   ```sh
+   npm run dev
+   ```
+
+3. **For GraphDB embedding visualization:**
+   - Replace GraphDB's `security-config.xml` with the one in `/docker/graphdb`
+
+### Configuration
+
+#### Environment Variables
+
+Set the following environment variables in your shell:
+
+```sh
+export GEMINI_API_KEY=your_gemini_api_key_here
+export LOCAL_ENDPOINT_LOV=http://your-local-endpoint
+export LOCAL_ENDPOINT=http://your-local-endpoint
+export SECRET_KEY=your_secret_key_here
+export UPLOAD_FOLDER=/path/to/uploads
+export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+export CLERK_MIDDLEWARE_ENABLED=true  # Set false if authentication not required
+export CLERK_SECRET_KEY=your_clerk_secret_key
+export CLASSIFICATION_API_URL=http://localhost:5000
+export GITHUB_TOKEN=your_github_token_here
+```
+
+#### Backend Configuration
+
+Configure the backend by editing `config.json`:
+
+```json
+{
+  "labeling" : {
+    "use_gemini": false,
+    "search_zenodo": true,
+    "search_github": true,
+    "search_lod_cloud": true,
+    "stop_before_merging": false
+  },
+  "extraction": {
+    "start_offset": 0,
+    "step_numbers": 10,
+    "step_range": 16,
+    "extract_sparql": true,
+    "query_lov": false
+  },
+  "processing" : {
+    "use_ner": false,
+    "use_filter": true
+  },
+  "training" : {
+     "classifier": "NAIVE_BAYES",
+     "feature": ["CURI", "PURI"],
+     "oversample": false,
+     "max_token": 256,
+     "use_tfidf_autoencoder": true
+  },
+  "profile": {
+    "store_profile_after_training": false,
+    "base_domain": "https://exemple.org"
+  },
+  "general_setting": {
+    "info": "Possible classifiers: SVM, NAIVE_BAYES, KNN, J48, MISTRAL, MLP, DEEP, BATCHNORM, Phase: LABELING, EXTRACTION, PROCESSING, TRAINING, STORE",
+    "start_phase": "labeling",
+    "stop_phase": "training"
+  }
+}
+```
+
+**Available Classifiers:** SVM, NAIVE_BAYES, KNN, J48, MISTRAL, MLP, DEEP, BATCHNORM  
+**Available Features:** CURI, PURI  
+**Processing Phases:** LABELING, EXTRACTION, PROCESSING, TRAINING, STORE
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-### Data Extraction Workflow
+### Training Process
 
-1. Download the latest JSON snapshot from the LOD Cloud.
-2. Set `GEMINI_API_KEY` in your environment.
-3. Run the scripts in order:
-   ```sh
-   python endpoint_lod_service.py
-   python github_search.py
-   python zenodo_records_extraction.py
-   ```
-   **Note:** Ensure you do not exceed the API rate limits.
-
-### Data Preparation
-
-Prepare local datasets:
-
+#### Full Training Pipeline
+Run the complete training process from extraction to model training:
 ```sh
-python data_preparation.py
-python data_preparation_remote.py
+python train.py
 ```
 
-(Optional) Include LOV tags and comments:
-
+#### Individual Script Training
+For more fine-tuned control, run individual scripts in `/src`:
 ```sh
-python lov_data_preparation.py
+# Run scripts in /src directory for specific phases
 ```
-
-Make sure `LOCAL_ENDPOINT_LOV` points to your SPARQL endpoint.
-
-### Utility & Preprocessing
-
-```sh
-python util.py
-python preprocessing.py
-```
-
-### Pipeline Build & Training
-
-1. Open `pipeline_build.py`
-2. Specify in the code:
-    - Classifier type (LLM or traditional ML)
-    - Features to use
-3. Execute:
-   ```sh
-   python pipeline_build.py
-   ```
 
 ### Running the Application
 
-Start the web service with the trained model:
-
+#### Local Flask Server
+After completing training, start the WSGI Flask server on port 5000:
 ```sh
 python app.py
 ```
+
+#### Prerequisites for Complete Profiling
+- **Linked Open Vocabularies (LOV) instance** is required for complete profiling and initial data extraction
 
 ### API Usage
 
@@ -176,26 +243,62 @@ Send POST requests to:
 - `/api/v1/profile/sparql`
 - `/api/v1/profile/file`
 
-Refer to the Swagger documentation (coming soon) for request and response formats.
+Refer to the Swagger documentation for detailed request and response formats.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- DOCKER DEPLOYMENT -->
+## Docker Deployment
+
+### Quick Setup with Pre-trained Model
+
+For a simpler deployment using the pre-trained Naive Bayes model:
+
+1. Navigate to the docker directory:
+   ```sh
+   cd /docker
+   ```
+
+2. Fill the `.env` file with your configuration
+
+3. Run with Docker Compose:
+   ```sh
+   docker-compose up
+   ```
+
+### Individual Docker Services
+
+Three individual Dockerfiles are provided for custom deployments:
+- **Backend** service
+- **Frontend** service  
+- **GraphDB** configuration
 
 ### Hardware Requirements
 
-| Component | Minimum Specification                           |
-|-----------|------------------------------------------------|
-| GPU       | NVIDIA GPU with 8+ GB VRAM (RTX 3070 or equiv) |
-| RAM       | 32 GB                                          |
-| CPU       | Modern multi-core processor                    |
-| CUDA      | 12.8                                           |
+#### Tested Configuration
+| Component | Specification                    |
+|-----------|----------------------------------|
+| CPU       | AMD Ryzen 5800x                 |
+| RAM       | 32 GB DDR4 3600MHz             |
+| GPU       | NVIDIA RTX 3070                |
+
+#### Recommended Configuration
+| Component | Specification                    |
+|-----------|----------------------------------|
+| RAM       | 64+ GB (larger size suggested)  |
+| GPU       | High-performance GPU for better LLM performance |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Add Swagger API documentation
-- [ ] Expand coverage for more LLMs
+- [x] Add Swagger API documentation
+- [x] Expand coverage for more LLMs
+- [x] Improve Docker deployment documentation
 - [ ] Add more dataset preparation examples
-- [ ] Add Docker support
+- [ ] Add performance optimization guides
+- [ ] Enhance frontend visualization features
 
 See the [open issues](https://github.com/mariocosenza/kgsum/issues) for a full list of proposed features (and known issues).
 
@@ -247,6 +350,7 @@ Project Link: [https://github.com/mariocosenza/kgsum](https://github.com/marioco
 * [Mistral LLM](https://mistral.ai/)
 * [LOD Cloud](https://lod-cloud.net/)
 * [Zenodo](https://zenodo.org/)
+* [Linked Open Vocabularies](https://lov.linkeddata.es/)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
