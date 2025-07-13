@@ -46,7 +46,7 @@ def clerk_jwt_required(fn):
                 )
                 g.current_user = payload
             except jwt.PyJWTError as e:
-                app.logger.error(f"Token validation error: {str(e)}")
+                app.logger.error(f"Token validation error: {e}")  # Only log internally
                 return jsonify({"error": "Token validation error"}), 401
 
         return await fn(*args, **kwargs)
@@ -140,7 +140,8 @@ async def sparql_profile():
         else:
             result = await generate_profile_service(endpoint, sparql=True)
     except Exception as e:
-        return jsonify({"error": f"Profile generation failed: {str(e)}"}), 500
+        app.logger.error(f"Profile generation failed: {e}")  # Only log internally
+        return jsonify({"error": "Profile generation failed"}), 500
 
     return jsonify(result), 200
 
@@ -199,7 +200,8 @@ async def rdf_profile():
     try:
         file.save(save_path)
     except Exception as e:
-        return jsonify({"error": f"Error saving file: {str(e)}"}), 500
+        app.logger.error(f"Error saving file: {e}")  # Only log internally
+        return jsonify({"error": "Error saving file"}), 500
 
     store_param = request.args.get('store', 'false').lower()
     store_flag = store_param in ('true', '1', 'yes')
@@ -210,7 +212,8 @@ async def rdf_profile():
         else:
             result = await generate_profile_service(save_path, sparql=False)
     except Exception as e:
-        return jsonify({"error": f"Profile generation failed: {str(e)}"}), 500
+        app.logger.error(f"Profile generation failed: {e}")  # Only log internally
+        return jsonify({"error": "Profile generation failed"}), 500
 
     if result is None:
         return jsonify({"error": "Profile generation failed unexpectedly"}), 500
