@@ -36,7 +36,7 @@ from transformers import (
     BitsAndBytesConfig
 )
 
-from config import ClassifierType
+from config import ClassifierType, Config
 
 try:
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
@@ -61,8 +61,6 @@ logger = logging.getLogger(__name__)
 
 FeatureLabels: TypeAlias = str | list[str]
 TextData = NewType("TextData", str)
-
-
 
 
 def is_uri(token: str) -> bool:
@@ -143,8 +141,8 @@ def majority_vote(predictions: list[Any] | str | Tuple[Any, float, str]) -> Any:
 
 
 def _predict_category_for_instance(
-    models: dict[str, KnowledgeGraphClassifier],
-    instance: dict[str, Any]
+        models: dict[str, KnowledgeGraphClassifier],
+        instance: dict[str, Any]
 ) -> Any | None:
     votes: list[tuple[Any, float, str]] = []
     for feature_name, model in models.items():
@@ -185,8 +183,8 @@ def _predict_category_for_instance(
 
 
 def predict_category_multi(
-    models: dict[str, KnowledgeGraphClassifier],
-    instance: dict[str, Any] | pd.DataFrame
+        models: dict[str, KnowledgeGraphClassifier],
+        instance: dict[str, Any] | pd.DataFrame
 ) -> Any | list[Any | None]:
     if isinstance(instance, pd.DataFrame):
         return instance.apply(
@@ -231,11 +229,11 @@ def oversample_dataframe(df: pd.DataFrame, target_label: str, max_factor: float 
 
 
 def train_multiple_models(
-    training_data: pd.DataFrame,
-    feature_columns: list[str],
-    target_label: str = "category",
-    classifier_type: ClassifierType = ClassifierType.NAIVE_BAYES,
-    oversample: bool = True,  # <-- new flag
+        training_data: pd.DataFrame,
+        feature_columns: list[str],
+        target_label: str = "category",
+        classifier_type: ClassifierType = ClassifierType.NAIVE_BAYES,
+        oversample: bool = True,  # <-- new flag
 ) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     """
     For each feature in `feature_columns`, train a separate KnowledgeGraphClassifier.
@@ -246,6 +244,8 @@ def train_multiple_models(
 
     for feature in tqdm(feature_columns, desc="Training models"):
         df_feat = remove_empty_rows(training_data, [feature, target_label])
+        class_dist = df_feat[target_label].value_counts()
+        logger.info("Class distribution for feature '%s': %s", feature, class_dist.to_dict())
         if df_feat.empty:
             logger.info("Skipping '%s': no data available.", feature)
             continue
@@ -319,12 +319,12 @@ class HFDataset(torch.utils.data.Dataset):
 
 class KnowledgeGraphClassifier:
     def __init__(
-        self,
-        classifier_type: ClassifierType = ClassifierType.NAIVE_BAYES,
-        balance_classes: bool = False,
-        vectorizer_type: str = "tfidf",
-        feature_labels: FeatureLabels | None = None,
-        **kwargs
+            self,
+            classifier_type: ClassifierType = ClassifierType.NAIVE_BAYES,
+            balance_classes: bool = False,
+            vectorizer_type: str = "tfidf",
+            feature_labels: FeatureLabels | None = None,
+            **kwargs
     ):
         self.classifier_type = classifier_type
         self.balance_classes = balance_classes
@@ -388,11 +388,11 @@ class KnowledgeGraphClassifier:
         return single_col
 
     def train(
-        self,
-        frame: pd.DataFrame,
-        feature_labels: FeatureLabels,
-        target_label: str = "category",
-        max_length: int = 256
+            self,
+            frame: pd.DataFrame,
+            feature_labels: FeatureLabels,
+            target_label: str = "category",
+            max_length: int = Config.MAX_TOKEN
     ) -> dict[str, Any]:
         if self.classifier_type == ClassifierType.MISTRAL:
             return self.train_mistral(frame, feature_labels, target_label=target_label, max_length=max_length)
@@ -459,7 +459,7 @@ class KnowledgeGraphClassifier:
         elif clf_type == ClassifierType.NAIVE_BAYES:
             estimator = MultinomialNB()
             param_dist = {
-                "classifier__alpha": np.linspace(0.1, 2, 7),
+                "classifier__alpha": np.linspace(0.01, 2, 10),
                 "classifier__fit_prior": [True, False],
             }
         elif clf_type == ClassifierType.KNN:
@@ -482,7 +482,6 @@ class KnowledgeGraphClassifier:
         else:
             raise ValueError("Unsupported classic classifier type.")
 
-
         memory = Memory("../data/trained/cache", verbose=0)
         pipeline = Pipeline([
             ("vectorizer", self.vectorizer),
@@ -503,13 +502,13 @@ class KnowledgeGraphClassifier:
             return prod
 
         total_poss = total_combinations(param_dist)
-        n_iter = min(20, total_poss)
+        n_iter = min(50, total_poss)
 
         search = RandomizedSearchCV(
             estimator=pipeline,
             param_distributions=param_dist,
             n_iter=n_iter,
-            cv=2,  # as requested
+            cv=2,
             scoring="f1_weighted",
             verbose=1,
             n_jobs=-1,
@@ -537,7 +536,8 @@ class KnowledgeGraphClassifier:
             report = classification_report(
                 y_test,
                 y_pred_test,
-                target_names=[str(self.target_label_inverse_mapping[i]) for i in range(len(self.target_label_inverse_mapping))],
+                target_names=[str(self.target_label_inverse_mapping[i]) for i in
+                              range(len(self.target_label_inverse_mapping))],
                 zero_division=0
             )
         else:
@@ -575,15 +575,15 @@ class KnowledgeGraphClassifier:
         }
 
     def train_mistral(
-        self,
-        frame: pd.DataFrame,
-        feature_labels: FeatureLabels,
-        target_label: str = "category",
-        max_length: int = 512,
-        qlora_r: int = 32,
-        qlora_alpha: int = 16,
-        batch_size: int = 8,
-        epochs: int = 15
+            self,
+            frame: pd.DataFrame,
+            feature_labels: FeatureLabels,
+            target_label: str = "category",
+            max_length: int = 512,
+            qlora_r: int = 32,
+            qlora_alpha: int = 16,
+            batch_size: int = 8,
+            epochs: int = 15
     ) -> dict[str, Any] | None:
         torch.backends.cudnn.benchmark = True
         if not torch.cuda.is_available():
@@ -767,9 +767,9 @@ class KnowledgeGraphClassifier:
         }
 
     def predict(
-        self,
-        data: str | list[str] | pd.Series | pd.DataFrame,
-        feature_labels: FeatureLabels | None = None
+            self,
+            data: str | list[str] | pd.Series | pd.DataFrame,
+            feature_labels: FeatureLabels | None = None
     ) -> np.ndarray:
         if self.model is None:
             raise ValueError("Model not trained/loaded. Call `.train()` or `.load()` first.")
@@ -811,7 +811,7 @@ class KnowledgeGraphClassifier:
             batch_size = 16
             self.model.eval()
             for i in tqdm(range(0, len(texts), batch_size), desc="Predicting", leave=False):
-                batch_texts = texts[i : i + batch_size]
+                batch_texts = texts[i: i + batch_size]
                 inputs = self.mistral_tokenizer(
                     batch_texts,
                     padding="max_length",
@@ -882,9 +882,9 @@ class KnowledgeGraphClassifier:
 
     @classmethod
     def load(
-        cls,
-        filepath: str | None = None,
-        classifier_type_hint: ClassifierType | None = None
+            cls,
+            filepath: str | None = None,
+            classifier_type_hint: ClassifierType | None = None
     ) -> KnowledgeGraphClassifier:
         if filepath is None and classifier_type_hint:
             filepath = f"../data/trained/model-{classifier_type_hint.name}.pkl"
@@ -934,9 +934,9 @@ class KnowledgeGraphClassifier:
 
 
 def save_multiple_models(
-    models: dict[str, KnowledgeGraphClassifier],
-    training_results: dict[str, Any],
-    filepath: str | None = None
+        models: dict[str, KnowledgeGraphClassifier],
+        training_results: dict[str, Any],
+        filepath: str | None = None
 ) -> None:
     if filepath is None:
         os.makedirs("../data/trained", exist_ok=True)
@@ -971,7 +971,7 @@ def save_multiple_models(
 
 
 def load_multiple_models(
-    filepath: str | None = None
+        filepath: str | None = None
 ) -> Tuple[dict[str, KnowledgeGraphClassifier], dict[str, Any]]:
     if filepath is None:
         filepath = "../data/trained/multiple_models.pkl"

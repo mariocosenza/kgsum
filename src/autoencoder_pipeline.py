@@ -23,6 +23,7 @@ def set_seed(seed: int = 42):
     torch.backends.cudnn.benchmark = False
     os.environ["PYTHONHASHSEED"] = str(seed)
 
+
 set_seed(42)
 # ---------------------------------------------------
 
@@ -41,9 +42,9 @@ from sklearn.metrics import f1_score, accuracy_score, confusion_matrix, classifi
 from imblearn.over_sampling import RandomOverSampler
 
 import logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 
 class TrainingResult(NamedTuple):
@@ -52,6 +53,7 @@ class TrainingResult(NamedTuple):
     confusion_matrix: np.ndarray
     report: str
     best_params: dict[str, Any]
+
 
 def parse_feature_value(val: Any) -> str:
     """Flatten lists and parse string-represented lists to space-separated string."""
@@ -67,13 +69,17 @@ def parse_feature_value(val: Any) -> str:
             pass
     return str(val)
 
+
 class AutoencoderDataset(Dataset):
     def __init__(self, data: np.ndarray):
         self.data = torch.tensor(data, dtype=torch.float32)
+
     def __len__(self) -> int:
         return len(self.data)
+
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         return self.data[idx], self.data[idx]
+
 
 class AEMLP(nn.Module):
     def __init__(self, input_dim: int, latent_dim: int = 32) -> None:
@@ -84,8 +90,10 @@ class AEMLP(nn.Module):
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, input_dim), nn.ReLU()
         )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
+
 
 class AEDeep(nn.Module):
     def __init__(self, input_dim: int, latent_dim: int = 32) -> None:
@@ -100,8 +108,10 @@ class AEDeep(nn.Module):
             nn.Linear(64, 128), nn.ReLU(),
             nn.Linear(128, input_dim), nn.ReLU()
         )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
+
 
 class AEBatchNorm(nn.Module):
     def __init__(self, input_dim: int, latent_dim: int = 32) -> None:
@@ -114,8 +124,10 @@ class AEBatchNorm(nn.Module):
             nn.Linear(latent_dim, 64), nn.BatchNorm1d(64), nn.ReLU(),
             nn.Linear(64, input_dim), nn.ReLU()
         )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decoder(self.encoder(x))
+
 
 def get_autoencoder(arch: ClassifierType, input_dim: int, latent_dim: int = 32) -> nn.Module:
     if arch == ClassifierType.MLP:
@@ -127,8 +139,10 @@ def get_autoencoder(arch: ClassifierType, input_dim: int, latent_dim: int = 32) 
     else:
         raise ValueError(f"Unknown autoencoder architecture: {arch}")
 
+
 class CategoryOneHotEncoder(BaseEstimator, TransformerMixin):
     """Robust one-hot encoder, handles unseen labels at test time."""
+
     def __init__(self) -> None:
         self.encoder: OneHotEncoder | None = None
         self.columns: list[str] | None = None
@@ -155,8 +169,10 @@ class CategoryOneHotEncoder(BaseEstimator, TransformerMixin):
     def fit_transform(self, X: pd.DataFrame | np.ndarray, y: Any = None, **fit_params) -> np.ndarray:
         return self.fit(X, y).transform(X)
 
+
 class FeatureTfidfEncoder(BaseEstimator, TransformerMixin):
     """TF-IDF encoding for large token sets, up to 10,000 features."""
+
     def __init__(self, max_features: int = 10000) -> None:
         self.max_features = max_features
         self.vectorizer = TfidfVectorizer(
@@ -166,17 +182,21 @@ class FeatureTfidfEncoder(BaseEstimator, TransformerMixin):
             norm="l2",
             token_pattern=r"(?u)\b\w+\b"
         )
+
     def fit(self, X: pd.DataFrame | np.ndarray, y: Any = None) -> Self:
         logger.info("[ENC] Fitting TfidfVectorizer")
         X_str = self._to_str_series(X)
         self.vectorizer.fit(X_str)
         return self
+
     def transform(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
         logger.info("[ENC] Transforming data with TfidfVectorizer")
         X_str = self._to_str_series(X)
         return self.vectorizer.transform(X_str).toarray()
+
     def fit_transform(self, X: pd.DataFrame | np.ndarray, y: Any = None, **fit_params) -> np.ndarray:
         return self.fit(X, y).transform(X)
+
     def _to_str_series(self, X: pd.DataFrame | np.ndarray) -> list[str]:
         # Always work with a 1D string list/series
         if isinstance(X, pd.DataFrame):
@@ -191,10 +211,11 @@ class FeatureTfidfEncoder(BaseEstimator, TransformerMixin):
         else:
             return pd.Series(X).astype(str).tolist()
 
+
 class AutoencoderEncoder(BaseEstimator, TransformerMixin):
     def __init__(
-        self, latent_dim: int = 32, epochs: int = 20, batch_size: int = 64,
-        lr: float = 1e-3, arch: ClassifierType = ClassifierType.MLP, verbose: bool = False
+            self, latent_dim: int = 32, epochs: int = 20, batch_size: int = 64,
+            lr: float = 1e-3, arch: ClassifierType = ClassifierType.MLP, verbose: bool = False
     ) -> None:
         self.latent_dim = latent_dim
         self.epochs = epochs
@@ -226,7 +247,7 @@ class AutoencoderEncoder(BaseEstimator, TransformerMixin):
                 optimizer.step()
                 total_loss += loss.item()
             if self.verbose and (epoch == 0 or epoch == self.epochs - 1):
-                logger.info(f"[{self.arch.name}] Epoch {epoch+1}/{self.epochs}, Loss: {total_loss/len(loader):.4f}")
+                logger.info(f"[{self.arch.name}] Epoch {epoch + 1}/{self.epochs}, Loss: {total_loss / len(loader):.4f}")
         return self
 
     def transform(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -247,8 +268,9 @@ class AutoencoderEncoder(BaseEstimator, TransformerMixin):
     def fit_transform(self, X: pd.DataFrame | np.ndarray, y: Any = None, **fit_params) -> np.ndarray:
         return self.fit(X, y).transform(X)
 
+
 def build_pipeline(
-    arch: ClassifierType, latent_dim: int = 32, use_tfidf: bool = True, oversample: bool = False
+        arch: ClassifierType, latent_dim: int = 32, use_tfidf: bool = True, oversample: bool = False
 ) -> Pipeline:
     logger.info("[PIPELINE] Building model pipeline. TF-IDF: %s | Oversample: %s", use_tfidf, oversample)
     steps: list[tuple[str, Any]] = []
@@ -262,6 +284,7 @@ def build_pipeline(
     steps.append(("classifier", RandomForestClassifier(random_state=42)))
     return Pipeline(steps)
 
+
 def random_search_params() -> dict[str, Sequence[Any]]:
     return {
         "classifier__n_estimators": [100, 200, 300],
@@ -269,11 +292,12 @@ def random_search_params() -> dict[str, Sequence[Any]]:
         "classifier__min_samples_split": [2, 5, 10],
     }
 
+
 def train_and_validate_model(
-    X_train: np.ndarray, y_train: np.ndarray,
-    X_test: np.ndarray, y_test: np.ndarray,
-    arch: ClassifierType, latent_dim: int = 32,
-    use_tfidf: bool = True, oversample: bool = False
+        X_train: np.ndarray, y_train: np.ndarray,
+        X_test: np.ndarray, y_test: np.ndarray,
+        arch: ClassifierType, latent_dim: int = 32,
+        use_tfidf: bool = True, oversample: bool = False
 ) -> tuple[Pipeline, TrainingResult]:
     logger.info("[TRAIN] Starting random search + validation")
     pipe = build_pipeline(arch=arch, latent_dim=latent_dim, use_tfidf=use_tfidf, oversample=oversample)
@@ -294,9 +318,10 @@ def train_and_validate_model(
     logger.info("[TRAIN] F1: %.4f | Acc: %.4f", f1, acc)
     return best_pipe, TrainingResult(f1, acc, cm, rep, search.best_params_)
 
+
 def save_models(
-    models: dict[str, Pipeline], training_results: dict[str, TrainingResult],
-    path: str
+        models: dict[str, Pipeline], training_results: dict[str, TrainingResult],
+        path: str
 ) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
@@ -307,6 +332,7 @@ def save_models(
         }, f)
     logger.info("[SAVE] Models saved at: %s", path)
 
+
 def load_models(path: str) -> tuple[dict[str, Pipeline], dict[str, TrainingResult]]:
     with open(path, "rb") as f:
         import pickle
@@ -314,9 +340,10 @@ def load_models(path: str) -> tuple[dict[str, Pipeline], dict[str, TrainingResul
     logger.info("[LOAD] Models loaded from: %s", path)
     return data["models"], data["training_results"]
 
+
 def train_autoencoder_models(
-    df: pd.DataFrame, feature_columns: list[str], target_label: str,
-    arch: ClassifierType, latent_dim: int, use_tfidf: bool = True, oversample: bool = False
+        df: pd.DataFrame, feature_columns: list[str], target_label: str,
+        arch: ClassifierType, latent_dim: int, use_tfidf: bool = True, oversample: bool = False
 ) -> tuple[dict[str, Pipeline], dict[str, TrainingResult]]:
     models: dict[str, Pipeline] = {}
     training_results: dict[str, TrainingResult] = {}
@@ -340,8 +367,9 @@ def train_autoencoder_models(
         print("Confusion Matrix:\n", result.confusion_matrix)
     return models, training_results
 
+
 def predict_category_majority_vote(
-    models: dict[str, Pipeline], processed_data: pd.DataFrame
+        models: dict[str, Pipeline], processed_data: pd.DataFrame
 ) -> list[Any]:
     logger.info("[PREDICT] Predicting majority vote for input shape: %s", processed_data.shape)
     all_preds = []

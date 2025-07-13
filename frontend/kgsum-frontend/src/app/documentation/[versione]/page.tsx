@@ -6,7 +6,7 @@ import {VERSIONS} from "@/components/VERSIONS";
 
 export async function generateStaticParams() {
     return VERSIONS.map((versione) => ({
-        versione: versione, // The key 'versione' must match your dynamic segment name '[versione]'
+        versione: versione,
     }));
 }
 
@@ -14,14 +14,14 @@ function checkVersion(version: string): boolean {
     return VERSIONS.includes(version);
 }
 
-export default async function SelectedVersionPage({ params }: { params: Promise<{ versione: string }> }) {
+export default async function SelectedVersionPage({params}: { params: Promise<{ versione: string }> }) {
     // Await the params Promise
     const resolvedParams = await params;
 
     // 1. Basic version check and redirect
     if (resolvedParams.versione !== 'latest') {
         if (!checkVersion(resolvedParams.versione)) {
-            redirect("/documentazione/latest");
+            redirect("/documentation/latest");
         }
     } else {
         resolvedParams.versione = VERSIONS[VERSIONS.length - 1];
@@ -29,10 +29,7 @@ export default async function SelectedVersionPage({ params }: { params: Promise<
 
     let content: string;
     try {
-        // --- CRITICAL CORRECTION HERE ---
-        // process.cwd() is your project root.
-        // Assuming your markdown files are in `src/docs/`
-        const markdownDocsDirectory = path.join(process.cwd(), 'src', 'app', 'documentazione', '[versione]');
+        const markdownDocsDirectory = path.join(process.cwd(), 'src', 'app', 'documentation', '[versione]');
         const filePath = path.join(markdownDocsDirectory, `${resolvedParams.versione}.md`);
 
         // Add a console.log to debug the exact path being attempted
@@ -40,10 +37,10 @@ export default async function SelectedVersionPage({ params }: { params: Promise<
 
         content = await fs.readFile(filePath, 'utf8');
     } catch {
-        redirect("/documentazione/latest");
+        redirect("/documentation/latest");
     }
 
     return (
-        <DocumentTemplate content={content} />
+        <DocumentTemplate content={content}/>
     );
 }

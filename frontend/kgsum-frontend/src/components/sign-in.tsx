@@ -12,7 +12,7 @@ export default function CustomSignIn(): ReactNode {
             :
             <SignedOut>
                 <SignInButton mode="modal">
-                    <Button>Accedi</Button>
+                    <Button>Login</Button>
                 </SignInButton>
             </SignedOut>
 

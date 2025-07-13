@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+
 import pandas as pd
 
 import src.pipeline_build
@@ -21,7 +22,7 @@ class CategoryPredictor:
         return majority_vote(predict_category_multi(self.models, processed_data))
 
     @staticmethod
-    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample = True):
+    def get_predictor(classifier=ClassifierType.NAIVE_BAYES, feature_columns: list[str] = None, oversample=True):
         combined_df_path = os.path.join(get_project_root(), 'data', 'processed', 'combined.json')
         if os.path.exists(combined_df_path):
             combined_df = pd.read_json(combined_df_path)
@@ -60,5 +61,5 @@ if __name__ == "__main__":
     PREDICTOR = CategoryPredictor.get_predictor(
         classifier=ClassifierType.NAIVE_BAYES,
         feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'],
-        oversample=True
+        oversample=False
     )

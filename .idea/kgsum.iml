@@ -8,6 +8,8 @@
       <sourceFolder url="file://$MODULE_DIR$/frontend" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/docker" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/data" />
+      <excludePattern pattern="*.rdf" />
     </content>
     <orderEntry type="jdk" jdkName="C:\Users\proge\miniconda3" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

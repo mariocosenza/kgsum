@@ -7,6 +7,8 @@ import pandas as pd
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
 
+import util
+from config import Config
 from src.util import merge_dataset
 
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +23,7 @@ LOCAL_ENDPOINT_LOV = os.environ['LOCAL_ENDPOINT_LOV']
 session = requests.Session()
 
 
-def find_tags_from_json(data_frame: pd.DataFrame):
+def find_tags_from_json(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
     response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
     subject_list = []
     response_cache = {}
@@ -30,6 +32,8 @@ def find_tags_from_json(data_frame: pd.DataFrame):
         all_tags = []
         for voc in set(row['voc']):
             logger.info(f'Vocabulary: {voc}')
+            if voc_filter and voc in util.VOC_FILTER:
+                continue
             try:
                 if voc not in response_cache:
                     response_lov = session.get(
@@ -101,7 +105,7 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
         return cache_dict[clean_uri]
 
 
-def find_voc_local(data_frame: pd.DataFrame):
+def find_voc_local(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     count = 0
@@ -110,6 +114,8 @@ def find_voc_local(data_frame: pd.DataFrame):
         all_tags = set()
         all_vocs = []
         for voc in set(row['voc']):
+            if voc_filter and voc in util.VOC_FILTER:
+                continue
             if count == 10000:
                 time.sleep(60)
                 count = 0
@@ -142,12 +148,14 @@ def find_voc_local(data_frame: pd.DataFrame):
     return response_df
 
 
-def _process_row(row_column: set) -> list[str] | None:
+def _process_row(row_column: set, curi_filter=Config.USE_FILTER) -> list[str] | None:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     all_comments = []
     for curi in row_column:
         if IS_URI.match(curi):
+            if curi_filter and curi in util.CURI_PURI_FILTER:
+                continue
             try:
                 sparql.setQuery(f"""
                         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -256,13 +264,16 @@ def _find_voc_tags_from_list(voc_list: list) -> list:
 
     return tags
 
+
 def find_tags_from_list(voc_list: list) -> list:
     return _find_voc_tags_from_list(voc_list)
+
 
 def find_comments_from_lists(curi_list: list, puri_list: list) -> list:
     comments = _process_row(set(curi_list))
     comments.extend(_process_row(set(puri_list)))
     return list(comments)
+
 
 def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
     logger.info('Started processing LOV data')

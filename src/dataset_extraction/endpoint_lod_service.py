@@ -1,13 +1,15 @@
 import hashlib
+import logging
 from os import path, makedirs
 
 import pandas as pd
 import requests
-import logging
+
 from src.util import is_endpoint_working
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("endpoint_lod")
+
 
 def download_lod_cloud_json_as_csv():
     url = "https://lod-cloud.net/versions/latest/lod-data.json"
@@ -43,9 +45,9 @@ def download_dataset():
             continue
 
         if (
-            response.status_code == 200 and
-            response.headers.get('Content-Type') and
-            response.headers['Content-Type'] != 'text/html'
+                response.status_code == 200 and
+                response.headers.get('Content-Type') and
+                response.headers['Content-Type'] != 'text/html'
         ):
             dir_path = f'../data/raw/rdf_dump/{category}'
             makedirs(dir_path, exist_ok=True)
@@ -59,24 +61,29 @@ def download_dataset():
             except Exception as e:
                 logger.error(f"Error writing file {file_path}: {e}")
 
+
 def extract_sparql_or_full_download_list():
     frame = pd.read_json('../data/raw/lod-data.json', orient='columns')
     return_list = pd.DataFrame(columns=['id', 'category', 'download_url', 'sparql_url'])
     count = 0
     for i in frame.columns:
         row = frame[i]['full_download']
-        count+=1
-        logger.info("Extracting " + i + f" Number: {count}" )
+        count += 1
+        logger.info("Extracting " + i + f" Number: {count}")
         if frame[i]['domain']:
             if len(row) > 0 and row[0]["status"] == 'OK':
                 if frame[i]['sparql'] and is_endpoint_working(frame[i]['sparql'][0]['access_url']):
-                    return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], row[0]['download_url'], frame[i]['sparql'][0]['access_url']]
+                    return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], row[0]['download_url'],
+                                                         frame[i]['sparql'][0]['access_url']]
                 else:
-                    return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], row[0]['download_url'], None]
+                    return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], row[0]['download_url'],
+                                                         None]
             elif frame[i]['sparql'] and is_endpoint_working(frame[i]['sparql'][0]['access_url']):
-                return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], None, frame[i]['sparql'][0]['access_url']]
+                return_list.loc[len(return_list)] = [frame[i]['_id'], frame[i]['domain'], None,
+                                                     frame[i]['sparql'][0]['access_url']]
 
     return_list.to_csv("../data/raw/sparql_full_download.csv", index=True)
+
 
 def main():
     if not path.exists("../data/raw/lod-data.json"):

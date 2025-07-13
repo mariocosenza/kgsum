@@ -7,7 +7,6 @@ COPY docker/ml/boot.sh ./
 
 # Copy project files from the context root
 COPY src ./src
-COPY frontend ./frontend
 COPY data/trained ./data/trained
 COPY environment.yml .
 COPY app.py .

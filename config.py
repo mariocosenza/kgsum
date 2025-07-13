@@ -37,7 +37,7 @@ class Config:
     CLASSIFIER: ClassifierType = ClassifierType.NAIVE_BAYES
     FEATURES= ["CURI"]
     OVERSAMPLE: bool = False
-    MAX_TOKEN: int = 256
+    MAX_TOKEN: int = 800000
     USE_TF_IDF_AUTOENCODER: bool = True
     STORE_PROFILE_AFTER_TRAINING: bool = False
     STORE_PROFILE_AT_RUN: bool = False

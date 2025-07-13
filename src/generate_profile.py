@@ -5,7 +5,6 @@ import urllib.parse
 import aiohttp
 import pandas as pd
 
-
 from src.dataset_preparation import process_file_full_inplace, logger
 from src.dataset_preparation_remote import process_endpoint_full_inplace
 from src.lov_data_preparation import IS_URI
@@ -13,7 +12,12 @@ from src.predict_category import CategoryPredictor
 from src.preprocessing import process_all_from_input
 
 LOCAL_ENDPOINT = os.environ['LOCAL_ENDPOINT']
-PREDICTOR: CategoryPredictor = CategoryPredictor.get_predictor()
+PREDICTOR: CategoryPredictor | None = None
+
+
+def load_predictor():
+    global PREDICTOR
+    PREDICTOR = CategoryPredictor.get_predictor()
 
 
 async def _update_query(query, timeout=300):
@@ -66,7 +70,7 @@ def _to_list(val):
     return val if isinstance(val, list) else [val]
 
 
-async def store_profile(profile: dict, category: str, base_iri = "http://example.org/resource/"):
+async def store_profile(profile: dict, category: str, base_iri="http://example.org/resource/"):
     raw_id = profile.get('id')
     if not raw_id:
         logger.warning("Missing profile id. Skipping insertion.")

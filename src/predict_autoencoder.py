@@ -14,13 +14,14 @@ from util import get_data_folder_path, get_project_root, get_model_file_path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def main(
-    features: list[str] = None,
-    classifier: ClassifierType = None,
-    latent_dim: int = 32,
-    target_label: str = "category",
-    use_tfidf: bool = True,
-    oversample: bool = True,
+        features: list[str] = None,
+        classifier: ClassifierType = None,
+        latent_dim: int = 32,
+        target_label: str = "category",
+        use_tfidf: bool = True,
+        oversample: bool = True,
 ) -> None:
     if features is None:
         features = ['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments', 'tlds']
@@ -56,6 +57,7 @@ def main(
             "Feature: %s | F1: %.4f | Acc: %.4f | Best params: %s",
             feature, metrics.f1, metrics.accuracy, metrics.best_params
         )
+
 
 if __name__ == "__main__":
     main()

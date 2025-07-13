@@ -7,6 +7,7 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
+from config import Config
 from lov_data_preparation import find_tags_from_list, find_comments_from_lists
 
 MAX_OFFSET = 1000
@@ -15,9 +16,11 @@ ENDPOINT_TIMEOUT = 600
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dataset_preparation_remote")
 
+
 async def _fetch_query(session: aiohttp.ClientSession, endpoint: str, query: str, timeout: int) -> str:
     async with session.post(endpoint, data={"query": query}, timeout=timeout) as response:
         return await response.text()
+
 
 async def async_select_remote_vocabularies(endpoint: str, timeout: int = 300) -> list[str]:
     logger.info(f"[VOC] Starting vocabulary query for endpoint: {endpoint}")
@@ -60,6 +63,7 @@ async def async_select_remote_vocabularies(endpoint: str, timeout: int = 300) ->
     logger.info(f"[VOC] Finished vocabulary query for endpoint: {endpoint} (found {len(vocabularies)} vocabularies)")
     return list(vocabularies)
 
+
 async def async_select_remote_class(endpoint: str, timeout: int = 300) -> list[str]:
     logger.info(f"[CLS] Starting class query for endpoint: {endpoint}")
     classes: list[str] = []
@@ -92,6 +96,7 @@ async def async_select_remote_class(endpoint: str, timeout: int = 300) -> list[s
     logger.info(f"[CURI] Finished class query for endpoint: {endpoint} (found {len(classes)} classes)")
     return classes
 
+
 async def async_select_remote_connection(endpoint: str, timeout: int = 300) -> list[str]:
     logger.info(f"[CON] Starting connection query for endpoint: {endpoint}")
     connections: list[str] = []
@@ -120,6 +125,7 @@ async def async_select_remote_connection(endpoint: str, timeout: int = 300) -> l
             return []
     logger.info(f"[CON] Finished connection query for endpoint: {endpoint} (found {len(connections)} connections)")
     return connections
+
 
 async def async_select_remote_label(endpoint: str, timeout: int = 300, en: bool = True) -> list[str]:
     logger.info(f"[LAB] Starting label query for endpoint: {endpoint} (en={en})")
@@ -180,6 +186,7 @@ async def async_select_remote_label(endpoint: str, timeout: int = 300, en: bool 
     logger.info(f"[LAB] Finished label query for endpoint: {endpoint} (found {len(labels)} labels)")
     return labels
 
+
 async def async_select_remote_title(endpoint: str, timeout: int = 300) -> str:
     logger.info(f"[TITLE] Starting title query for endpoint: {endpoint}")
     title = ""
@@ -206,6 +213,7 @@ async def async_select_remote_title(endpoint: str, timeout: int = 300) -> str:
             return ""
     logger.info(f"[TITLE] Finished title query for endpoint: {endpoint}")
     return title
+
 
 async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: int = 300) -> list[str]:
     logger.info(f"[TLDS] Starting TLD query for endpoint: {endpoint}")
@@ -247,6 +255,7 @@ async def async_select_remote_tlds(endpoint: str, limit: int = 1000, timeout: in
     logger.info(f"[TLDS] Finished TLD query for endpoint: {endpoint} (found {len(tlds)} TLDs)")
     return list(tlds)
 
+
 async def async_select_remote_property(endpoint: str, timeout: int = 300) -> list[str]:
     logger.info(f"[PROP] Starting property query for endpoint: {endpoint}")
     properties: list[str] = []
@@ -279,6 +288,7 @@ async def async_select_remote_property(endpoint: str, timeout: int = 300) -> lis
     logger.info(f"[PURI] Finished property query for endpoint: {endpoint} (found {len(properties)} properties)")
     return properties
 
+
 async def async_has_void_file(endpoint: str, timeout: int = 300) -> str | bool:
     logger.info(f"[VOID] Checking for VOID file at endpoint: {endpoint}")
     query = f"""
@@ -305,6 +315,7 @@ async def async_has_void_file(endpoint: str, timeout: int = 300) -> str | bool:
         except Exception as e:
             logger.warning(f"[VOID] Error checking for VOID file: {e}. Endpoint: {endpoint}")
             return False
+
 
 async def async_select_void_description(endpoint: str, timeout: int = 300, void_file: bool = False) -> list[str]:
     logger.info(f"[VDESC] Starting VOID description query for endpoint: {endpoint}")
@@ -337,6 +348,7 @@ async def async_select_void_description(endpoint: str, timeout: int = 300, void_
     logger.info(f"[DSC] Finished VOID description query for endpoint: {endpoint}")
     return list(descriptions)
 
+
 async def async_select_void_license(endpoint: str, timeout: int = 300, void_file: bool = False) -> list[str]:
     logger.info(f"[VLIC] Starting VOID license query for endpoint: {endpoint}")
     licenses: set[str] = set()
@@ -368,6 +380,7 @@ async def async_select_void_license(endpoint: str, timeout: int = 300, void_file
     logger.info(f"[VLIC] Finished VOID license query for endpoint: {endpoint}")
     return list(licenses)
 
+
 async def async_select_void_creator(endpoint: str, timeout: int = 300, void_file: bool = False) -> list[str]:
     logger.info(f"[VCRE] Starting VOID creator query for endpoint: {endpoint}")
     creators: set[str] = set()
@@ -398,6 +411,7 @@ async def async_select_void_creator(endpoint: str, timeout: int = 300, void_file
             return []
     logger.info(f"[VCRE] Finished VOID creator query for endpoint: {endpoint}")
     return list(creators)
+
 
 async def async_select_void_subject_remote(endpoint: str, timeout: int = 300, void_file: bool = False) -> list[str]:
     logger.info(f"[SVJ] Starting VOID subject query for endpoint: {endpoint}")
@@ -453,6 +467,7 @@ async def async_select_void_subject_remote(endpoint: str, timeout: int = 300, vo
     logger.info(f"[SBJ] Finished VOID subject query for endpoint: {endpoint}")
     return list(class_names)
 
+
 async def process_endpoint(row: pd.Series) -> list[Any]:
     endpoint = str(row["sparql_url"])
     row_id = str(row["id"])
@@ -486,6 +501,7 @@ async def process_endpoint(row: pd.Series) -> list[Any]:
         str(row["category"]),
     ]
 
+
 async def process_endpoint_void(row: pd.Series) -> list[Any]:
     endpoint = str(row["sparql_url"])
     row_id = str(row["id"])
@@ -504,6 +520,7 @@ async def process_endpoint_void(row: pd.Series) -> list[Any]:
         str(row["category"]),
     ]
 
+
 async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False) -> dict[str, Any]:
     row = pd.Series({"id": "", "sparql_url": endpoint, "category": ""})
     void_uri = await async_has_void_file(endpoint)
@@ -517,9 +534,9 @@ async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False)
     void_list = await process_endpoint_void(row)
     voc_tags = []
     comments = []
-    if ingest_lov:
+    if ingest_lov or Config.QUERY_LOV:
         voc_tags = find_tags_from_list(data_list[2])
-        comments = find_comments_from_lists(curi_list= data_list[3], puri_list=data_list[4])
+        comments = find_comments_from_lists(curi_list=data_list[3], puri_list=data_list[4])
 
     return {
         "id": endpoint,
@@ -539,7 +556,9 @@ async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False)
         "comments": comments
     }
 
+
 import os
+
 
 async def main_normal() -> None:
     logger.info("[MAIN] Starting asynchronous remote dataset processing (normal mode).")
