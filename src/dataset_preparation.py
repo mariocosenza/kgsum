@@ -10,7 +10,7 @@ from rdflib import Graph
 from rdflib.plugins.sparql import prepareQuery
 
 from config import Config
-from lov_data_preparation import find_tags_from_list, find_comments_from_lists
+from src.lov_data_preparation import find_tags_from_list, find_comments_from_lists
 from src.util import match_file_lod, CATEGORIES
 
 logging.basicConfig(level=logging.INFO)

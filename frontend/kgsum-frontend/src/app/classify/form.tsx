@@ -101,7 +101,7 @@ function InfiniteProgress({isVisible}: { isVisible: boolean }) {
                 <div className="flex-1 relative h-2 bg-muted rounded-full overflow-hidden">
                     <div className="absolute inset-0 h-full bg-primary rounded-full animate-progress-infinite"></div>
                 </div>
-                <span className="text-sm text-muted-foreground font-medium">Elaborando...</span>
+                <span className="text-sm text-muted-foreground font-medium">Computing...</span>
             </div>
             <style jsx>{`
         @keyframes progress-infinite {
