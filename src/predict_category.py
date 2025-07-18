@@ -60,6 +60,6 @@ if __name__ == "__main__":
         shutil.rmtree(directory_path)
     PREDICTOR = CategoryPredictor.get_predictor(
         classifier=ClassifierType.NAIVE_BAYES,
-        feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'tlds'],
+        feature_columns=['voc', 'curi', 'puri', 'lcn', 'lpn', 'lab', 'comments','tlds'],
         oversample=False
     )

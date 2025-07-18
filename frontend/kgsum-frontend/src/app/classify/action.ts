@@ -80,7 +80,7 @@ export async function createPost(
                 });
 
                 if (!response.ok) {
-                    let errorMessage = `Errore API (${response.status})`;
+                    let errorMessage = `Error API (${response.status})`;
 
                     try {
                         const errorData = await response.json();
@@ -99,7 +99,7 @@ export async function createPost(
                     }
 
                     return {
-                        message: `Errore: ${errorMessage}`,
+                        message: `Error: ${errorMessage}`,
                     };
                 }
 
@@ -211,7 +211,7 @@ export async function createPost(
                     }
                 } else {
                     // Error case - handle API errors
-                    let errorMessage = `Errore API (${response.status})`;
+                    let errorMessage = `Error API (${response.status})`;
 
                     try {
                         const errorData = await response.json();
@@ -240,7 +240,7 @@ export async function createPost(
                     }
 
                     return {
-                        message: `Errore: ${errorMessage}`,
+                        message: `Error: ${errorMessage}`,
                     };
                 }
 

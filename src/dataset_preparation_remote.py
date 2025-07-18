@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import os
 import xml.etree.ElementTree as eT
 from typing import Any
 
@@ -555,9 +556,6 @@ async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False)
         "tags": voc_tags,
         "comments": comments
     }
-
-
-import os
 
 
 async def main_normal() -> None:

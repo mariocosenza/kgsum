@@ -11,10 +11,10 @@
     "step_numbers": 10,
     "step_range": 16,
     "extract_sparql": true,
-    "query_lov": true
+    "query_lov": false
   },
   "processing" : {
-    "use_ner": true,
+    "use_ner": false,
     "use_filter": true
   },
   "training" : {

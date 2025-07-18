@@ -475,7 +475,7 @@ export const Form = () => {
                             </div>
 
                             {/* Display server validation errors */}
-                            {state?.message && state.message.includes("Errore") && (
+                            {state?.message && state.message.includes("Error") && (
                                 <div className="mt-6 p-4 rounded-lg border border-destructive/50 bg-destructive/10">
                                     <div className="flex items-start space-x-2">
                                         <AlertTriangleIcon className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0"/>

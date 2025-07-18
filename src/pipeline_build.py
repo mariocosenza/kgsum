@@ -114,31 +114,40 @@ def majority_vote(predictions: list[Any] | str | Tuple[Any, float, str]) -> Any:
         logger.info("No valid predictions available for majority vote.")
         return None
 
+    # Check if predictions contain tuples with scores/metrics
     if all(isinstance(p, (tuple, list)) and len(p) >= 2 for p in filtered):
-        weight_sum: dict[Any, float] = {}
+        # Find the prediction with the best (highest) metric score
+        best_prediction = None
+        best_score = float('-inf')
+
         for tup in filtered:
             label = tup[0]
             try:
-                w = float(tup[1])
+                score = float(tup[1])
+                if score > best_score:
+                    best_score = score
+                    best_prediction = label
             except Exception:
-                w = 1.0
-            weight_sum[label] = weight_sum.get(label, 0.0) + w
+                continue
 
-        if not weight_sum:
-            logger.info("No weighted predictions available for majority vote.")
+        if best_prediction is not None:
+            logger.info("Best model prediction: '%s' with score %.4f", best_prediction, best_score)
+            return best_prediction
+        else:
+            logger.info("No valid scored predictions available.")
             return None
 
-        best_label, best_weight = max(weight_sum.items(), key=lambda x: x[1])
-        logger.info("Weighted vote: '%s' with total weight %.4f", best_label, best_weight)
-        return best_label
-
+    # Fallback: if predictions are simple labels without scores, return the first one
     simple_labels = [p for p in filtered if not isinstance(p, (tuple, list))]
     if not simple_labels:
         simple_labels = [p[0] for p in filtered]
-    most_common = Counter(simple_labels).most_common(1)[0][0]
-    logger.info("Majority vote result: '%s'", most_common)
-    return most_common
 
+    if simple_labels:
+        first_prediction = simple_labels[0]
+        logger.info("Single model prediction: '%s'", first_prediction)
+        return first_prediction
+
+    return None
 
 def _predict_category_for_instance(
         models: dict[str, KnowledgeGraphClassifier],
@@ -583,7 +592,7 @@ class KnowledgeGraphClassifier:
             qlora_r: int = 32,
             qlora_alpha: int = 16,
             batch_size: int = 8,
-            epochs: int = 15
+            epochs: int = 6
     ) -> dict[str, Any] | None:
         torch.backends.cudnn.benchmark = True
         if not torch.cuda.is_available():

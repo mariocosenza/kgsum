@@ -60,4 +60,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main(classifier=ClassifierType.MLP, oversample=False)
