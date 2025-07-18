@@ -9,7 +9,7 @@ import aiohttp
 import pandas as pd
 
 from config import Config
-from lov_data_preparation import find_tags_from_list, find_comments_from_lists
+from src.lov_data_preparation import find_tags_from_list, find_comments_from_lists
 
 MAX_OFFSET = 1000
 ENDPOINT_TIMEOUT = 600

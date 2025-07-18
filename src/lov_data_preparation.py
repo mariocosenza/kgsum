@@ -8,9 +8,8 @@ import pandas as pd
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
 
-import util
 from config import Config
-from src.util import merge_dataset
+from src.util import merge_dataset, VOC_FILTER, CURI_PURI_FILTER
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vocabulary_extraction")
@@ -35,7 +34,7 @@ def find_tags_from_json(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER) 
 
         for voc in set(row['voc']):
             logger.info(f'Vocabulary: {voc}')
-            if voc_filter and voc in util.VOC_FILTER:
+            if voc_filter and voc in VOC_FILTER:
                 continue
             try:
                 if voc not in response_cache:
@@ -120,7 +119,7 @@ def find_voc_local(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER) -> pd
         all_tags = set()
         all_vocs = []
         for voc in set(row['voc']):
-            if voc_filter and voc in util.VOC_FILTER:
+            if voc_filter and voc in VOC_FILTER:
                 continue
             if count == 10000:
                 time.sleep(60)
@@ -163,7 +162,7 @@ def _process_row(row_column: Set[str], curi_filter=Config.USE_FILTER) -> Optiona
 
     for curi in row_column:
         if IS_URI.match(curi):
-            if curi_filter and curi in util.CURI_PURI_FILTER:
+            if curi_filter and curi in CURI_PURI_FILTER:
                 continue
             try:
                 sparql.setQuery(f"""

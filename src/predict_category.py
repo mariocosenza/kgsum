@@ -7,7 +7,7 @@ import pandas as pd
 import src.pipeline_build
 from src.pipeline_build import ClassifierType, majority_vote, predict_category_multi, save_multiple_models, \
     load_multiple_models
-from util import get_project_root, get_model_file_path, get_data_folder_path
+from src.util import get_project_root, get_model_file_path, get_data_folder_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

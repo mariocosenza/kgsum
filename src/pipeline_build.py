@@ -6,7 +6,6 @@ import os
 import pickle
 import re
 import warnings
-from collections import Counter
 from typing import Any, Tuple, NewType, TypeAlias
 
 import numpy as np
