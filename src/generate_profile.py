@@ -6,9 +6,9 @@ from typing import Any
 import aiohttp
 import pandas as pd
 
+from lov_data_preparation import IS_URI
 from src.dataset_preparation import process_file_full_inplace, logger
 from src.dataset_preparation_remote import process_endpoint_full_inplace
-from src.lov_data_preparation import IS_URI
 from src.predict_category import CategoryPredictor
 from src.preprocessing import process_all_from_input
 
