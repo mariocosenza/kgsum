@@ -29,15 +29,70 @@ export default async function SelectedVersionPage({params}: { params: Promise<{ 
 
     let content: string;
     try {
-        const markdownDocsDirectory = path.join(process.cwd(), 'src', 'app', 'documentation', '[versione]');
-        const filePath = path.join(markdownDocsDirectory, `${resolvedParams.versione}.md`);
+        // More robust path resolution - try multiple possible locations
+        const possiblePaths = [
+            // Original path
+            path.join(process.cwd(), 'src', 'app', 'documentation', '[versione]', `${resolvedParams.versione}.md`),
+            // Alternative: files in public directory
+            path.join(process.cwd(), 'public', 'docs', `${resolvedParams.versione}.md`),
+            // Alternative: files in docs directory at root
+            path.join(process.cwd(), 'docs', `${resolvedParams.versione}.md`),
+            // Alternative: files in same directory without brackets
+            path.join(process.cwd(), 'src', 'app', 'documentation', `${resolvedParams.versione}.md`),
+        ];
 
-        // Add a console.log to debug the exact path being attempted
-        console.log(`Attempting to read file: ${filePath}`);
+        console.log(`Working directory: ${process.cwd()}`);
+        console.log(`Looking for version: ${resolvedParams.versione}`);
+        console.log(`Available versions: ${VERSIONS.join(', ')}`);
+
+        let filePath: string | null = null;
+
+        // Try each possible path
+        for (const possiblePath of possiblePaths) {
+            try {
+                await fs.access(possiblePath);
+                filePath = possiblePath;
+                console.log(`Found file at: ${filePath}`);
+                break;
+            } catch {
+                console.log(`File not found at: ${possiblePath}`);
+            }
+        }
+
+        if (!filePath) {
+            // If no file found, try to list available files for debugging
+            for (const dir of [
+                path.join(process.cwd(), 'src', 'app', 'documentation', '[versione]'),
+                path.join(process.cwd(), 'public', 'docs'),
+                path.join(process.cwd(), 'docs'),
+                path.join(process.cwd(), 'src', 'app', 'documentation'),
+            ]) {
+                try {
+                    const files = await fs.readdir(dir);
+                    console.log(`Files in ${dir}:`, files);
+                } catch {
+                    console.log(`Directory does not exist: ${dir}`);
+                }
+            }
+
+            console.error(`No markdown file found for version: ${resolvedParams.versione}`);
+            redirect("/documentation/latest");
+            return; // This won't execute, but TypeScript needs it
+        }
 
         content = await fs.readFile(filePath, 'utf8');
-    } catch {
+        console.log(`Successfully read file: ${filePath}`);
+
+    } catch (error) {
+        console.error(`Error reading file:`, error);
+
+        // Additional debugging: check if it's a permission issue or file doesn't exist
+        if (error instanceof Error) {
+            console.error(`Error details: ${error.message}`);
+        }
+
         redirect("/documentation/latest");
+        return; // This won't execute, but TypeScript needs it
     }
 
     return (

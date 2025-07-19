@@ -1,11 +1,11 @@
-version: '3.8'
+name: kgsum
 
 services:
   ml:
     build:
       context: ../
       dockerfile: docker/ml/Dockerfile
-    container_name: ml-service
+    container_name: kgsum
     ports:
       - "5000:5000"
     environment:
@@ -18,7 +18,7 @@ services:
       - CLERK_MIDDLEWARE_ENABLED=${CLERK_MIDDLEWARE_ENABLED}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     restart: unless-stopped
-  #     command: ["bash", "boot.sh"]
+ #   command: ["bash", "boot.sh"]
 
   kgsum-frontend:
     build:
@@ -35,7 +35,7 @@ services:
       - NODE_ENV=production
       - PORT=80
       - TZ=UTC
-      - BUILD_DATE=2025-06-28 13:53:17
+      - BUILD_DATE=2025-07-18 14:02:05
       - BUILD_USER=mariocosenza
       - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
@@ -44,7 +44,7 @@ services:
     user: "0:0"
     labels:
       - "maintainer=mariocosenza"
-      - "build.date=2025-06-28 13:53:17"
+      - "build.date=2025-07-18 14:02:05"
       - "version=latest"
       - "project=kgsum-frontend"
     depends_on:

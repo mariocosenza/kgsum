@@ -2,6 +2,7 @@ import json
 import os
 from enum import Enum, auto
 
+
 class ClassifierType(Enum):
     SVM = "SVM"
     NAIVE_BAYES = "NAIVE_BAYES"
@@ -20,6 +21,7 @@ class Phase(Enum):
     TRAINING = "TRAINING"
     STORE = "STORE"
 
+
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "default_secret")
     USE_GEMINI: bool = True
@@ -35,7 +37,7 @@ class Config:
     USE_NER: bool = True
     USE_FILTER: bool = True
     CLASSIFIER: ClassifierType = ClassifierType.NAIVE_BAYES
-    FEATURES= ["CURI"]
+    FEATURES = ["CURI"]
     OVERSAMPLE: bool = False
     MAX_TOKEN: int = 800000
     USE_TF_IDF_AUTOENCODER: bool = True
@@ -43,15 +45,43 @@ class Config:
     STORE_PROFILE_AT_RUN: bool = False
     BASE_DOMAIN = "https://exemple.org"
     START_PHASE: Phase = Phase.TRAINING
-    STOP_PHASE: Phase =  Phase.TRAINING
+    STOP_PHASE: Phase = Phase.TRAINING
     ALLOWED_PHASE: list[Phase] = [Phase.PROCESSING, Phase.TRAINING]
 
     @staticmethod
     def init_configuration():
-        config_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(config_dir, "config.json")
-        with open(config_path, "r") as f:
-            config = json.load(f)
+        # Try multiple possible locations for the config file
+        possible_paths = [
+            # Current working directory (most common for Docker)
+            os.path.join(os.getcwd(), "config.json"),
+            # Same directory as this Python file
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json"),
+            # Root directory (common in Docker containers)
+            "/app/config.json",
+            # Parent directory
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json"),
+            # Default fallback
+            "config.json"
+        ]
+
+        config_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                config_path = path
+                break
+
+        if not config_path:
+            raise FileNotFoundError(
+                f"Config file not found. Searched in: {possible_paths}\n"
+                f"Current working directory: {os.getcwd()}\n"
+                f"File directory: {os.path.dirname(os.path.abspath(__file__))}"
+            )
+
+        try:
+            with open(config_path, "r") as f:
+                config = json.load(f)
+        except Exception as e:
+            raise Exception(f"Error reading config file at {config_path}: {e}")
 
         Config.USE_GEMINI = bool(config["labeling"].get("use_gemini", False))
         Config.SEARCH_GITHUB = bool(config["labeling"].get("search_github", False))
@@ -87,26 +117,33 @@ class Config:
 class ProductionConfig(Config):
     DEBUG = False
 
+
 class DevelopmentConfig(Config):
     DEBUG = True
+
 
 def _assign_enum_classifier(enum_string: str):
     return ClassifierType(enum_string.upper())
 
+
 def _assign_enum_phase(enum_string: str):
     return Phase(enum_string.upper())
 
+
 def _check_phase_order(phase: Phase, phase_2: Phase):
-     phase_order = [Phase.LABELING, Phase.EXTRACTION, Phase.PROCESSING, Phase.TRAINING, Phase.STORE]
-     if phase_order.index(phase) > phase_order.index(phase_2):
-         raise ValueError("Phase order is inconsistent")
+    phase_order = [Phase.LABELING, Phase.EXTRACTION, Phase.PROCESSING, Phase.TRAINING, Phase.STORE]
+    if phase_order.index(phase) > phase_order.index(phase_2):
+        raise ValueError("Phase order is inconsistent")
+
 
 def _phase_list(phase: Phase, phase_2: Phase) -> list[Phase]:
     phase_order = [Phase.LABELING, Phase.EXTRACTION, Phase.PROCESSING, Phase.TRAINING, Phase.STORE]
     list_phase = [phase]
     for phase_o in phase_order:
-        if phase_order.index(phase_o) >= phase_order.index(phase) and phase_order.index(phase_o) <= phase_order.index(phase_2):
+        if phase_order.index(phase_o) >= phase_order.index(phase) and phase_order.index(phase_o) <= phase_order.index(
+                phase_2):
             list_phase.append(phase_o)
     return list_phase
+
 
 Config.init_configuration()

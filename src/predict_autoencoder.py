@@ -9,7 +9,7 @@ import pandas as pd
 from autoencoder_pipeline import (
     ClassifierType, load_models, train_autoencoder_models, save_models,
 )
-from util import get_data_folder_path, get_project_root, get_model_file_path
+from src.util import get_data_folder_path, get_project_root, get_model_file_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,4 +60,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main(classifier=ClassifierType.MLP, oversample=False)

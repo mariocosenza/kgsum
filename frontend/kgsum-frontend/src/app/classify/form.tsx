@@ -101,7 +101,7 @@ function InfiniteProgress({isVisible}: { isVisible: boolean }) {
                 <div className="flex-1 relative h-2 bg-muted rounded-full overflow-hidden">
                     <div className="absolute inset-0 h-full bg-primary rounded-full animate-progress-infinite"></div>
                 </div>
-                <span className="text-sm text-muted-foreground font-medium">Elaborando...</span>
+                <span className="text-sm text-muted-foreground font-medium">Computing...</span>
             </div>
             <style jsx>{`
         @keyframes progress-infinite {
@@ -475,7 +475,7 @@ export const Form = () => {
                             </div>
 
                             {/* Display server validation errors */}
-                            {state?.message && state.message.includes("Errore") && (
+                            {state?.message && state.message.includes("Error") && (
                                 <div className="mt-6 p-4 rounded-lg border border-destructive/50 bg-destructive/10">
                                     <div className="flex items-start space-x-2">
                                         <AlertTriangleIcon className="w-5 h-5 text-destructive mt-0.5 flex-shrink-0"/>

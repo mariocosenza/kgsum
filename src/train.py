@@ -3,7 +3,7 @@ import logging
 import shutil
 from os import path, makedirs
 
-import dataset_extraction.endpoint_lod_service
+import src.dataset_extraction.endpoint_lod_service
 import dataset_extraction.github_search
 import dataset_extraction.zenodo_records_extraction
 import dataset_preparation_remote
@@ -11,10 +11,10 @@ import lov_data_preparation
 import predict_autoencoder
 import preprocessing
 from config import Config, Phase, ClassifierType
-from dataset_preparation import create_local_dataset, create_local_void_dataset
-from generate_profile import generate_profile_from_store
-from predict_category import CategoryPredictor
-from util import merge_zenodo_sparql, merge_github_sparql, get_data_folder_path
+from src.dataset_preparation import create_local_dataset, create_local_void_dataset
+from src.generate_profile import generate_profile_from_store
+from src.predict_category import CategoryPredictor
+from src.util import merge_zenodo_sparql, merge_github_sparql, get_data_folder_path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

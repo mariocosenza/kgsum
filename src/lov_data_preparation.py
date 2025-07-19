@@ -2,14 +2,14 @@ import logging
 import os
 import re
 import time
+from typing import List, Dict, Any, Set, Optional
 
 import pandas as pd
 import requests
 from SPARQLWrapper import SPARQLWrapper, JSON
 
-import util
 from config import Config
-from src.util import merge_dataset
+from src.util import merge_dataset, VOC_FILTER, CURI_PURI_FILTER
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vocabulary_extraction")
@@ -23,16 +23,18 @@ LOCAL_ENDPOINT_LOV = os.environ['LOCAL_ENDPOINT_LOV']
 session = requests.Session()
 
 
-def find_tags_from_json(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
+def find_tags_from_json(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER) -> List[str]:
     response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
     subject_list = []
     response_cache = {}
+
     for index, row in data_frame.iterrows():
         all_vocs = []
         all_tags = []
+
         for voc in set(row['voc']):
             logger.info(f'Vocabulary: {voc}')
-            if voc_filter and voc in util.VOC_FILTER:
+            if voc_filter and voc in VOC_FILTER:
                 continue
             try:
                 if voc not in response_cache:
@@ -49,7 +51,6 @@ def find_tags_from_json(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
 
             if response_lov.status_code == 200:
                 try:
-                    # Use the built-in json() method for parsing
                     response_dict = response_lov.json()
                     tags = response_dict.get('tags', [])
                     frame_tags = []
@@ -64,16 +65,19 @@ def find_tags_from_json(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
                     logger.error(f"Error parsing JSON for vocabulary {voc}: {e}")
 
         if all_vocs:
-            response_df.loc[len(response_df)] = {
+            # Create a new row as a dictionary and concatenate it to the DataFrame
+            new_row = pd.DataFrame([{
                 'id': row['id'],
                 'tags': all_tags,
                 'voc': all_vocs,
                 'category': row['category']
-            }
+            }])
+            response_df = pd.concat([response_df, new_row], ignore_index=True)
+
     return subject_list
 
 
-def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
+def _get_lov_search_result(uri: str, cache_dict: Dict[str, Any]) -> Optional[frozenset]:
     match = CLEAN_URI.search(uri)
     clean_uri = match.group(1) if match else uri
     if clean_uri not in cache_dict:
@@ -84,8 +88,8 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
             )
         except requests.exceptions.RequestException as e:
             logger.error(f"Request error for term search {uri}: {e}")
-            cache_dict[clean_uri] = ''
-            return ''
+            cache_dict[clean_uri] = None
+            return None
         if response_lov.status_code == 200:
             try:
                 buckets = response_lov.json().get('aggregations', {}) \
@@ -99,22 +103,23 @@ def _get_lov_search_result(uri, cache_dict) -> frozenset | str:
                     return frozenset_set
             except Exception as e:
                 logger.error(f"Error parsing term search for {uri}: {e}")
-        cache_dict[clean_uri] = ''
-        return ''
+        cache_dict[clean_uri] = None
+        return None
     else:
         return cache_dict[clean_uri]
 
 
-def find_voc_local(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
+def find_voc_local(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER) -> pd.DataFrame:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     count = 0
     response_df = pd.DataFrame(columns=['id', 'tags', 'voc', 'category'])
+
     for index, row in data_frame.iterrows():
         all_tags = set()
         all_vocs = []
         for voc in set(row['voc']):
-            if voc_filter and voc in util.VOC_FILTER:
+            if voc_filter and voc in VOC_FILTER:
                 continue
             if count == 10000:
                 time.sleep(60)
@@ -139,22 +144,25 @@ def find_voc_local(data_frame: pd.DataFrame, voc_filter=Config.USE_FILTER):
                     time.sleep(2)
                     continue
         if all_vocs:
-            response_df.loc[len(response_df)] = {
+            # Create a new row and concatenate it
+            new_row = pd.DataFrame([{
                 'id': row['id'],
                 'tags': list(all_tags),
                 'voc': all_vocs,
                 'category': row['category']
-            }
+            }])
+            response_df = pd.concat([response_df, new_row], ignore_index=True)
     return response_df
 
 
-def _process_row(row_column: set, curi_filter=Config.USE_FILTER) -> list[str] | None:
+def _process_row(row_column: Set[str], curi_filter=Config.USE_FILTER) -> Optional[List[str]]:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
-    all_comments = []
+    all_comments = set()
+
     for curi in row_column:
         if IS_URI.match(curi):
-            if curi_filter and curi in util.CURI_PURI_FILTER:
+            if curi_filter and curi in CURI_PURI_FILTER:
                 continue
             try:
                 sparql.setQuery(f"""
@@ -166,31 +174,37 @@ def _process_row(row_column: set, curi_filter=Config.USE_FILTER) -> list[str] | 
                         """)
                 res = sparql.query().convert()
                 comments = {term['o']['value'] for term in res['results']['bindings']}
-                all_comments.append(list(comments))
+                all_comments.update(comments)
                 time.sleep(0.1)
             except Exception as e:
                 logger.error(f'Error processing uri {curi}: {e}')
                 time.sleep(10)
                 continue
-    return all_comments if all_comments else None
+
+    return list(all_comments) if all_comments else None
 
 
-def find_local_curi_puri_comments(data_frame: pd.DataFrame):
+def find_local_curi_puri_comments(data_frame: pd.DataFrame) -> pd.DataFrame:
     response_df = pd.DataFrame(columns=['id', 'curi', 'puri', 'curi_comments', 'puri_comments', 'category'])
+
     for index, row in data_frame.iterrows():
         logger.info(f'Processing curi and puri in row: {index}')
         curi_set = set(row['curi'])
         puri_set = set(row['puri'])
         curi_comments = _process_row(curi_set)
         puri_comments = _process_row(puri_set)
-        response_df.loc[len(response_df)] = {
+
+        # Create new row and concatenate
+        new_row = pd.DataFrame([{
             'id': row['id'],
-            'curi': curi_set,
-            'puri': puri_set,
+            'curi': list(curi_set),  # Convert set to list for DataFrame storage
+            'puri': list(puri_set),  # Convert set to list for DataFrame storage
             'curi_comments': curi_comments,
             'puri_comments': puri_comments,
             'category': row['category']
-        }
+        }])
+        response_df = pd.concat([response_df, new_row], ignore_index=True)
+
     # Combine comments from curi and puri columns
     response_df['comments'] = response_df.apply(
         lambda x: (x['curi_comments'] or []) + (x['puri_comments'] or []), axis=1
@@ -198,17 +212,18 @@ def find_local_curi_puri_comments(data_frame: pd.DataFrame):
     return response_df
 
 
-def find_local_curi_puri_comments_combined(uri_list: list) -> list:
+def find_local_curi_puri_comments_combined(uri_list: List[str]) -> List[str]:
     comments = _process_row(set(uri_list))
-    return list(comments) if comments else []
+    return comments if comments else []
 
 
-def find_voc_local_combined(voc_list: list) -> list:
+def find_voc_local_combined(voc_list: List[str]) -> List[str]:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     all_tags = set()
     voc_list = set(voc_list)
     count = 0
+
     for voc in voc_list:
         logger.info(f'Processing voc {voc}')
         if count == 1000:
@@ -234,17 +249,19 @@ def find_voc_local_combined(voc_list: list) -> list:
     return list(all_tags)
 
 
-def _find_voc_tags_from_list(voc_list: list) -> list:
+def _find_voc_tags_from_list(voc_list: List[str]) -> List[str]:
     sparql = SPARQLWrapper(LOCAL_ENDPOINT_LOV)
     sparql.setReturnFormat(JSON)
     count = 0
-    tags = list(str)
+    tags = set()
+
     for voc in set(voc_list):
         if count == 10000:
             time.sleep(60)
             count = 0
         count += 1
         logger.info(f'Processing voc {voc}')
+
         if IS_URI.match(voc):
             try:
                 sparql.setQuery(f"""
@@ -262,17 +279,28 @@ def _find_voc_tags_from_list(voc_list: list) -> list:
                 time.sleep(2)
                 continue
 
-    return tags
+    return list(tags)
 
 
-def find_tags_from_list(voc_list: list) -> list:
-    return _find_voc_tags_from_list(voc_list)
+def find_tags_from_list(voc_list: List[str]) -> List[str]:
+    try:
+        return _find_voc_tags_from_list(voc_list)
+    except Exception as e:
+        logger.error(f'Error processing voc {voc_list}: {e}')
+        return []
 
 
-def find_comments_from_lists(curi_list: list, puri_list: list) -> list:
-    comments = _process_row(set(curi_list))
-    comments.extend(_process_row(set(puri_list)))
-    return list(comments)
+def find_comments_from_lists(curi_list: List[str], puri_list: List[str]) -> List[str]:
+    all_comments = []
+    curi_comments = _process_row(set(curi_list))
+    puri_comments = _process_row(set(puri_list))
+
+    if curi_comments:
+        all_comments.extend(curi_comments)
+    if puri_comments:
+        all_comments.extend(puri_comments)
+
+    return all_comments
 
 
 def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
@@ -285,10 +313,9 @@ def find_comments_and_voc_tags(data_frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def main():
-    merged_df = merge_dataset()  # merge_dataset() should return a DataFrame
+    merged_df = merge_dataset()
     result_df = find_comments_and_voc_tags(merged_df)
     result_df.to_json('../data/raw/lov_cloud/voc_cmt.json', orient='records')
-    # Close the global session when done
     session.close()
 
 

@@ -11,6 +11,7 @@ COPY data/trained ./data/trained
 COPY environment.yml .
 COPY app.py .
 COPY config.py .
+COPY config.json .
 
 RUN chmod +x boot.sh
 

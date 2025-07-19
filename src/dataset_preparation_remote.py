@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import os
 import xml.etree.ElementTree as eT
 from typing import Any
 
@@ -8,7 +9,7 @@ import aiohttp
 import pandas as pd
 
 from config import Config
-from lov_data_preparation import find_tags_from_list, find_comments_from_lists
+from src.lov_data_preparation import find_tags_from_list, find_comments_from_lists
 
 MAX_OFFSET = 1000
 ENDPOINT_TIMEOUT = 600
@@ -555,9 +556,6 @@ async def process_endpoint_full_inplace(endpoint: str, ingest_lov: bool = False)
         "tags": voc_tags,
         "comments": comments
     }
-
-
-import os
 
 
 async def main_normal() -> None:

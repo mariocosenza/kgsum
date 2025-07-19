@@ -264,13 +264,16 @@ def process_row(
     if not isinstance(lab_raw, list):
         lab_raw = [lab_raw] if lab_raw else []
 
-    # Process each lab item individually
+    # Process each lab item individually with proper whitespace handling
     lab_normalized = []
     for lab_item in lab_raw:
-        if isinstance(lab_item, str) and lab_item.strip():
-            normalized = spacy_clean_normalize_single(lab_item, pipeline_dict_int, fallback_pipeline_int)
-            if normalized:
-                lab_normalized.append(normalized)
+        if isinstance(lab_item, str):
+            # Strip whitespace before processing
+            lab_item_stripped = lab_item.strip()
+            if lab_item_stripped:  # Only process non-empty strings after stripping
+                normalized = spacy_clean_normalize_single(lab_item_stripped, pipeline_dict_int, fallback_pipeline_int)
+                if normalized and normalized.strip():  # Ensure the result is not just whitespace
+                    lab_normalized.append(normalized.strip())
 
     lab_text = " ".join(lab_normalized)
 
@@ -476,6 +479,10 @@ def process_all_from_input(
         df, pipeline_dict, fallback_pipeline
     )
 
+    tags = []
+    if Config.QUERY_LOV:
+        tags = remove_duplicates(input_data.get("tags", []))
+
     return {
         "id": remove_duplicates(combined_df["id"].tolist()),
         "title": remove_duplicates(combined_df["title"].tolist()),
@@ -494,6 +501,7 @@ def process_all_from_input(
         "sbj": remove_duplicates(void_df["sbj"].tolist()),
         "ner": remove_duplicates(sum(combined_df["ner"].tolist(), [])),
         "con": remove_duplicates(combined_df["con"].tolist()),
+        "tags": tags
     }
 
 
@@ -534,7 +542,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(
-        use_ner=not args.no_ner,
+        use_ner=args.no_ner,
         use_gpu=args.gpu,
-        enable_filter=not args.no_filter
+        enable_filter=args.no_filter
     )
