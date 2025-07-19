@@ -481,7 +481,7 @@ def process_all_from_input(
 
     tags = []
     if Config.QUERY_LOV:
-        tags = remove_duplicates(input_data["tags"])
+        tags = remove_duplicates(input_data.get("tags", []))
 
     return {
         "id": remove_duplicates(combined_df["id"].tolist()),
