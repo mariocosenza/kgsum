@@ -78,7 +78,7 @@ USER mariocosenza
 
 # Expose port 80
 EXPOSE 80
-EXPOSE 433
+EXPOSE 443
 
 # Set port to 80 for Next.js 15
 ENV PORT=80
