@@ -63,7 +63,7 @@ async def generate_profile(endpoint: str | None = None, file: str | None = None)
     except Exception as e:
         logger.error(f"Profile generation failed: {e}")
         return {
-            'error': f'Profile generation failed: {str(e)}'
+            'error': 'An internal error occurred during profile generation.'
         }
 
 
@@ -85,7 +85,7 @@ async def generate_and_store_profile(
     except Exception as e:
         logger.error(f"Profile generation and storage failed: {e}")
         return {
-            'error': f'Profile generation and storage failed: {str(e)}'
+            'error': 'An internal error occurred during profile generation and storage.'
         }
 
 

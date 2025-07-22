@@ -23,7 +23,7 @@ async def generate_profile_service(endpoint: str, sparql: bool = False) -> dict:
             os.remove(path=endpoint)
             return result
         except Exception as e:
-            raise ValueError(f'Cannot process the given Knowledge Graph {e}')
+            raise ValueError('Cannot process the given Knowledge Graph due to an internal error.')
 
 
 async def generate_profile_service_store(endpoint: str, sparql=False):
@@ -36,4 +36,4 @@ async def generate_profile_service_store(endpoint: str, sparql=False):
             os.remove(path=endpoint)
             return result
         except Exception as e:
-            raise ValueError(f'Cannot process the given Knowledge Graph {e}')
+            raise ValueError('Cannot process the given Knowledge Graph due to an internal error.')
