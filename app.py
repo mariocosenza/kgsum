@@ -218,6 +218,8 @@ async def rdf_profile():
     if result is None:
         return jsonify({"error": "Profile generation failed unexpectedly"}), 500
 
+    if 'error' in result:
+        return jsonify({"error": result['error']}), 500
     return jsonify(result), 200
 
 
