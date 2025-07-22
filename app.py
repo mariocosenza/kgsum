@@ -219,6 +219,7 @@ async def rdf_profile():
         return jsonify({"error": "Profile generation failed unexpectedly"}), 500
 
     if 'error' in result:
+        app.logger.error(f"Profile generation returned an error: {result['error']}")  # Log the error details
         return jsonify({"error": result['error']}), 500
     return jsonify(result), 200
 
