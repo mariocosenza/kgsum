@@ -108,8 +108,8 @@ class Config:
         Config.STORE_PROFILE_AT_RUN = bool(config["profile"].get("store_profile_at_run", False))
         Config.BASE_DOMAIN = config["profile"].get("base_domain", "https://exemple.org")
 
-        Config.START_PHASE = _assign_enum_phase(config["general_setting"].get("start_phase", "NO"))
-        Config.STOP_PHASE = _assign_enum_phase(config["general_setting"].get("stop_phase", "NO"))
+        Config.START_PHASE = _assign_enum_phase(config["general_settings"].get("start_phase", "NO"))
+        Config.STOP_PHASE = _assign_enum_phase(config["general_settings"].get("stop_phase", "NO"))
         _check_phase_order(Config.START_PHASE, Config.STOP_PHASE)
         Config.ALLOWED_PHASE = _phase_list(phase=Config.START_PHASE, phase_2=Config.STOP_PHASE)
 
