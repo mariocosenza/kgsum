@@ -155,7 +155,7 @@ class OllamaGemmaPredictor:
 
 
 class GeminiPredictor:
-    def __init__(self, temperature=0.0, model="models/gemini-2.0-flash", max_retries=5, initial_wait=10):
+    def __init__(self, temperature=0.0, model="models/gemini-2.5-flash", max_retries=5, initial_wait=10):
         self.temperature = temperature
         self.model = model
         self.key = os.environ.get("GEMINI_API_KEY")
@@ -291,11 +291,6 @@ class GeminiPredictor:
         logging.info(f"Gemini final precision: {precision:.4f}")
         logging.info(f"Gemini final recall:    {recall:.4f}")
         logging.info(f"Gemini final f1_score:  {f1:.4f}")
-        print(f"\nGemini final metrics (from predict_frame):")
-        print(f"  Accuracy : {acc:.4f}")
-        print(f"  Precision: {precision:.4f}")
-        print(f"  Recall   : {recall:.4f}")
-        print(f"  F1       : {f1:.4f}\n")
 
         return frame
 
@@ -317,7 +312,7 @@ if __name__ == "__main__":
         system_message_internal=system_message
     )
 
-    # # Gemini 2 Flash
+    # Gemini 2 Flash
     # gemini_predictor = GeminiPredictor(
     #     temperature=0.2,
     #     model="models/gemini-2.0-flash"
@@ -326,6 +321,6 @@ if __name__ == "__main__":
     #     df,
     #     content_column="comments",
     #     category_column="category",
-    #     system_message=system_message
+    #     system_message_internal=system_message
     # )
     # print(df_with_gemini_preds)
