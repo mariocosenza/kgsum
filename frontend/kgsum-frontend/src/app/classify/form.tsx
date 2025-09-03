@@ -283,7 +283,7 @@ export const Form = () => {
                                     className="w-full"
                                 >
                                     <div className="flex justify-center mb-6">
-                                        {UPLOAD? <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
+                                        {UPLOAD ? <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
                                             <TabsTrigger value="SPARQL" id="tab-sparql" className="text-center text-sm">
                                                 SPARQL
                                             </TabsTrigger>
