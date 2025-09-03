@@ -47,6 +47,7 @@ class Config:
     START_PHASE: Phase = Phase.TRAINING
     STOP_PHASE: Phase = Phase.TRAINING
     ALLOWED_PHASE: list[Phase] = [Phase.PROCESSING, Phase.TRAINING]
+    ALLOW_UPLOAD: bool = False
 
     @staticmethod
     def init_configuration():
@@ -108,6 +109,7 @@ class Config:
         Config.STORE_PROFILE_AT_RUN = bool(config["profile"].get("store_profile_at_run", False))
         Config.BASE_DOMAIN = config["profile"].get("base_domain", "https://exemple.org")
 
+        Config.ALLOW_UPLOAD = bool(config["general_settings"].get("allow_upload", False))
         Config.START_PHASE = _assign_enum_phase(config["general_settings"].get("start_phase", "NO"))
         Config.STOP_PHASE = _assign_enum_phase(config["general_settings"].get("stop_phase", "NO"))
         _check_phase_order(Config.START_PHASE, Config.STOP_PHASE)

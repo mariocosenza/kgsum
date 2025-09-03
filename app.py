@@ -8,6 +8,7 @@ from flask import Flask
 from flask import request, jsonify, g
 from werkzeug.utils import secure_filename
 
+from config import Config
 from src.service.generate_profile_service import load_classifier
 from src.service.file_upload_service import UPLOAD_FOLDER, allowed_file
 from src.service.generate_profile_service import generate_profile_service_store, generate_profile_service
@@ -180,11 +181,16 @@ async def rdf_profile():
               type: object
       400:
         description: Bad request (missing file or invalid parameters)
+      403:
+        description: Permission denied
       429:
         description: Too many active requests
       500:
         description: Server overloaded or internal error
     """
+    if not Config.ALLOW_UPLOAD:
+        app.logger.error(f"Profile generation returned an error: No permission to upload file")  # Log the error details
+        return jsonify({"error": "No permission to upload file"}), 403
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
 
