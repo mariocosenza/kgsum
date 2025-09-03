@@ -10,6 +10,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 import {Button} from "@/components/ui/button";
 import {Textarea} from "@/components/ui/textarea";
 import Link from "next/link";
+const UPLOAD =  process.env.UPLOAD === 'true' || false
 
 function FileIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -241,7 +242,11 @@ export const Form = () => {
 
     // Reset form when switching tabs
     const handleTabChange = (newTab: string) => {
-        setTab(newTab as "SPARQL" | "DUMP");
+        if (UPLOAD) {
+            setTab(newTab as "SPARQL" | "DUMP");
+        } else {
+            setTab(newTab as "SPARQL");
+        }
         // Reset form state when switching tabs
         setSparqlUrl("");
         setHasFile(false);
@@ -278,14 +283,19 @@ export const Form = () => {
                                     className="w-full"
                                 >
                                     <div className="flex justify-center mb-6">
-                                        <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
+                                        {UPLOAD? <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
                                             <TabsTrigger value="SPARQL" id="tab-sparql" className="text-center text-sm">
                                                 SPARQL
                                             </TabsTrigger>
                                             <TabsTrigger value="DUMP" id="tab-dump" className="text-center text-sm">
                                                 DUMP
                                             </TabsTrigger>
+                                        </TabsList> : <TabsList className="grid w-full max-w-md grid-cols-1 h-10">
+                                            <TabsTrigger value="SPARQL" id="tab-sparql" className="text-center text-sm">
+                                                SPARQL
+                                            </TabsTrigger>
                                         </TabsList>
+                                        }
                                     </div>
 
                                     {/* Fixed height container for consistent tab content height */}
@@ -313,7 +323,7 @@ export const Form = () => {
                                             </div>
                                         </TabsContent>
 
-                                        <TabsContent value="DUMP" className="space-y-4 mt-0">
+                                        {UPLOAD && <TabsContent value="DUMP" className="space-y-4 mt-0">
                                             <Card
                                                 className="border-2 border-dashed border-muted hover:border-muted-foreground/50 transition-colors min-h-[180px]">
                                                 <CardContent
@@ -397,7 +407,7 @@ export const Form = () => {
                                                     </p>
                                                 </div>
                                             )}
-                                        </TabsContent>
+                                        </TabsContent> }
                                     </div>
                                 </Tabs>
                             </div>
