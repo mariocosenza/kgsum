@@ -193,12 +193,13 @@ Configure the backend by editing `config.json`:
   },
   "profile": {
     "store_profile_after_training": false,
-    "base_domain": "https://exemple.org"
+    "base_domain": "https://example.org"
   },
-  "general_setting": {
+  "general_settings": {
     "info": "Possible classifiers: SVM, NAIVE_BAYES, KNN, J48, MISTRAL, MLP, DEEP, BATCHNORM, Phase: LABELING, EXTRACTION, PROCESSING, TRAINING, STORE",
     "start_phase": "labeling",
-    "stop_phase": "training"
+    "stop_phase": "training",
+    "allow_upload": "false"
   }
 }
 ```
