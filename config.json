@@ -32,6 +32,6 @@
     "info": "Possible classifiers: SVM, NAIVE_BAYES, KNN, J48, MISTRAL, MLP, DEEP, BATCHNORM, Phase: LABELING, EXTRACTION, PROCESSING, TRAINING, STORE",
     "start_phase": "labeling",
     "stop_phase": "training",
-    "allow_upload": "false"
+    "allow_upload": false
   }
 }

@@ -10,7 +10,7 @@ import {Checkbox} from "@/components/ui/checkbox";
 import {Button} from "@/components/ui/button";
 import {Textarea} from "@/components/ui/textarea";
 import Link from "next/link";
-const UPLOAD =  process.env.UPLOAD === 'true' || false
+const UPLOAD = process.env.UPLOAD === 'true';
 
 function FileIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
@@ -283,7 +283,7 @@ export const Form = () => {
                                     className="w-full"
                                 >
                                     <div className="flex justify-center mb-6">
-                                        {UPLOAD? <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
+                                        {UPLOAD ? <TabsList className="grid w-full max-w-md grid-cols-2 h-10">
                                             <TabsTrigger value="SPARQL" id="tab-sparql" className="text-center text-sm">
                                                 SPARQL
                                             </TabsTrigger>
